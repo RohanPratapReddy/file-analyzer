@@ -28,6 +28,26 @@ Pass `--no-git` to census every file on disk instead. On success a JSON summary 
 printed to stdout. On failure the engine keeps its `temp/` staging dir for
 debugging and the process exits non-zero.
 
+> **Driving this from a script or an AI agent?** Add **`--quiet`** so the engine's
+> progress lines go to stderr and **stdout carries only the final JSON** — safe to
+> pipe straight into a parser. See [Part 4 — AI agents (MCP)](#part-4--ai-agents-mcp)
+> for the MCP server and the cross-agent guide.
+
+### Installing it as a command
+
+You can run the CLI three ways — all equivalent:
+
+```bash
+python -m src.main <source-dir> --out ./artifacts     # from the repo root
+python src/main.py <source-dir> --out ./artifacts      # by path, from any cwd
+file-analyzer <source-dir> --out ./artifacts           # after `pip install .`
+```
+
+`pip install .` (or `pipx install .`) puts a **`file-analyzer`** command on your
+`PATH`, invocable from any directory, and a **`file-analyzer-mcp`** command that
+starts the MCP server. Everything documented below applies identically to all
+three forms.
+
 ---
 
 ## Part 1 — Full-pipeline arguments
@@ -43,6 +63,7 @@ debugging and the process exits non-zero.
 | `--dialect {sqlite,postgresql,pgsql}` | `sqlite` | SQL dump dialect. Use `postgresql` for a `psql`-loadable dump (what the docker loader wants). |
 | `--temp PATH` | `<out>/temp` | Staging dir for intermediate files. Point it somewhere writable when the source tree is read-only (e.g. in a container). |
 | `--keep-temp` | off | Keep the `temp/` staging dir on success (for debugging). |
+| `-q`, `--quiet` | off | Route the engine's incidental progress lines to stderr so **stdout carries only the final JSON result**. Use it when piping to a parser or driving from an agent. Applies to component mode too. |
 
 ### Concurrency
 
@@ -324,6 +345,52 @@ copies tables only) and [`views/README.md`](views/README.md) for the view layer.
 
 ---
 
+## Part 4 — AI agents (MCP)
+
+`file-analyzer` ships an **[MCP](https://modelcontextprotocol.io) server** so AI
+agents (Claude Code/Desktop, opencode, Cursor, Cline, Windsurf, Antigravity, …)
+can drive the engine directly. The intended loop is **analyze once, then ask
+questions with SQL** over the `v_*` views — the agent writes ordinary `SELECT`s
+instead of parsing walls of text.
+
+```bash
+pip install -r requirements-agent.txt     # the MCP SDK (mcp[cli])
+python -m src.mcp_server                   # stdio transport
+#   or, after `pip install .`:  file-analyzer-mcp
+
+# register with an agent (Claude Code shown; others take the same command):
+claude mcp add file-analyzer -- python -m src.mcp_server
+```
+
+### Tools
+
+| tool | what it does |
+|------|--------------|
+| `analyze_repository(path, out_dir?, dialect?, no_git?, workers?)` | Run the full pipeline; returns the JSON summary incl. the `database` path. Output defaults to `<path>/.file-analyzer`. |
+| `query(sql, db_path, limit?)` | Run a **single read-only** `SELECT`/`WITH` against the database (opened `mode=ro` + `PRAGMA query_only`). |
+| `list_views(db_path)` | List the installed `v_*` analysis views. |
+| `describe_schema(db_path, include_views?)` | Base tables + columns, plus the view catalog SQL. |
+| `run_component(component, path, out_dir?)` | Run one analyzer block (a language/plane/`census`) in isolation — the [Part 2](#part-2--component-mode-run-the-modules-separately) blocks. |
+| `list_components()` | Enumerate valid `run_component` names. |
+
+Resource `file-analyzer://views` returns the full view catalog (name, base tables,
+SQL) as JSON for context. The MCP server wraps the **same** in-process engine as
+the CLI, and routes the engine's stdout chatter to stderr so it never corrupts the
+JSON-RPC stream.
+
+### Other agent surfaces
+
+- **[`../AGENTS.md`](../AGENTS.md)** — the cross-agent driving guide (both the MCP
+  and the `--quiet` CLI paths, plus a question → SQL cheat-sheet).
+- **[`../tools.json`](../tools.json)** — JSON-schema function definitions to drop
+  into a function-calling `tools` array (Grok/DeepSeek/OpenAI-style).
+- **[`../.claude/skills/file-analyzer/SKILL.md`](../.claude/skills/file-analyzer/SKILL.md)**
+  — a Claude Code skill so the analyzer is reached for proactively on whole-repo
+  questions.
+- Non-MCP agents can just shell out to `file-analyzer … --quiet` and parse stdout.
+
+---
+
 ## Exit codes
 
 | code | meaning |
@@ -336,6 +403,9 @@ copies tables only) and [`views/README.md`](views/README.md) for the view layer.
 
 - [`../README.md`](../README.md) — project overview, the views layer, the Go/Java
   readers, and the Docker workflow.
+- [Part 4 — AI agents (MCP)](#part-4--ai-agents-mcp) and [`../AGENTS.md`](../AGENTS.md)
+  — drive the engine from Claude/opencode/Cursor/Grok/DeepSeek/… via the MCP server,
+  `tools.json`, or the `--quiet` CLI.
 - `python -m src.views --help` — install/list/read the `v_*` analysis views over an
   existing database.
 - `docker compose --profile engine run --build engine --help` — the same

@@ -7,9 +7,15 @@ Start here:
 
 - **[USAGE.md](USAGE.md)** — the `python -m src.main` CLI surface: every flag for
   the full pipeline, plus **component mode** (`--component NAME`) for running one
-  block standalone. Read this first.
+  block standalone, the `--quiet` pure-JSON contract, and
+  [Part 4 — AI agents (MCP)](USAGE.md#part-4--ai-agents-mcp). Read this first.
 - **[../README.md](../README.md)** — project overview: what the tool produces, the
   views layer, the Go/Java readers, and the Docker workflow.
+- **[../AGENTS.md](../AGENTS.md)** — driving `file-analyzer` from an AI agent
+  (Claude, opencode, Cursor, Grok, DeepSeek, …): the MCP server
+  ([`src/mcp_server.py`](../src/mcp_server.py)), the `--quiet` CLI, and
+  [`../tools.json`](../tools.json) function-calling definitions. A Claude Code skill
+  lives at [`../.claude/skills/file-analyzer/SKILL.md`](../.claude/skills/file-analyzer/SKILL.md).
 
 Below, one folder per `src/` subpackage. Each doc explains what that module does,
 how to use it on its own (component-mode CLI where one exists, plus the Python
