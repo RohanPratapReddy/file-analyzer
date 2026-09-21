@@ -1,0 +1,71 @@
+# =============================================================================
+# tabgen "readers" — Python analysis pipeline dependencies
+# =============================================================================
+# The reader package (src/) has a PURE-STDLIB CORE: RepositoryAnalyzer, the
+# router, all {Lang}Analyzers, SchemaAnalyzer, DatabaseAnalyzer, the archive and
+# machine-code/binary forensic layers, and the SQLite db-generator all run with
+# NOTHING installed but CPython. `from src import AnalysisEngine` and a full
+# repository -> SQLite run work on a bare interpreter.
+#
+# Every package below is therefore OPTIONAL. Each is imported lazily and guarded
+# (inside a function / try-except); when it is absent the corresponding format
+# still analyzes but DEGRADES to a bounded metadata/"partial" profile instead of
+# a full deep parse. Installing a package upgrades those files from "partial" to
+# "ok" (richer schema, real statistics, decoded frames) — it never changes
+# routing and never turns a real parser into a stub.
+#
+# Pinning: intentionally unpinned. The guards tolerate any modern release; pin in
+# a downstream lockfile if you need reproducibility. A few packages (GDAL,
+# python-snappy) require system libraries — see the notes on those lines.
+#
+# Install everything:      pip install -r requirements.txt
+# Minimal / core only:     install nothing (stdlib is enough)
+# =============================================================================
+
+# --- Tabular / numeric / columnar data (DataAnalyzer) ------------------------
+numpy                    # tensor/array stats, .npy/.npz, dtype/shape profiling
+pandas                   # csv/tsv/parquet/excel dataframes: dtypes, null/min/max
+pyarrow                  # parquet / arrow / feather / ORC readers
+
+# --- Serialization & config formats ------------------------------------------
+PyYAML                   # .yaml/.yml parsing (config, schema, DataAnalyzer)
+msgpack                  # MessagePack ML-container + wire-format decode
+
+# --- Compression / archive containers (ArchiveAnalyzer) ----------------------
+zstandard                # .zst / .zstd streams
+lz4                      # .lz4 streams
+Brotli                   # .br streams
+python-snappy            # .snappy streams  (needs system libsnappy)
+py7zr                    # .7z archive extraction
+rarfile                  # .rar archive listing (needs `unrar`/`bsdtar` on PATH)
+
+# --- Documents & office ------------------------------------------------------
+openpyxl                 # .xlsx workbook sheets/cells (DataAnalyzer)
+pypdf                    # .pdf page/metadata extraction
+
+# --- Images & graphics -------------------------------------------------------
+Pillow                   # raster images: dimensions/mode/EXIF-technical tags
+opencv-python-headless   # video frame probing + advanced image metrics
+rawpy                    # camera RAW (.cr2/.nef/.arw/...) technical metadata
+
+# --- Audio & video -----------------------------------------------------------
+soundfile                # wav/flac/ogg PCM properties (sample rate, channels)
+mutagen                  # audio container tags (mp3/flac/m4a technical fields)
+torchaudio               # audio tensor/codec metrics (media_metrics)
+
+# --- Scientific / imaging / geospatial (science_formats, DataAnalyzer) -------
+h5py                     # HDF5 (.h5/.hdf5) group/dataset structure
+pydicom                  # DICOM technical tags ONLY (no PII/pixel payload)
+nibabel                  # NIfTI (.nii/.nii.gz) neuroimaging headers
+laspy                    # LAS/LAZ point-cloud headers
+GDAL                     # GeoTIFF/geospatial rasters (needs system GDAL libs)
+
+# --- ML model / tensor containers (model_formats, DataAnalyzer) --------------
+torch                    # .pt/.pth state-dict + per-layer model tables
+onnx                     # .onnx graph structure / initializers
+flax                     # JAX/Flax checkpoint structures
+transformers             # model-config / tokenizer metadata (media_metrics)
+
+# --- Source-code parsing (prog_lang, optional accelerator) -------------------
+tree-sitter              # precise CST parsing engine for {Lang}Analyzers
+tree-sitter-languages    # prebuilt grammars used by the tree-sitter path

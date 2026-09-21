@@ -216,3 +216,33 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ---------------------------------------------------------------------------
+# file-analyzer: project-specific build outputs & generated artifacts
+# ---------------------------------------------------------------------------
+
+# Go reader/plane binaries (regenerated via `go build`) -- Windows and Unix.
+# The Go SOURCE (plane.go, main.go, go.mod, go.sum) IS tracked; only the
+# compiled binaries are ignored.
+*.exe
+src/views/go/repo-reader
+src/router/go/analysis-plane
+
+# Java compiled classes (regenerated via `javac`). The bundled JDBC/SLF4J
+# .jar dependencies under src/views/java/ ARE intentionally tracked (they are
+# runtime dependencies, not build outputs) -- do NOT add *.jar here.
+*.class
+src/views/java/out/
+
+# AnalysisEngine output artifacts (produced by `python -m src.main`):
+# the emitted database, the .sql dump, and the default --out directory.
+/artifacts/
+*.db
+*.sqlite
+repository.db
+repository_schema.sql
+
+# Standalone-component / analyzer JSON dumps (produced by running individual
+# analyzers, e.g. code_analysis.json / polyglot_analysis.json) -- run outputs,
+# not source.
+*_analysis.json

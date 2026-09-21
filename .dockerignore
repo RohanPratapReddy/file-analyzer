@@ -1,0 +1,28 @@
+# =============================================================================
+# Build context for the images (Dockerfile).
+# =============================================================================
+# The `loader` stage is fully self-contained: it apt-installs pgloader + the psql
+# client and inlines its load script via a Dockerfile heredoc. It COPYs NOTHING
+# from the tree. The other stages need source:
+#   * `go-build`/`reader` -> the Go VIEW-reader under src/views/go (+ src/views/sql).
+#   * `engine`            -> the whole src/ Python package (runs `python -m src.main`).
+#
+# So: exclude everything, then re-include the src/ package. This keeps the
+# context to just what the source-using stages compile/run.
+*
+
+!src/**
+
+# Never bring caches or build outputs into the context.
+**/__pycache__/
+*.pyc
+src/views/go/repo-reader
+src/views/go/repo-reader.exe
+src/views/go/*.exe
+src/router/go/analysis-plane
+src/router/go/*.exe
+src/router/java/out/
+
+# (The AnalysisEngine artifacts are NOT baked into any image -- they are
+#  bind-mounted at runtime: /artifacts (loader/reader/engine) and /workspace
+#  (engine source repo) by db.docker-compose.yml.)

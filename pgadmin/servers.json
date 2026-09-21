@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "tabgen (AnalysisEngine)",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "repository",
+      "Username": "sentinel",
+      "SSLMode": "prefer",
+      "Comment": "Postgres backend loaded from AnalysisEngine .db / .sql artifacts. Password: sentinel (default)."
+    }
+  }
+}
