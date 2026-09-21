@@ -1,0 +1,10 @@
+# =============================================================================
+# file-analyzer -- AI-agent integration dependencies
+# =============================================================================
+# Only needed to run the MCP server (src/mcp_server.py). The CLI and library work
+# without this. The engine's own analysis extras are in requirements.txt.
+#
+#     pip install -r requirements-agent.txt
+# =============================================================================
+
+mcp[cli]                 # Model Context Protocol SDK (FastMCP, stdio transport)

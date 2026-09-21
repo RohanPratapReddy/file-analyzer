@@ -237,6 +237,8 @@ src/views/java/out/
 # AnalysisEngine output artifacts (produced by `python -m src.main`):
 # the emitted database, the .sql dump, and the default --out directory.
 /artifacts/
+# Default output dir for the MCP server's analyze_repository (src/mcp_server.py).
+.file-analyzer/
 *.db
 *.sqlite
 repository.db

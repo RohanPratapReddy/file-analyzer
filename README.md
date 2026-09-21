@@ -41,14 +41,60 @@ python -m src.main --help
 
 Flags: `--out`, `--db`, `--sql`, `--dialect {sqlite,postgresql}`, `--temp`
 (staging dir; defaults under `--out`, so a read-only source still analyzes),
-`--workers`, `--no-archives`, `--no-git`, `--keep-temp`. Prints a JSON summary on
-success.
+`--workers`, `--no-archives`, `--no-git`, `--keep-temp`, `--quiet` (stdout carries
+only the final JSON — for pipes/agents). Prints a JSON summary on success.
+
+### Install as a command
+
+`pip`/`pipx`-install to get a `file-analyzer` command invocable from any directory
+(no `python -m`, no specific cwd):
+
+```bash
+pipx install .            # or: pip install .
+file-analyzer /path/to/repo --out ./artifacts --quiet
+file-analyzer-mcp         # start the MCP server (extras: pip install ".[agent]")
+```
+
+### Or one-line Docker (no local Python)
+
+The Dockerfile's `engine` stage runs the analyzer over a repo mounted at
+`/workspace` and writes artifacts to `/artifacts`:
+
+```bash
+docker build --target engine -t file-analyzer .
+docker run --rm -v "$PWD:/workspace:ro" -v "$PWD/artifacts:/artifacts" \
+  file-analyzer /workspace --out /artifacts --quiet
+```
 
 Then query the result:
 
 ```bash
 sqlite3 ./artifacts/repository.db "SELECT * FROM v_extension_distribution;"
 ```
+
+## Use with AI agents (MCP)
+
+`file-analyzer` ships an [MCP](https://modelcontextprotocol.io) server so agents
+(Claude Code/Desktop, opencode, Cursor, Cline, Windsurf, …) can drive the engine.
+The intended loop is **analyze once, then ask questions with SQL** over the `v_*`
+views — the agent writes ordinary `SELECT`s instead of parsing walls of text.
+
+```bash
+pip install -r requirements-agent.txt      # the MCP SDK
+python -m src.mcp_server                    # stdio transport
+
+# register with Claude Code (other agents take the same command in their config):
+claude mcp add file-analyzer -- python -m src.mcp_server
+```
+
+Tools: `analyze_repository`, `query`, `list_views`, `describe_schema`,
+`run_component`, `list_components`. `query` is read-only (`mode=ro` +
+`PRAGMA query_only`, single `SELECT`/`WITH` only).
+
+Not using MCP? The CLI is agent-friendly too: pass **`--quiet`** so stdout carries
+only the final JSON (progress goes to stderr), and see **[`AGENTS.md`](AGENTS.md)**
+for the driving guide and **[`tools.json`](tools.json)** for function-calling
+(Grok/DeepSeek/OpenAI-style) tool definitions.
 
 ## Using the pipeline as a library
 

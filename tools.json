@@ -1,0 +1,138 @@
+{
+  "$comment": "Function-calling tool definitions for file-analyzer. Drop these into a `tools` array for Grok / DeepSeek / OpenAI-style APIs. They mirror the MCP server (src/mcp_server.py); dispatch each call to `python -m src.main ...` (use --quiet for pure-JSON stdout) or to the MCP tool of the same name. Intended loop: analyze_repository once, then query the returned `database` with SQL over the v_* views.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "analyze_repository",
+        "description": "Analyze a repository and build a queryable SQLite database of everything in it (files, per-language symbols and imports, DB schemas, data-file profiles, archives, binaries, configs, docs). Never executes the code. Returns a JSON summary including the `database` path to pass to query/list_views/describe_schema, plus counts and the installed v_* views.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Directory to analyze. Must be a git repository unless no_git is true."
+            },
+            "out_dir": {
+              "type": "string",
+              "description": "Where to write artifacts. Default: <path>/.file-analyzer."
+            },
+            "dialect": {
+              "type": "string",
+              "enum": ["sqlite", "postgresql"],
+              "description": "SQL dump dialect. Default: sqlite."
+            },
+            "no_git": {
+              "type": "boolean",
+              "description": "Census every file on disk instead of only git-tracked files. Default: false."
+            },
+            "workers": {
+              "type": "integer",
+              "description": "Worker count for the concurrent stages. Default: CPU count."
+            }
+          },
+          "required": ["path"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "query",
+        "description": "Run a single read-only SQL query against an analyzed repository database. Only one SELECT/WITH statement is accepted; the database is opened read-only. Prefer the ready-made v_* views (see list_views), e.g. 'SELECT * FROM v_import_edges'. Returns {row_count, truncated, rows}.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "sql": {
+              "type": "string",
+              "description": "A single SELECT or WITH query."
+            },
+            "db_path": {
+              "type": "string",
+              "description": "Path to repository.db from analyze_repository (its `database` field)."
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Max rows to return (<= 0 = no cap). Default: 100."
+            }
+          },
+          "required": ["sql", "db_path"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "list_views",
+        "description": "List the v_* analysis views installed in a repository database. Each view is a ready-made answer readable with 'SELECT * FROM <view>' via query. Returns {count, views:[{name, base_tables}]}.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "db_path": {
+              "type": "string",
+              "description": "Path to repository.db from analyze_repository."
+            }
+          },
+          "required": ["db_path"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "describe_schema",
+        "description": "Describe the base tables (names, columns, types) of a repository database, plus optionally the installed views and their catalog SQL. Use to write precise SQL when the v_* views don't cover a question.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "db_path": {
+              "type": "string",
+              "description": "Path to repository.db from analyze_repository."
+            },
+            "include_views": {
+              "type": "boolean",
+              "description": "Also return the installed views and their SELECT SQL. Default: true."
+            }
+          },
+          "required": ["db_path"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "run_component",
+        "description": "Run a single analyzer building block over a repo and return its tables JSON, without the full pipeline. Component is a language analyzer ('PythonAnalyzer', 'RustAnalyzer', ...), a plane ('code','schema','data','config','text','markup','document','database','misc'), or 'census'. Call list_components for valid names.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "description": "Component name (case-insensitive). See list_components."
+            },
+            "path": {
+              "type": "string",
+              "description": "Directory to analyze."
+            },
+            "out_dir": {
+              "type": "string",
+              "description": "Where to write the emitted JSON. Default: <path>/.file-analyzer."
+            }
+          },
+          "required": ["component", "path"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "list_components",
+        "description": "Enumerate the analyzer building blocks runnable via run_component (special components, planes, and per-language analyzer class names).",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    }
+  ]
+}

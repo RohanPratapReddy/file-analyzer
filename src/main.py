@@ -60,6 +60,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import sys
 from pathlib import Path
@@ -276,6 +277,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p.add_argument("--keep-temp", action="store_true",
                    help="keep the temp/ staging directory on success (for debugging).")
+    p.add_argument("-q", "--quiet", action="store_true",
+                   help="route the engine's incidental progress lines to stderr so "
+                        "stdout carries ONLY the final JSON result (for agents/pipes).")
 
     # -- component mode (run ONE building block, bypass AnalysisEngine) -----
     comp = p.add_argument_group(
@@ -307,6 +311,18 @@ def build_parser() -> argparse.ArgumentParser:
                       help="for --component census: also emit the file->analyzer "
                            "mapping and per-class shards.")
     return p
+
+
+def _maybe_quiet(args):
+    """Route incidental engine stdout to stderr when ``--quiet`` is set.
+
+    The analyzers/generators print progress to stdout; under ``--quiet`` we send
+    that to stderr so the only thing on stdout is the final JSON result. The JSON
+    is printed *outside* this context, so it always reaches the real stdout.
+    """
+    if getattr(args, "quiet", False):
+        return contextlib.redirect_stdout(sys.stderr)
+    return contextlib.nullcontext()
 
 
 def _run_census(args, source: Path):
@@ -356,7 +372,8 @@ def run_component(args) -> int:
         return 2
 
     try:
-        repo, (folders, extensions, files) = _run_census(args, source)
+        with _maybe_quiet(args):
+            repo, (folders, extensions, files) = _run_census(args, source)
     except Exception as exc:
         sys.stderr.write(f"[main] census failed: {exc}\n")
         return 1
@@ -414,16 +431,17 @@ def run_component(args) -> int:
             f"emitting empty tables.\n")
 
     try:
-        engine = engine_cls(file_paths=[str(p) for p in selected],
-                            dump_file_type="memory")
-        tables = engine.analyze()
-        file_index_rows = None
-        if noncode:
-            # Mirror the per-shard worker: rewrite local ids -> repository ids.
-            file_index = engine.link_repository(
-                (folders, extensions, files), [str(p) for p in selected])
-            tables = engine.get_tables()
-            file_index_rows = len(file_index) if file_index is not None else None
+        with _maybe_quiet(args):
+            engine = engine_cls(file_paths=[str(p) for p in selected],
+                                dump_file_type="memory")
+            tables = engine.analyze()
+            file_index_rows = None
+            if noncode:
+                # Mirror the per-shard worker: rewrite local ids -> repository ids.
+                file_index = engine.link_repository(
+                    (folders, extensions, files), [str(p) for p in selected])
+                tables = engine.get_tables()
+                file_index_rows = len(file_index) if file_index is not None else None
     except Exception as exc:
         sys.stderr.write(f"[main] component {facade_name} failed: {exc}\n")
         return 1
@@ -460,13 +478,14 @@ def _run_linkage_component(args, out_dir: Path) -> int:
         sys.stderr.write(f"[main] {exc}\n")
         return 2
     try:
-        linkage = ImportLinkageAnalyzer(
-            repository_tables=repo_tables,
-            code_analyzer_tables=data.get("code_tables", {}),
-            analyzed_file_paths=data.get("analyzed_file_paths"),
-            code_file_map=data.get("code_file_map"),
-            dump_file_type="memory",
-        ).generate()
+        with _maybe_quiet(args):
+            linkage = ImportLinkageAnalyzer(
+                repository_tables=repo_tables,
+                code_analyzer_tables=data.get("code_tables", {}),
+                analyzed_file_paths=data.get("analyzed_file_paths"),
+                code_file_map=data.get("code_file_map"),
+                dump_file_type="memory",
+            ).generate()
     except Exception as exc:
         sys.stderr.write(f"[main] linkage failed: {exc}\n")
         return 1
@@ -510,10 +529,11 @@ def _run_dbgen_component(args, out_dir: Path) -> int:
             schema_name=args.schema_name,
             drop_existing=not args.no_drop,
         )
-        generator.generate()
-        if args.build_db:
-            generator.export_to_sqlite_db_concurrent(
-                str(db_path), workers=args.injection_workers)
+        with _maybe_quiet(args):
+            generator.generate()
+            if args.build_db:
+                generator.export_to_sqlite_db_concurrent(
+                    str(db_path), workers=args.injection_workers)
     except Exception as exc:
         sys.stderr.write(f"[main] dbgen failed: {exc}\n")
         return 1
@@ -592,7 +612,8 @@ def run(argv=None) -> int:
     )
 
     try:
-        summary = engine.run()
+        with _maybe_quiet(args):
+            summary = engine.run()
     except Exception as exc:  # engine retains temp/ for debugging
         sys.stderr.write(f"[main] analysis failed: {exc}\n")
         return 1

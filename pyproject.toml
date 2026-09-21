@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "file-analyzer"
+version = "0.1.0"
+description = "Static, read-only analysis engine that turns a repository into a queryable SQLite/PostgreSQL database of code, schemas, data, archives, binaries and docs."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [{ name = "Rohan Pratap Reddy Ravula" }]
+keywords = ["static-analysis", "code-intelligence", "repository", "sqlite", "mcp", "ai-agent"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Quality Assurance",
+]
+# The pure-stdlib core needs nothing installed. Optional extras below upgrade
+# individual formats from a partial profile to a full deep-parse (see
+# requirements.txt for the complete, annotated list) and enable the MCP server.
+dependencies = []
+
+[project.optional-dependencies]
+# AI-agent integration: the MCP server (python -m src.mcp_server).
+agent = ["mcp[cli]>=1.2"]
+
+[project.urls]
+Homepage = "https://github.com/RohanPratapReddy/file-analyzer"
+Repository = "https://github.com/RohanPratapReddy/file-analyzer"
+
+[project.scripts]
+# Invoke from anywhere, no `python -m` and no specific cwd:
+#     file-analyzer /path/to/repo --out ./artifacts --quiet
+file-analyzer = "src.main:run"
+#     file-analyzer-mcp        # start the MCP server over stdio
+file-analyzer-mcp = "src.mcp_server:main"
+
+# The package is literally named `src` (the existing public API is `from src
+# import ...`); ship it and its subpackages, but not the Go/Java reader trees
+# (they have no __init__.py and are not importable Python).
+[tool.setuptools.packages.find]
+include = ["src*"]
+
+# Non-package data dirs are located at runtime via __file__ paths, so they must
+# travel inside the wheel: the extension catalog + IANA timezone tables, and the
+# analysis-view SQL/JSON artifacts.
+[tool.setuptools.package-data]
+"src" = ["tables/*.json"]
+"src.views" = ["sql/*.json", "sql/*.sql"]
