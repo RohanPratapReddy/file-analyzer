@@ -25,8 +25,10 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-# AI-agent integration: the MCP server (python -m mcp_server).
-agent = ["mcp[cli]>=1.2"]
+# AI-agent integration: the MCP server (python -m mcp_server). Pinned to mcp 1.x
+# -- the server uses the v1 FastMCP API, which 2.x renamed/changed (FastMCP ->
+# MCPServer in mcp.server.mcpserver).
+agent = ["mcp[cli]>=1.2,<2"]
 
 [project.urls]
 Homepage = "https://github.com/RohanPratapReddy/file-analyzer"

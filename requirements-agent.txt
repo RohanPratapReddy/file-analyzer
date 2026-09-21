@@ -7,4 +7,6 @@
 #     pip install -r requirements-agent.txt
 # =============================================================================
 
-mcp[cli]                 # Model Context Protocol SDK (FastMCP, stdio transport)
+# Pinned to the 1.x line: mcp_server.py is built on the v1 FastMCP API, which
+# 2.x renamed to MCPServer (mcp.server.mcpserver) with a changed surface.
+mcp[cli]>=1.2,<2         # Model Context Protocol SDK (FastMCP, stdio transport)
