@@ -48,4 +48,5 @@ jobs:
       - name: Test with pytest
         run: |
           # Tolerate "no tests collected" (exit code 5) until a suite exists.
-          pytest -q; code=$?; if [ "$code" -ne 0 ] && [ "$code" -ne 5 ]; then exit "$code"; fi
+          # The `|| ...` keeps `bash -e` from aborting on pytest's exit code.
+          pytest -q || [ $? -eq 5 ]
