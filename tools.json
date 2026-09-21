@@ -1,11 +1,11 @@
 {
-  "$comment": "Function-calling tool definitions for file-analyzer. Drop these into a `tools` array for Grok / DeepSeek / OpenAI-style APIs. They mirror the MCP server (src/mcp_server.py); dispatch each call to `python -m src.main ...` (use --quiet for pure-JSON stdout) or to the MCP tool of the same name. Intended loop: analyze_repository once, then query the returned `database` with SQL over the v_* views.",
+  "$comment": "Function-calling tool definitions for file-analyzer. Drop these into a `tools` array for Grok / DeepSeek / OpenAI-style APIs. They mirror the MCP server (mcp_server.py); dispatch each call to `python -m src.main ...` (use --quiet for pure-JSON stdout) or to the MCP tool of the same name. Intended loop: analyze_repository once, then query the returned `database` with SQL over the v_* views.",
   "tools": [
     {
       "type": "function",
       "function": {
         "name": "analyze_repository",
-        "description": "Analyze a repository and build a queryable SQLite database of everything in it (files, per-language symbols and imports, DB schemas, data-file profiles, archives, binaries, configs, docs). Never executes the code. Returns a JSON summary including the `database` path to pass to query/list_views/describe_schema, plus counts and the installed v_* views.",
+        "description": "Analyze a repository and build a queryable SQLite database of everything in it (files, per-language symbols and imports, DB schemas, data-file profiles, archives, binaries, configs, docs). Never executes the code. The analysis planes fan out across Go and Java workers when those toolchains are on PATH (falling back to concurrent Python otherwise). Returns a JSON summary including the `database` path to pass to query/list_views/describe_schema, plus counts, the installed v_* views, and a `toolchains` map reporting which native fast paths were available.",
         "parameters": {
           "type": "object",
           "properties": {
@@ -28,7 +28,15 @@
             },
             "workers": {
               "type": "integer",
-              "description": "Worker count for the concurrent stages. Default: CPU count."
+              "description": "Worker count for the concurrent census/analysis stages. Default: CPU count."
+            },
+            "plane_workers": {
+              "type": "integer",
+              "description": "Concurrency for the Go/Java analysis planes. Default: CPU count."
+            },
+            "injection_workers": {
+              "type": "integer",
+              "description": "Concurrency for the database injection stage. Default: CPU count."
             }
           },
           "required": ["path"]
@@ -71,6 +79,40 @@
             "db_path": {
               "type": "string",
               "description": "Path to repository.db from analyze_repository."
+            }
+          },
+          "required": ["db_path"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "read_views",
+        "description": "Bulk-read many v_* analysis views in one call instead of issuing one query per view. With engine='auto' (default) it partitions the views across the native Go and Java readers and runs them at the same wall-clock time, transparently falling back to a concurrent pure-Python read when neither toolchain is on PATH. All reads are strictly read-only. Returns {engine, used, view_count, views:{name:{columns,rows}|{error}}}.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "db_path": {
+              "type": "string",
+              "description": "Path to repository.db from analyze_repository."
+            },
+            "views": {
+              "type": "string",
+              "description": "Comma-separated view names to read. Default: every installed view."
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Max rows per view (<= 0 = no cap). Default: 50."
+            },
+            "engine": {
+              "type": "string",
+              "enum": ["auto", "native", "python"],
+              "description": "'auto' = native Go/Java if available else Python; 'native' = require the Go/Java readers (error if absent); 'python' = concurrent in-process, no toolchain needed. Default: auto."
+            },
+            "workers": {
+              "type": "integer",
+              "description": "Per-language worker count. Default: CPU count."
             }
           },
           "required": ["db_path"]

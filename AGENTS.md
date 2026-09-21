@@ -20,22 +20,29 @@ plain `SELECT`s instead of parsing walls of text.
 Launch over stdio:
 
 ```bash
-python -m src.mcp_server          # needs: pip install "mcp[cli]"
+python -m mcp_server              # or: file-analyzer-mcp  --  needs: pip install "mcp[cli]"
 ```
 
 Register it (Claude Code shown; other agents take the same command in their MCP config):
 
 ```bash
-claude mcp add file-analyzer -- python -m src.mcp_server
+claude mcp add file-analyzer -- python -m mcp_server
 ```
+
+The server starts fast (it doesn't load the analyzer fleet at import) and warms
+that fleet in a background thread so the first tool call runs at full speed. To
+warm it ahead of time at install/registration (e.g. in a Dockerfile or CI), run
+`python -m mcp_server --precompile` once — it bytecode-compiles `src/`, imports
+the engine, and exits. Disable the background warm-up with `FILE_ANALYZER_MCP_NO_WARM=1`.
 
 Tools exposed:
 
 | Tool | What it does |
 |---|---|
-| `analyze_repository(path, out_dir?, dialect?, no_git?, workers?)` | Build the database. Returns a summary incl. the `database` path. |
+| `analyze_repository(path, out_dir?, dialect?, no_git?, workers?, plane_workers?, injection_workers?)` | Build the database. The analysis planes fan out across Go/Java when available; returns a summary incl. the `database` path and a `toolchains` map. |
 | `query(sql, db_path, limit?)` | Run a **single read-only** `SELECT`/`WITH` against the database. |
 | `list_views(db_path)` | List the installed `v_*` analysis views. |
+| `read_views(db_path, views?, limit?, engine?, workers?)` | **Bulk-read** many `v_*` views in one call. `engine="auto"` splits them across the Go and Java readers concurrently, falling back to concurrent Python when no toolchain is present. |
 | `describe_schema(db_path, include_views?)` | Base tables + columns, plus the view catalog SQL. |
 | `run_component(component, path, out_dir?)` | Run one analyzer block (a language/plane/`census`) in isolation. |
 | `list_components()` | Enumerate valid `run_component` names. |
@@ -85,6 +92,14 @@ views; drop to base tables (see `describe_schema`) for anything they don't cover
 `list_views(db_path)` returns the full set for the specific database (views only
 exist when their base tables are present, so a repo with no DB schemas simply
 won't have the `v_schema_*` views).
+
+**One view vs. many.** Use `query` for a single view or a custom `SELECT`. To pull
+a whole batch of views (or all of them) at once, use `read_views` — with
+`engine="auto"` it partitions the set across the native Go and Java readers and
+runs them at the same wall-clock time, so a wide sweep of large views is faster
+than issuing one `query` per view. It transparently falls back to a concurrent
+pure-Python read when neither toolchain is on PATH; for a handful of small views,
+`engine="python"` avoids the subprocess/JVM start-up and is quickest.
 
 ---
 

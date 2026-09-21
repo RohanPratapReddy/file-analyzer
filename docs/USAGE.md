@@ -355,20 +355,21 @@ instead of parsing walls of text.
 
 ```bash
 pip install -r requirements-agent.txt     # the MCP SDK (mcp[cli])
-python -m src.mcp_server                   # stdio transport
+python -m mcp_server                       # stdio transport
 #   or, after `pip install .`:  file-analyzer-mcp
 
 # register with an agent (Claude Code shown; others take the same command):
-claude mcp add file-analyzer -- python -m src.mcp_server
+claude mcp add file-analyzer -- python -m mcp_server
 ```
 
 ### Tools
 
 | tool | what it does |
 |------|--------------|
-| `analyze_repository(path, out_dir?, dialect?, no_git?, workers?)` | Run the full pipeline; returns the JSON summary incl. the `database` path. Output defaults to `<path>/.file-analyzer`. |
+| `analyze_repository(path, out_dir?, dialect?, no_git?, workers?, plane_workers?, injection_workers?)` | Run the full pipeline; returns the JSON summary incl. the `database` path and a `toolchains` map. The analysis planes fan out across Go/Java when available. Output defaults to `<path>/.file-analyzer`. |
 | `query(sql, db_path, limit?)` | Run a **single read-only** `SELECT`/`WITH` against the database (opened `mode=ro` + `PRAGMA query_only`). |
 | `list_views(db_path)` | List the installed `v_*` analysis views. |
+| `read_views(db_path, views?, limit?, engine?, workers?)` | **Bulk-read** many `v_*` views at once. `engine="auto"` splits them across the Go and Java readers concurrently (read-only), falling back to concurrent Python when no toolchain is present. |
 | `describe_schema(db_path, include_views?)` | Base tables + columns, plus the view catalog SQL. |
 | `run_component(component, path, out_dir?)` | Run one analyzer block (a language/plane/`census`) in isolation — the [Part 2](#part-2--component-mode-run-the-modules-separately) blocks. |
 | `list_components()` | Enumerate valid `run_component` names. |

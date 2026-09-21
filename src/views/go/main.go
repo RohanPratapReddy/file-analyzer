@@ -34,6 +34,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -41,6 +42,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -70,6 +72,10 @@ func main() {
 	workers := flag.Int("workers", runtime.NumCPU(), "number of concurrent worker goroutines")
 	repeat := flag.Int("repeat", 1, "how many times to replay the full view set across the pool")
 	verbose := flag.Bool("verbose", false, "print every result body (default prints bodies once per distinct view)")
+	// Machine-readable mode: used by the Python launcher (src/views/native_reader.py).
+	jsonOut := flag.Bool("json", false, "emit a single JSON object of {view: {columns, rows}} to stdout instead of the human report")
+	viewsCSV := flag.String("views", "", "comma-separated subset of installed view names to read (default: all)")
+	limit := flag.Int("limit", maxRows, "max rows per view in -json mode (<= 0 means no cap)")
 	flag.Parse()
 
 	if *workers < 1 {
@@ -105,6 +111,14 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "fatal: reading view catalog: %v\n", err)
 		os.Exit(1)
+	}
+
+	// Machine-readable path: read the (optionally filtered) views concurrently and
+	// emit ONE JSON object to stdout. All diagnostics go to stderr so stdout stays
+	// pure JSON for the Python launcher to parse.
+	if *jsonOut {
+		emitJSON(db, viewNames, *viewsCSV, *workers, *limit)
+		return
 	}
 
 	fmt.Printf("== repository-reader (Go) ==\n")
@@ -258,7 +272,8 @@ func loadSQLDump(sqlPath string) (string, func(), error) {
 		return "", func() {}, fmt.Errorf("loading dump into snapshot: %w", err)
 	}
 	loader.Close()
-	fmt.Printf("(loaded .sql dump into private read-only snapshot: %s)\n", tmpPath)
+	// stderr, not stdout: -json mode requires stdout to carry only the JSON object.
+	fmt.Fprintf(os.Stderr, "(loaded .sql dump into private read-only snapshot: %s)\n", tmpPath)
 	return tmpPath, cleanup, nil
 }
 
@@ -348,6 +363,107 @@ func runView(ctx context.Context, db *sql.DB, viewName string) (string, int, err
 		count++
 	}
 	return sb.String(), count, rows.Err()
+}
+
+// viewJSON is one view's payload in the machine-readable output.
+type viewJSON struct {
+	Columns []string `json:"columns"`
+	Rows    [][]any  `json:"rows"`
+}
+
+// emitJSON reads the requested views concurrently and writes a single JSON object
+// {"engine","views":{name:{columns,rows}},"errors":{name:msg}} to stdout. Values
+// are decoded generically; []byte cells become strings so the JSON is readable.
+func emitJSON(db *sql.DB, viewNames []string, viewsCSV string, workers, limit int) {
+	wanted := parseCSVSet(viewsCSV) // empty set => all views
+	views := map[string]viewJSON{}
+	errs := map[string]string{}
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	if workers < 1 {
+		workers = 1
+	}
+	sem := make(chan struct{}, workers)
+	ctx := context.Background()
+	for _, v := range viewNames {
+		if len(wanted) > 0 && !wanted[v] {
+			continue
+		}
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(view string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			cols, rows, err := readViewStructured(ctx, db, view, limit)
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				errs[view] = err.Error()
+				return
+			}
+			if rows == nil {
+				rows = [][]any{}
+			}
+			views[view] = viewJSON{Columns: cols, Rows: rows}
+		}(v)
+	}
+	wg.Wait()
+	enc := json.NewEncoder(os.Stdout)
+	if err := enc.Encode(map[string]any{"engine": "go", "views": views, "errors": errs}); err != nil {
+		fmt.Fprintf(os.Stderr, "fatal: encoding json: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// readViewStructured reads one view into (columns, rows) with []byte cells coerced
+// to strings so they encode as JSON text rather than base64.
+func readViewStructured(ctx context.Context, db *sql.DB, viewName string, limit int) ([]string, [][]any, error) {
+	query := `SELECT * FROM "` + strings.ReplaceAll(viewName, `"`, `""`) + `"`
+	if limit > 0 {
+		query += " LIMIT " + strconv.Itoa(limit)
+	}
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, nil, err
+	}
+	var out [][]any
+	for rows.Next() {
+		vals := make([]any, len(cols))
+		ptrs := make([]any, len(cols))
+		for i := range vals {
+			ptrs[i] = &vals[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			return cols, out, err
+		}
+		rec := make([]any, len(cols))
+		for i, v := range vals {
+			if b, ok := v.([]byte); ok {
+				rec[i] = string(b)
+			} else {
+				rec[i] = v
+			}
+		}
+		out = append(out, rec)
+	}
+	return cols, out, rows.Err()
+}
+
+// parseCSVSet turns "a,b, c" into {"a","b","c"}; an empty string yields an empty
+// set (meaning "no filter" to the caller).
+func parseCSVSet(csv string) map[string]bool {
+	set := map[string]bool{}
+	for _, part := range strings.Split(csv, ",") {
+		if p := strings.TrimSpace(part); p != "" {
+			set[p] = true
+		}
+	}
+	return set
 }
 
 func cell(v any) string {

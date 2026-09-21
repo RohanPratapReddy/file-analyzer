@@ -13,7 +13,7 @@ Start here:
   views layer, the Go/Java readers, and the Docker workflow.
 - **[../AGENTS.md](../AGENTS.md)** — driving `file-analyzer` from an AI agent
   (Claude, opencode, Cursor, Grok, DeepSeek, …): the MCP server
-  ([`src/mcp_server.py`](../src/mcp_server.py)), the `--quiet` CLI, and
+  ([`mcp_server.py`](../mcp_server.py)), the `--quiet` CLI, and
   [`../tools.json`](../tools.json) function-calling definitions. A Claude Code skill
   lives at [`../.claude/skills/file-analyzer/SKILL.md`](../.claude/skills/file-analyzer/SKILL.md).
 

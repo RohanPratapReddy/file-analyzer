@@ -25,7 +25,7 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-# AI-agent integration: the MCP server (python -m src.mcp_server).
+# AI-agent integration: the MCP server (python -m mcp_server).
 agent = ["mcp[cli]>=1.2"]
 
 [project.urls]
@@ -37,17 +37,40 @@ Repository = "https://github.com/RohanPratapReddy/file-analyzer"
 #     file-analyzer /path/to/repo --out ./artifacts --quiet
 file-analyzer = "src.main:run"
 #     file-analyzer-mcp        # start the MCP server over stdio
-file-analyzer-mcp = "src.mcp_server:main"
+file-analyzer-mcp = "mcp_server:main"
 
 # The package is literally named `src` (the existing public API is `from src
-# import ...`); ship it and its subpackages, but not the Go/Java reader trees
-# (they have no __init__.py and are not importable Python).
+# import ...`); ship it and its subpackages. The Go/Java reader/plane trees have
+# no __init__.py (they are not importable Python), so they are not picked up as
+# packages here -- they travel as package-data instead (see below) so the
+# build-on-demand `go build` / `javac` fast paths work from an installed wheel.
 [tool.setuptools.packages.find]
 include = ["src*"]
 
+# The MCP server lives at the repository root (a top-level module, not part of
+# the `src` package) so that importing it does not pull in `src/__init__.py` and
+# the whole analyzer fleet -- keeping server startup fast. It must still ship in
+# the wheel, so declare it as a standalone module.
+[tool.setuptools]
+py-modules = ["mcp_server"]
+
 # Non-package data dirs are located at runtime via __file__ paths, so they must
-# travel inside the wheel: the extension catalog + IANA timezone tables, and the
-# analysis-view SQL/JSON artifacts.
+# travel inside the wheel: the extension catalog + IANA timezone tables, the
+# analysis-view SQL/JSON artifacts, and the Go/Java source trees + JDBC jars that
+# the plane runner (src.router) and the view readers (src.views) build on demand.
 [tool.setuptools.package-data]
 "src" = ["tables/*.json"]
-"src.views" = ["sql/*.json", "sql/*.sql"]
+"src.views" = [
+    "sql/*.json",
+    "sql/*.sql",
+    "go/*.go",
+    "go/go.mod",
+    "go/go.sum",
+    "java/*.java",
+    "java/*.jar",
+]
+"src.router" = [
+    "go/*.go",
+    "go/go.mod",
+    "java/*.java",
+]

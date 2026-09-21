@@ -66,6 +66,10 @@ public class RepositoryReader {
         int workers = Runtime.getRuntime().availableProcessors();
         int repeat = 1;
         boolean verbose = false;
+        // Machine-readable mode: used by the Python launcher (src/views/native_reader.py).
+        boolean jsonOut = false;
+        String viewsCsv = "";
+        int limit = MAX_ROWS;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -73,6 +77,9 @@ public class RepositoryReader {
                 case "-workers" -> workers = Math.max(1, Integer.parseInt(args[++i]));
                 case "-repeat" -> repeat = Math.max(1, Integer.parseInt(args[++i]));
                 case "-verbose" -> verbose = true;
+                case "-json" -> jsonOut = true;
+                case "-views" -> viewsCsv = args[++i];
+                case "-limit" -> limit = Integer.parseInt(args[++i]);
                 default -> { System.err.println("unknown arg: " + args[i]); System.exit(1); }
             }
         }
@@ -99,6 +106,14 @@ public class RepositoryReader {
         try {
             verifyReadOnly(dbPath);
             List<String> viewNames = installedViews(dbPath);
+
+            // Machine-readable path: read the (optionally filtered) views concurrently
+            // and emit ONE JSON object to stdout. Diagnostics stay on stderr so stdout
+            // is pure JSON for the Python launcher. The finally block still cleans temp.
+            if (jsonOut) {
+                emitJson(dbPath, viewNames, viewsCsv, workers, limit);
+                return;
+            }
 
             System.out.println("== RepositoryReader (Java) ==");
             System.out.println("source     : " + source);
@@ -219,7 +234,8 @@ public class RepositoryReader {
                 st.execute(stmt);
             }
         }
-        System.out.println("(loaded .sql dump into private read-only snapshot: " + tmp + ")");
+        // stderr, not stdout: -json mode requires stdout to carry only the JSON object.
+        System.err.println("(loaded .sql dump into private read-only snapshot: " + tmp + ")");
         return tmp;
     }
 
@@ -377,6 +393,137 @@ public class RepositoryReader {
             }
             return new String[]{sb.toString(), Integer.toString(count)};
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Machine-readable (JSON) path -- consumed by src/views/native_reader.py
+    // ------------------------------------------------------------------
+
+    /** One view read into structured form (or an error). */
+    record ViewData(String view, List<String> columns, List<List<Object>> rows, String error) {}
+
+    /**
+     * Reads the requested views concurrently and writes a single JSON object
+     * {"engine","views":{name:{columns,rows}},"errors":{name:msg}} to stdout.
+     */
+    static void emitJson(Path dbPath, List<String> viewNames, String viewsCsv,
+                         int workers, int limit) throws Exception {
+        Set<String> wanted = parseCsvSet(viewsCsv); // empty => all
+        List<String> targets = new ArrayList<>();
+        for (String v : viewNames) {
+            if (wanted.isEmpty() || wanted.contains(v)) targets.add(v);
+        }
+
+        ExecutorService pool = Executors.newFixedThreadPool(Math.max(1, workers));
+        List<Future<ViewData>> futures = new ArrayList<>();
+        for (String v : targets) {
+            futures.add(pool.submit((Callable<ViewData>) () -> readViewStructured(dbPath, v, limit)));
+        }
+        pool.shutdown();
+        List<ViewData> datas = new ArrayList<>();
+        for (Future<ViewData> f : futures) datas.add(f.get());
+
+        StringBuilder views = new StringBuilder();
+        StringBuilder errs = new StringBuilder();
+        boolean firstV = true, firstE = true;
+        for (ViewData d : datas) {
+            if (d.error() != null) {
+                if (!firstE) errs.append(',');
+                firstE = false;
+                appendJsonString(errs, d.view());
+                errs.append(':');
+                appendJsonString(errs, d.error());
+                continue;
+            }
+            if (!firstV) views.append(',');
+            firstV = false;
+            appendJsonString(views, d.view());
+            views.append(":{\"columns\":[");
+            for (int i = 0; i < d.columns().size(); i++) {
+                if (i > 0) views.append(',');
+                appendJsonString(views, d.columns().get(i));
+            }
+            views.append("],\"rows\":[");
+            for (int r = 0; r < d.rows().size(); r++) {
+                if (r > 0) views.append(',');
+                views.append('[');
+                List<Object> row = d.rows().get(r);
+                for (int c = 0; c < row.size(); c++) {
+                    if (c > 0) views.append(',');
+                    appendJsonValue(views, row.get(c));
+                }
+                views.append(']');
+            }
+            views.append("]}");
+        }
+
+        StringBuilder out = new StringBuilder();
+        out.append("{\"engine\":\"java\",\"views\":{").append(views)
+           .append("},\"errors\":{").append(errs).append("}}");
+        System.out.println(out);
+    }
+
+    /** Reads one view into (columns, rows); byte[] cells become strings. */
+    static ViewData readViewStructured(Path dbPath, String viewName, int limit) {
+        String query = "SELECT * FROM \"" + viewName.replace("\"", "\"\"") + "\"";
+        if (limit > 0) query += " LIMIT " + limit;
+        try (Connection c = openReadOnly(dbPath);
+             Statement st = c.createStatement();
+             ResultSet rs = st.executeQuery(query)) {
+            ResultSetMetaData md = rs.getMetaData();
+            int cols = md.getColumnCount();
+            List<String> columns = new ArrayList<>();
+            for (int i = 1; i <= cols; i++) columns.add(md.getColumnLabel(i));
+            List<List<Object>> rows = new ArrayList<>();
+            while (rs.next()) {
+                List<Object> row = new ArrayList<>();
+                for (int i = 1; i <= cols; i++) {
+                    Object v = rs.getObject(i);
+                    if (v instanceof byte[] b) v = new String(b);
+                    row.add(v);
+                }
+                rows.add(row);
+            }
+            return new ViewData(viewName, columns, rows, null);
+        } catch (Exception ex) {
+            return new ViewData(viewName, null, null, ex.getMessage());
+        }
+    }
+
+    static Set<String> parseCsvSet(String csv) {
+        Set<String> set = new HashSet<>();
+        if (csv != null) {
+            for (String p : csv.split(",")) {
+                String t = p.strip();
+                if (!t.isEmpty()) set.add(t);
+            }
+        }
+        return set;
+    }
+
+    static void appendJsonString(StringBuilder sb, String s) {
+        sb.append('"');
+        for (int i = 0; i < s.length(); i++) {
+            char ch = s.charAt(i);
+            switch (ch) {
+                case '"' -> sb.append("\\\"");
+                case '\\' -> sb.append("\\\\");
+                case '\n' -> sb.append("\\n");
+                case '\r' -> sb.append("\\r");
+                case '\t' -> sb.append("\\t");
+                default -> {
+                    if (ch < 0x20) sb.append(String.format("\\u%04x", (int) ch));
+                    else sb.append(ch);
+                }
+            }
+        }
+        sb.append('"');
+    }
+
+    static void appendJsonValue(StringBuilder sb, Object v) {
+        if (v == null) { sb.append("null"); return; }
+        if (v instanceof Number || v instanceof Boolean) { sb.append(v.toString()); return; }
+        appendJsonString(sb, v.toString());
     }
 
     static String indent(String body) {

@@ -81,15 +81,17 @@ views — the agent writes ordinary `SELECT`s instead of parsing walls of text.
 
 ```bash
 pip install -r requirements-agent.txt      # the MCP SDK
-python -m src.mcp_server                    # stdio transport
+python -m mcp_server                        # stdio transport (or: file-analyzer-mcp)
 
 # register with Claude Code (other agents take the same command in their config):
-claude mcp add file-analyzer -- python -m src.mcp_server
+claude mcp add file-analyzer -- python -m mcp_server
 ```
 
-Tools: `analyze_repository`, `query`, `list_views`, `describe_schema`,
-`run_component`, `list_components`. `query` is read-only (`mode=ro` +
-`PRAGMA query_only`, single `SELECT`/`WITH` only).
+Tools: `analyze_repository`, `query`, `list_views`, `read_views`,
+`describe_schema`, `run_component`, `list_components`. `query` is read-only
+(`mode=ro` + `PRAGMA query_only`, single `SELECT`/`WITH` only); `read_views`
+bulk-reads many `v_*` views at once, splitting them across the native Go and Java
+readers concurrently (with a concurrent pure-Python fallback).
 
 Not using MCP? The CLI is agent-friendly too: pass **`--quiet`** so stdout carries
 only the final JSON (progress goes to stderr), and see **[`AGENTS.md`](AGENTS.md)**
@@ -141,8 +143,10 @@ Postgres/Docker backend, picks it up with no code changes.
 | `catalog.py`  | the view catalog: `VIEW_CATALOG` of `ViewDef(name, tables, select)`; DB object names are `v_<name>`. |
 | `builder.py`  | turns the catalog into real objects: `install_views_sqlite(db)`, `append_views_to_sql_dump(sql)`, `views_ddl(dialect)`, `write_sql_artifacts(dir)`. |
 | `reader.py`   | Python reads over the installed views: `list_views`, `read_view`, `read_all_views`. |
+| `native_reader.py` | concurrent bulk reads: `read_views_native` splits the views across the Go (`go/`) and Java (`java/`) readers and runs them at the same wall-clock time; `read_views_python` is the toolchain-free concurrent fallback. |
 | `__main__.py` | CLI (`python -m src.views …`).                                             |
 | `sql/`        | generated artifacts: `views.sqlite.sql`, `views.pgsql.sql`, `catalog.json`. |
+| `go/`, `java/` | native concurrent view readers (`-json` mode) that `native_reader.py` builds on demand. |
 | `go/`, `java/`| the Go + Java reader programs (below).                                     |
 
 A view is created only when **all of its base tables are present**, so a database
