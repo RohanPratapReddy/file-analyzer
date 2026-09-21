@@ -13,14 +13,28 @@
 #
 # Comments are '//' and '/* */'; strings use '"' and "'".
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_$][A-Za-z0-9_$]*"
 _TYPE = r"[A-Za-z_$][A-Za-z0-9_$<>\[\].]*"
 _KEYWORDS = {
-    "if", "for", "while", "switch", "return", "else", "do", "catch", "try",
-    "synchronized", "new", "case", "break", "continue", "super", "this",
+    "if",
+    "for",
+    "while",
+    "switch",
+    "return",
+    "else",
+    "do",
+    "catch",
+    "try",
+    "synchronized",
+    "new",
+    "case",
+    "break",
+    "continue",
+    "super",
+    "this",
 }
 
 
@@ -36,14 +50,17 @@ class ProcessingAnalyzer(RegexCodeAnalyzer):
         r"(?m)^\s*(?:public\s+|abstract\s+|final\s+|static\s+)*"
         r"(class|interface)\s+(" + _ID + r")"
         r"(?:\s+extends\s+(" + _TYPE + r"))?"
-        r"(?:\s+implements\s+([\w.,<>\s]+?))?\s*\{")
+        r"(?:\s+implements\s+([\w.,<>\s]+?))?\s*\{"
+    )
     _FUNC = re.compile(
         r"(?m)^[ \t]*(?:public\s+|private\s+|protected\s+|static\s+|final\s+"
-        r"|abstract\s+)*(" + _TYPE + r")\s+(" + _ID + r")\s*\(([^)]*)\)\s*\{")
+        r"|abstract\s+)*(" + _TYPE + r")\s+(" + _ID + r")\s*\(([^)]*)\)\s*\{"
+    )
     _METHOD = _FUNC
     _FIELD = re.compile(
         r"(?m)^[ \t]*(?:public\s+|private\s+|protected\s+|static\s+|final\s+)*"
-        r"(" + _TYPE + r")\s+(" + _ID + r")\s*(?:=[^;]*)?;")
+        r"(" + _TYPE + r")\s+(" + _ID + r")\s*(?:=[^;]*)?;"
+    )
 
     def _args(self, inner):
         ids = []
@@ -85,21 +102,32 @@ class ProcessingAnalyzer(RegexCodeAnalyzer):
 
         for m in self._CLASS.finditer(clean):
             body_start, body_end = m.end() - 1, self._find_matching(clean, m.end() - 1)
-            body = clean[m.end():body_end]
+            body = clean[m.end() : body_end]
             method_ids = []
             for mm in self._METHOD.finditer(body):
                 if mm.group(1) in _KEYWORDS or mm.group(2) in _KEYWORDS:
                     continue
-                method_ids.append(self._add_function(
-                    file_id, mm.group(2), self._args(mm.group(3)), [],
-                    description="processing method"))
+                method_ids.append(
+                    self._add_function(
+                        file_id,
+                        mm.group(2),
+                        self._args(mm.group(3)),
+                        [],
+                        description="processing method",
+                    )
+                )
             parents = []
             if m.group(3):
                 parents.append(self._register_class(m.group(3)))
             for impl in self._split_top_level(m.group(4) or ""):
                 parents.append(self._register_class(impl.strip()))
-            self._add_class(file_id, m.group(2), description="processing " + m.group(1),
-                            parent_ids=parents or None, method_ids=method_ids or None)
+            self._add_class(
+                file_id,
+                m.group(2),
+                description="processing " + m.group(1),
+                parent_ids=parents or None,
+                method_ids=method_ids or None,
+            )
 
         # top-level functions and fields (outside any class body)
         for m in self._FUNC.finditer(clean):
@@ -107,8 +135,13 @@ class ProcessingAnalyzer(RegexCodeAnalyzer):
                 continue
             if m.group(1) in _KEYWORDS or m.group(2) in _KEYWORDS:
                 continue
-            self._add_function(file_id, m.group(2), self._args(m.group(3)), [],
-                               description="processing function")
+            self._add_function(
+                file_id,
+                m.group(2),
+                self._args(m.group(3)),
+                [],
+                description="processing function",
+            )
         for m in self._FIELD.finditer(clean):
             if self._in_class(m.start(), spans):
                 continue

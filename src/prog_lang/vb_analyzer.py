@@ -14,7 +14,7 @@
 #   Structure Point ... End Structure                      -> struct (class row)
 #   Enum Color : Red : Green : End Enum                    -> enum (class row)
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _TYPE_KW = ("class", "module", "structure", "interface", "enum")
@@ -27,15 +27,19 @@ class VBAnalyzer(RegexCodeAnalyzer):
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ('"',)
 
-    _MODS = r"(?:(?:public|private|protected|friend|shared|overridable|" \
-            r"overrides|mustinherit|notinheritable|partial|readonly|" \
-            r"mustoverride|shadows|default|static|widening|narrowing|" \
-            r"protected\s+friend|friend\s+protected)\s+)*"
+    _MODS = (
+        r"(?:(?:public|private|protected|friend|shared|overridable|"
+        r"overrides|mustinherit|notinheritable|partial|readonly|"
+        r"mustoverride|shadows|default|static|widening|narrowing|"
+        r"protected\s+friend|friend\s+protected)\s+)*"
+    )
     _IMPORT = re.compile(r"^\s*Imports\s+([\w.]+)(?:\s*=\s*[\w.]+)?", re.IGNORECASE)
     _TYPE = re.compile(
         r"^\s*" + _MODS + r"(" + "|".join(_TYPE_KW) + r")\s+([A-Za-z_]\w*)"
         r"(?:\s*\(\s*Of\s+[^)]*\))?"
-        r"(?:\s+Inherits\s+([\w.]+))?", re.IGNORECASE)
+        r"(?:\s+Inherits\s+([\w.]+))?",
+        re.IGNORECASE,
+    )
     _INHERITS = re.compile(r"^\s*(?:Inherits|Implements)\s+([\w.,\s]+)$", re.IGNORECASE)
     _END_TYPE = re.compile(r"^\s*End\s+(" + "|".join(_TYPE_KW) + r")\b", re.IGNORECASE)
     _METHOD = re.compile(
@@ -43,21 +47,30 @@ class VBAnalyzer(RegexCodeAnalyzer):
         r"([A-Za-z_]\w*|New)\s*"
         r"(?:\(\s*Of\s+[^)]*\)\s*)?"
         r"(?:\(([^)]*)\))?"
-        r"(?:\s+As\s+([\w.\[\]()]+))?", re.IGNORECASE)
+        r"(?:\s+As\s+([\w.\[\]()]+))?",
+        re.IGNORECASE,
+    )
     _DECLARE = re.compile(
         r"^\s*" + _MODS + r"Declare\s+(?:Ansi\s+|Unicode\s+|Auto\s+)?"
-        r"(?:Sub|Function)\s+([A-Za-z_]\w*)", re.IGNORECASE)
+        r"(?:Sub|Function)\s+([A-Za-z_]\w*)",
+        re.IGNORECASE,
+    )
     _PROPERTY = re.compile(
         r"^\s*" + _MODS + r"(?:readonly\s+|writeonly\s+|default\s+)*"
         r"Property\s+([A-Za-z_]\w*)(?:\s*\(([^)]*)\))?"
-        r"(?:\s+As\s+([\w.\[\]()]+))?", re.IGNORECASE)
+        r"(?:\s+As\s+([\w.\[\]()]+))?",
+        re.IGNORECASE,
+    )
     _FIELD = re.compile(
         r"^\s*(?:" + _MODS + r"|Dim\s+|Const\s+|Dim\s+Shared\s+)"
         r"([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)*)\s+As\s+([\w.\[\]()]+)",
-        re.IGNORECASE)
+        re.IGNORECASE,
+    )
     _DIM = re.compile(
         r"^\s*(?:Dim|Const|Private|Public|Friend|Protected)\s+"
-        r"([A-Za-z_]\w*)\s*(?:As\s+[\w.\[\]()]+)?", re.IGNORECASE)
+        r"([A-Za-z_]\w*)\s*(?:As\s+[\w.\[\]()]+)?",
+        re.IGNORECASE,
+    )
 
     def _clean(self, text):
         text = self._strip_comments(text)
@@ -85,7 +98,7 @@ class VBAnalyzer(RegexCodeAnalyzer):
                 mod = im.group(1)
                 self._add_import(file_id, mod.split(".")[-1], mod)
 
-        stack = []       # container dicts
+        stack = []  # container dicts
         containers = []
         i, n = 0, len(lines)
         while i < n:
@@ -100,8 +113,14 @@ class VBAnalyzer(RegexCodeAnalyzer):
                         p = p.strip().split(".")[-1]
                         if p in self._class_registry:
                             parents.append(self._class_registry[p])
-                d = {"name": name, "kind": kind, "parents": parents,
-                     "methods": [], "attrs": [], "enum": kind == "enum"}
+                d = {
+                    "name": name,
+                    "kind": kind,
+                    "parents": parents,
+                    "methods": [],
+                    "attrs": [],
+                    "enum": kind == "enum",
+                }
                 containers.append(d)
                 stack.append(d)
                 i += 1
@@ -128,8 +147,9 @@ class VBAnalyzer(RegexCodeAnalyzer):
             if dm:
                 owner = stack[-1] if stack else None
                 cid = self._class_registry.get(owner["name"]) if owner else None
-                fid = self._add_function(file_id, dm.group(1), [], [], class_id=cid,
-                                         description="vb declare")
+                fid = self._add_function(
+                    file_id, dm.group(1), [], [], class_id=cid, description="vb declare"
+                )
                 if owner:
                     owner["methods"].append(fid)
                 i += 1
@@ -162,8 +182,12 @@ class VBAnalyzer(RegexCodeAnalyzer):
                 continue
 
             fm = self._FIELD.match(line)
-            if fm and not re.match(r"^\s*(Sub|Function|Property|End|If|For|While|"
-                                   r"Select|Return|Set|Get)\b", line, re.IGNORECASE):
+            if fm and not re.match(
+                r"^\s*(Sub|Function|Property|End|If|For|While|"
+                r"Select|Return|Set|Get)\b",
+                line,
+                re.IGNORECASE,
+            ):
                 names, ftype = fm.group(1), fm.group(2)
                 owner = stack[-1] if stack else None
                 for nm in names.split(","):
@@ -180,9 +204,14 @@ class VBAnalyzer(RegexCodeAnalyzer):
             i += 1
 
         for c in containers:
-            self._add_class(file_id, c["name"], description=f"vb {c['kind']}",
-                            parent_ids=c["parents"], method_ids=c["methods"],
-                            attr_ids=c["attrs"])
+            self._add_class(
+                file_id,
+                c["name"],
+                description=f"vb {c['kind']}",
+                parent_ids=c["parents"],
+                method_ids=c["methods"],
+                attr_ids=c["attrs"],
+            )
 
     def _params(self, params):
         arg_ids = []
@@ -190,9 +219,15 @@ class VBAnalyzer(RegexCodeAnalyzer):
             part = part.strip()
             if not part:
                 continue
-            part = re.sub(r"(?i)^(byval|byref|optional|paramarray)\s+", "", part).strip()
-            part = re.sub(r"(?i)^(byval|byref|optional|paramarray)\s+", "", part).strip()
-            m = re.match(r"([A-Za-z_]\w*)\s*(?:As\s+([\w.\[\]()]+))?", part, re.IGNORECASE)
+            part = re.sub(
+                r"(?i)^(byval|byref|optional|paramarray)\s+", "", part
+            ).strip()
+            part = re.sub(
+                r"(?i)^(byval|byref|optional|paramarray)\s+", "", part
+            ).strip()
+            m = re.match(
+                r"([A-Za-z_]\w*)\s*(?:As\s+([\w.\[\]()]+))?", part, re.IGNORECASE
+            )
             if m:
                 default = None
                 if "=" in part:

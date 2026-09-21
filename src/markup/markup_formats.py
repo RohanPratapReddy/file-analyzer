@@ -64,14 +64,14 @@ from xml.parsers import expat
 # file, only cap a pathological one and note the truncation honestly).
 # ---------------------------------------------------------------------------
 _MAX_BYTES = 48 * 1024 * 1024
-_ELEMENT_BUDGET = 4000        # distinct element/tag names retained
-_ATTR_BUDGET = 8000           # distinct (element, attribute) pairs retained
-_SECTION_BUDGET = 2000        # structural sections retained
-_NS_BUDGET = 512              # namespace declarations retained
-_DISTINCT_VAL_CAP = 64        # per-attribute distinct-value sample cap
-_TEXT_SAMPLES = 8             # char-data chunks retained per open element
-_DEPTH_GUARD = 512            # runaway-nesting guard
-_PREVIEW = 240                # sample-text / preview clip length
+_ELEMENT_BUDGET = 4000  # distinct element/tag names retained
+_ATTR_BUDGET = 8000  # distinct (element, attribute) pairs retained
+_SECTION_BUDGET = 2000  # structural sections retained
+_NS_BUDGET = 512  # namespace declarations retained
+_DISTINCT_VAL_CAP = 64  # per-attribute distinct-value sample cap
+_TEXT_SAMPLES = 8  # char-data chunks retained per open element
+_DEPTH_GUARD = 512  # runaway-nesting guard
+_PREVIEW = 240  # sample-text / preview clip length
 
 
 # ===========================================================================
@@ -143,8 +143,9 @@ def _prefix_of(name: str) -> Optional[str]:
 _RE_INT = re.compile(r"^[+-]?\d+$")
 _RE_FLOAT = re.compile(r"^[+-]?(\d+\.\d*|\.\d+|\d+)([eE][+-]?\d+)?$")
 _RE_TS = re.compile(r"^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2})?")
-_RE_UUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}"
-                      r"-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+_RE_UUID = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}" r"-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
 
 
 def _infer_value_type(value: str) -> str:
@@ -172,28 +173,47 @@ def _infer_value_type(value: str) -> str:
 # ===========================================================================
 def _blank_metrics() -> Dict[str, int]:
     return {
-        "element_count": 0, "distinct_element_count": 0,
-        "attribute_count": 0, "distinct_attribute_count": 0,
-        "namespace_count": 0, "max_depth": 0,
-        "comment_count": 0, "pi_count": 0, "cdata_count": 0,
+        "element_count": 0,
+        "distinct_element_count": 0,
+        "attribute_count": 0,
+        "distinct_attribute_count": 0,
+        "namespace_count": 0,
+        "max_depth": 0,
+        "comment_count": 0,
+        "pi_count": 0,
+        "cdata_count": 0,
         "text_length": 0,
     }
 
 
 def _profile(fmt: str, family: str, engine: str, language: str) -> Dict[str, Any]:
     return {
-        "format": fmt, "family": family, "engine": engine, "kind": "markup",
-        "markup_language": language, "detected_via": "extension",
-        "status": "ok", "encoding": None, "byte_size": None, "line_count": None,
-        "well_formed": None, "root_element": None, "dialect": None,
+        "format": fmt,
+        "family": family,
+        "engine": engine,
+        "kind": "markup",
+        "markup_language": language,
+        "detected_via": "extension",
+        "status": "ok",
+        "encoding": None,
+        "byte_size": None,
+        "line_count": None,
+        "well_formed": None,
+        "root_element": None,
+        "dialect": None,
         "metrics": _blank_metrics(),
-        "elements": [], "attributes": [], "namespaces": [],
-        "sections": [], "properties": [], "notes": None,
+        "elements": [],
+        "attributes": [],
+        "namespaces": [],
+        "sections": [],
+        "properties": [],
+        "notes": None,
     }
 
 
-def _forensic(fmt: str, family: str, engine: str, data: bytes,
-              note: str) -> Dict[str, Any]:
+def _forensic(
+    fmt: str, family: str, engine: str, data: bytes, note: str
+) -> Dict[str, Any]:
     prof = _profile(fmt, family, engine, "binary")
     prof["status"] = "forensic"
     prof["byte_size"] = len(data)
@@ -252,12 +272,21 @@ class _XmlWalker:
                 self._elem_over = True
                 return None
             st = self.elements[name] = {
-                "tag": _localname(name), "qname": name,
-                "ns_prefix": _prefix_of(name), "ns_uri": None,
-                "count": 0, "min_depth": None, "max_depth": 0,
-                "total_children": 0, "max_children": 0,
-                "leaf_count": 0, "text_count": 0, "total_text_len": 0,
-                "attr_names": set(), "sample_text": None, "is_root": False,
+                "tag": _localname(name),
+                "qname": name,
+                "ns_prefix": _prefix_of(name),
+                "ns_uri": None,
+                "count": 0,
+                "min_depth": None,
+                "max_depth": 0,
+                "total_children": 0,
+                "max_children": 0,
+                "leaf_count": 0,
+                "text_count": 0,
+                "total_text_len": 0,
+                "attr_names": set(),
+                "sample_text": None,
+                "is_root": False,
                 "ordinal": len(self.elements) + 1,
             }
         return st
@@ -270,12 +299,19 @@ class _XmlWalker:
                 self._attr_over = True
                 return None
             st = self.attributes[key] = {
-                "element_tag": _localname(elem), "element_qname": elem,
-                "name": _localname(attr), "qname": attr,
+                "element_tag": _localname(elem),
+                "element_qname": elem,
+                "name": _localname(attr),
+                "qname": attr,
                 "ns_prefix": _prefix_of(attr),
-                "count": 0, "values": set(), "value_over": False,
-                "vtype": None, "vtype_mixed": False,
-                "sample": None, "min_len": None, "max_len": 0,
+                "count": 0,
+                "values": set(),
+                "value_over": False,
+                "vtype": None,
+                "vtype_mixed": False,
+                "sample": None,
+                "min_len": None,
+                "max_len": 0,
             }
         return st
 
@@ -294,7 +330,9 @@ class _XmlWalker:
         self.metrics["element_count"] += 1
         if st is not None:
             st["count"] += 1
-            st["min_depth"] = depth if st["min_depth"] is None else min(st["min_depth"], depth)
+            st["min_depth"] = (
+                depth if st["min_depth"] is None else min(st["min_depth"], depth)
+            )
             st["max_depth"] = max(st["max_depth"], depth)
             if depth == 0:
                 st["is_root"] = True
@@ -326,18 +364,28 @@ class _XmlWalker:
                 if ast["sample"] is None and v:
                     ast["sample"] = v[:_PREVIEW]
                 lv = len(v)
-                ast["min_len"] = lv if ast["min_len"] is None else min(ast["min_len"], lv)
+                ast["min_len"] = (
+                    lv if ast["min_len"] is None else min(ast["min_len"], lv)
+                )
                 ast["max_len"] = max(ast["max_len"], lv)
             pfx = _prefix_of(a)
             if pfx and pfx in self.namespaces:
                 self.namespaces[pfx]["usage"] += 1
         if depth < _DEPTH_GUARD:
-            self._stack.append({
-                "name": name, "depth": depth,
-                "child_elems": 0, "has_child": False, "text": [],
-                "attrs": {k: v for k, v in attrs.items()
-                          if not (k == "xmlns" or k.startswith("xmlns:"))},
-            })
+            self._stack.append(
+                {
+                    "name": name,
+                    "depth": depth,
+                    "child_elems": 0,
+                    "has_child": False,
+                    "text": [],
+                    "attrs": {
+                        k: v
+                        for k, v in attrs.items()
+                        if not (k == "xmlns" or k.startswith("xmlns:"))
+                    },
+                }
+            )
         if self._stack[:-1]:
             self._stack[-2]["child_elems"] += 1
             self._stack[-2]["has_child"] = True
@@ -368,15 +416,22 @@ class _XmlWalker:
             if title is None:
                 t = "".join(node["text"]).strip()
                 title = t[:_PREVIEW] if t else None
-            self.sections.append({
-                "name": _localname(node["name"]),
-                "type": "element",
-                "path": "/" + _localname(self.root or "") + "/" + _localname(node["name"]),
-                "depth": 1, "ordinal": len(self.sections) + 1,
-                "tag": node["name"], "child_count": nchild,
-                "text_len": len("".join(node["text"]).strip()),
-                "title": title,
-            })
+            self.sections.append(
+                {
+                    "name": _localname(node["name"]),
+                    "type": "element",
+                    "path": "/"
+                    + _localname(self.root or "")
+                    + "/"
+                    + _localname(node["name"]),
+                    "depth": 1,
+                    "ordinal": len(self.sections) + 1,
+                    "tag": node["name"],
+                    "child_count": nchild,
+                    "text_len": len("".join(node["text"]).strip()),
+                    "title": title,
+                }
+            )
 
     def char(self, data: str) -> None:
         self.metrics["text_length"] += len(data)
@@ -394,14 +449,16 @@ class _XmlWalker:
     def cdata_start(self) -> None:
         self.metrics["cdata_count"] += 1
 
-    def xml_decl(self, version: Optional[str], encoding: Optional[str],
-                 standalone: int) -> None:
+    def xml_decl(
+        self, version: Optional[str], encoding: Optional[str], standalone: int
+    ) -> None:
         self.xml_version = version
         self.xml_encoding = encoding
         self.xml_standalone = {1: "yes", 0: "no"}.get(standalone)
 
-    def doctype_decl(self, name: str, sysid: Optional[str],
-                     pubid: Optional[str], _internal: int) -> None:
+    def doctype_decl(
+        self, name: str, sysid: Optional[str], pubid: Optional[str], _internal: int
+    ) -> None:
         self.doctype = {"name": name, "system_id": sysid, "public_id": pubid}
 
     def _decl_ns(self, prefix: str, uri: str) -> None:
@@ -409,12 +466,16 @@ class _XmlWalker:
             return
         if len(self.namespaces) >= _NS_BUDGET:
             return
-        self.namespaces[prefix] = {"prefix": prefix, "uri": uri,
-                                   "is_default": prefix == "", "usage": 0}
+        self.namespaces[prefix] = {
+            "prefix": prefix,
+            "uri": uri,
+            "is_default": prefix == "",
+            "usage": 0,
+        }
 
 
 def _make_parser(walker: _XmlWalker) -> "expat.XMLParserType":
-    p = expat.ParserCreate()          # no namespace_separator: keep raw qnames
+    p = expat.ParserCreate()  # no namespace_separator: keep raw qnames
     p.buffer_text = True
     p.StartElementHandler = walker.start
     p.EndElementHandler = walker.end
@@ -430,7 +491,8 @@ def _make_parser(walker: _XmlWalker) -> "expat.XMLParserType":
 def _walker_into_profile(prof: Dict[str, Any], w: _XmlWalker) -> None:
     prof["root_element"] = _localname(w.root) if w.root else None
     prof["metrics"]["max_depth"] = max(
-        (e["max_depth"] for e in w.elements.values()), default=0)
+        (e["max_depth"] for e in w.elements.values()), default=0
+    )
     prof["metrics"]["comment_count"] = w.metrics["comment_count"]
     prof["metrics"]["pi_count"] = w.metrics["pi_count"]
     prof["metrics"]["cdata_count"] = w.metrics["cdata_count"]
@@ -439,32 +501,52 @@ def _walker_into_profile(prof: Dict[str, Any], w: _XmlWalker) -> None:
 
     for st in w.elements.values():
         names = sorted(st["attr_names"])
-        prof["elements"].append({
-            "tag": st["tag"], "qname": st["qname"],
-            "ns_prefix": st["ns_prefix"], "ns_uri": st["ns_uri"],
-            "count": st["count"],
-            "min_depth": st["min_depth"] or 0, "max_depth": st["max_depth"],
-            "total_children": st["total_children"], "max_children": st["max_children"],
-            "leaf_count": st["leaf_count"], "text_count": st["text_count"],
-            "total_text_len": st["total_text_len"],
-            "attr_names": names, "sample_text": st["sample_text"],
-            "is_root": st["is_root"], "ordinal": st["ordinal"],
-        })
+        prof["elements"].append(
+            {
+                "tag": st["tag"],
+                "qname": st["qname"],
+                "ns_prefix": st["ns_prefix"],
+                "ns_uri": st["ns_uri"],
+                "count": st["count"],
+                "min_depth": st["min_depth"] or 0,
+                "max_depth": st["max_depth"],
+                "total_children": st["total_children"],
+                "max_children": st["max_children"],
+                "leaf_count": st["leaf_count"],
+                "text_count": st["text_count"],
+                "total_text_len": st["total_text_len"],
+                "attr_names": names,
+                "sample_text": st["sample_text"],
+                "is_root": st["is_root"],
+                "ordinal": st["ordinal"],
+            }
+        )
     for st in w.attributes.values():
         dv = len(st["values"]) + (1 if st["value_over"] else 0)
         vtype = "MIXED" if st["vtype_mixed"] else (st["vtype"] or "STRING")
-        prof["attributes"].append({
-            "element_tag": st["element_tag"], "element_qname": st["element_qname"],
-            "name": st["name"], "ns_prefix": st["ns_prefix"],
-            "count": st["count"], "distinct_values": dv, "value_type": vtype,
-            "sample": st["sample"],
-            "min_len": st["min_len"] or 0, "max_len": st["max_len"],
-        })
+        prof["attributes"].append(
+            {
+                "element_tag": st["element_tag"],
+                "element_qname": st["element_qname"],
+                "name": st["name"],
+                "ns_prefix": st["ns_prefix"],
+                "count": st["count"],
+                "distinct_values": dv,
+                "value_type": vtype,
+                "sample": st["sample"],
+                "min_len": st["min_len"] or 0,
+                "max_len": st["max_len"],
+            }
+        )
     for st in w.namespaces.values():
-        prof["namespaces"].append({
-            "prefix": st["prefix"], "uri": st["uri"],
-            "is_default": st["is_default"], "usage": st["usage"],
-        })
+        prof["namespaces"].append(
+            {
+                "prefix": st["prefix"],
+                "uri": st["uri"],
+                "is_default": st["is_default"],
+                "usage": st["usage"],
+            }
+        )
     prof["sections"] = w.sections
     _finalize_element_metrics(prof)
 
@@ -493,13 +575,18 @@ def _walker_into_profile(prof: Dict[str, Any], w: _XmlWalker) -> None:
         props.append(("limits", "distinct_attribute_cap_reached", True))
 
 
-_RE_TAG = re.compile(r"<\s*(/?)\s*([A-Za-z_][\w.\-]*(?::[\w.\-]+)?)((?:\s+[^<>]*?)?)\s*(/?)>")
-_RE_ATTR = re.compile(r"([A-Za-z_][\w.\-]*(?::[\w.\-]+)?)\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s\"'<>]+)")
+_RE_TAG = re.compile(
+    r"<\s*(/?)\s*([A-Za-z_][\w.\-]*(?::[\w.\-]+)?)((?:\s+[^<>]*?)?)\s*(/?)>"
+)
+_RE_ATTR = re.compile(
+    r"([A-Za-z_][\w.\-]*(?::[\w.\-]+)?)\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s\"'<>]+)"
+)
 _RE_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 
 
-def _lenient_tag_scan(text: str, prof: Dict[str, Any],
-                      void_tags: Optional[frozenset] = None) -> None:
+def _lenient_tag_scan(
+    text: str, prof: Dict[str, Any], void_tags: Optional[frozenset] = None
+) -> None:
     """Regex tag census used when a strict parse is not well-formed.
 
     Produces real element / attribute / section rows (open/close balanced for an
@@ -511,7 +598,12 @@ def _lenient_tag_scan(text: str, prof: Dict[str, Any],
 
     w = _XmlWalker()
     for m in _RE_TAG.finditer(body):
-        closing, name, attr_str, self_close = m.group(1), m.group(2), m.group(3), m.group(4)
+        closing, name, attr_str, self_close = (
+            m.group(1),
+            m.group(2),
+            m.group(3),
+            m.group(4),
+        )
         low = name.lower()
         if closing:
             # find nearest matching open on the stack
@@ -553,19 +645,40 @@ def _engine_xml(data: bytes, prof: Dict[str, Any], decoded: str) -> None:
         line = getattr(err, "lineno", "?")
         col = getattr(err, "offset", "?")
         prof["properties"].append(
-            ("parse", "expat_error", f"{expat.ErrorString(err.code)} at line {line} col {col}"))
+            (
+                "parse",
+                "expat_error",
+                f"{expat.ErrorString(err.code)} at line {line} col {col}",
+            )
+        )
         _lenient_tag_scan(decoded, prof)
         if not prof["notes"]:
-            prof["notes"] = "not well-formed XML; lenient tag census; no tags fabricated"
+            prof["notes"] = (
+                "not well-formed XML; lenient tag census; no tags fabricated"
+            )
 
 
 # ===========================================================================
 # HTML engine (lenient html.parser walk)
 # ===========================================================================
-_HTML_VOID = frozenset({
-    "area", "base", "br", "col", "embed", "hr", "img", "input",
-    "link", "meta", "param", "source", "track", "wbr",
-})
+_HTML_VOID = frozenset(
+    {
+        "area",
+        "base",
+        "br",
+        "col",
+        "embed",
+        "hr",
+        "img",
+        "input",
+        "link",
+        "meta",
+        "param",
+        "source",
+        "track",
+        "wbr",
+    }
+)
 
 
 class _HtmlCollector(HTMLParser):
@@ -575,8 +688,16 @@ class _HtmlCollector(HTMLParser):
         self.headings: List[Dict[str, Any]] = []
         self.title: Optional[str] = None
         self._in_title = False
-        self.counts = {"script": 0, "style": 0, "link": 0, "form": 0,
-                       "img": 0, "a": 0, "input": 0, "table": 0}
+        self.counts = {
+            "script": 0,
+            "style": 0,
+            "link": 0,
+            "form": 0,
+            "img": 0,
+            "a": 0,
+            "input": 0,
+            "table": 0,
+        }
         self.doctype: Optional[str] = None
         self._pending_heading: Optional[Dict[str, Any]] = None
 
@@ -643,12 +764,19 @@ def _engine_html(data: bytes, prof: Dict[str, Any], decoded: str) -> None:
     # sections: headings (nesting depth approximated by heading level)
     prof["sections"] = []
     for i, h in enumerate(c.headings[:_SECTION_BUDGET], start=1):
-        prof["sections"].append({
-            "name": h["text"][:_PREVIEW] or f"h{h['level']}",
-            "type": "heading", "path": f"h{h['level']}",
-            "depth": h["level"], "ordinal": i, "tag": f"h{h['level']}",
-            "child_count": 0, "text_len": len(h["text"]), "title": h["text"][:_PREVIEW],
-        })
+        prof["sections"].append(
+            {
+                "name": h["text"][:_PREVIEW] or f"h{h['level']}",
+                "type": "heading",
+                "path": f"h{h['level']}",
+                "depth": h["level"],
+                "ordinal": i,
+                "tag": f"h{h['level']}",
+                "child_count": 0,
+                "text_len": len(h["text"]),
+                "title": h["text"][:_PREVIEW],
+            }
+        )
     props = prof["properties"]
     if c.doctype:
         props.append(("html", "doctype", c.doctype))
@@ -711,7 +839,7 @@ def _engine_sgml(data: bytes, prof: Dict[str, Any], decoded: str) -> None:
         w.start(name, {})
         if inline:
             w.char(inline)
-            w.end(name)          # leaf tag with an inline value: close it
+            w.end(name)  # leaf tag with an inline value: close it
     while w._stack:
         w.end(w._stack[-1]["name"])
     _walker_into_profile(prof, w)
@@ -728,21 +856,41 @@ def _engine_sgml(data: bytes, prof: Dict[str, Any], decoded: str) -> None:
 # lightweight). Each produces a construct-type element census + a heading /
 # structural section outline, with real per-construct metrics.
 # ===========================================================================
-def _elrow(tag: str, count: int, ordinal: int, *, min_depth: int = 0,
-           max_depth: int = 0, sample: Optional[str] = None,
-           text_len: int = 0) -> Dict[str, Any]:
+def _elrow(
+    tag: str,
+    count: int,
+    ordinal: int,
+    *,
+    min_depth: int = 0,
+    max_depth: int = 0,
+    sample: Optional[str] = None,
+    text_len: int = 0,
+) -> Dict[str, Any]:
     return {
-        "tag": tag, "qname": tag, "ns_prefix": None, "ns_uri": None,
-        "count": count, "min_depth": min_depth, "max_depth": max_depth,
-        "total_children": 0, "max_children": 0, "leaf_count": count,
-        "text_count": 1 if text_len else 0, "total_text_len": text_len,
-        "attr_names": [], "sample_text": sample, "is_root": False,
+        "tag": tag,
+        "qname": tag,
+        "ns_prefix": None,
+        "ns_uri": None,
+        "count": count,
+        "min_depth": min_depth,
+        "max_depth": max_depth,
+        "total_children": 0,
+        "max_children": 0,
+        "leaf_count": count,
+        "text_count": 1 if text_len else 0,
+        "total_text_len": text_len,
+        "attr_names": [],
+        "sample_text": sample,
+        "is_root": False,
         "ordinal": ordinal,
     }
 
 
-def _emit_constructs(prof: Dict[str, Any], counts: Dict[str, int],
-                     samples: Optional[Dict[str, str]] = None) -> None:
+def _emit_constructs(
+    prof: Dict[str, Any],
+    counts: Dict[str, int],
+    samples: Optional[Dict[str, str]] = None,
+) -> None:
     samples = samples or {}
     ordinal = 0
     total = 0
@@ -761,9 +909,18 @@ _RE_TEXTILE_HEAD = re.compile(r"^h([1-6])\.\s+(.*)$")
 
 
 def _engine_wiki(text: str, prof: Dict[str, Any]) -> None:
-    counts = {"heading": 0, "internal_link": 0, "external_link": 0,
-              "template": 0, "table": 0, "list_item": 0, "image": 0,
-              "bold": 0, "italic": 0, "redirect": 0}
+    counts = {
+        "heading": 0,
+        "internal_link": 0,
+        "external_link": 0,
+        "template": 0,
+        "table": 0,
+        "list_item": 0,
+        "image": 0,
+        "bold": 0,
+        "italic": 0,
+        "redirect": 0,
+    }
     sections: List[Dict[str, Any]] = []
     ordinal = 0
     for raw in text.splitlines():
@@ -776,29 +933,51 @@ def _engine_wiki(text: str, prof: Dict[str, Any]) -> None:
             counts["heading"] += 1
             ordinal += 1
             if len(sections) < _SECTION_BUDGET:
-                sections.append({"name": mh.group(2)[:_PREVIEW], "type": "heading",
-                                 "path": "=" * level, "depth": level, "ordinal": ordinal,
-                                 "tag": f"h{level}", "child_count": 0,
-                                 "text_len": len(mh.group(2)), "title": mh.group(2)[:_PREVIEW]})
+                sections.append(
+                    {
+                        "name": mh.group(2)[:_PREVIEW],
+                        "type": "heading",
+                        "path": "=" * level,
+                        "depth": level,
+                        "ordinal": ordinal,
+                        "tag": f"h{level}",
+                        "child_count": 0,
+                        "text_len": len(mh.group(2)),
+                        "title": mh.group(2)[:_PREVIEW],
+                    }
+                )
         elif mt:
             level = int(mt.group(1))
             counts["heading"] += 1
             ordinal += 1
             if len(sections) < _SECTION_BUDGET:
-                sections.append({"name": mt.group(2)[:_PREVIEW], "type": "heading",
-                                 "path": f"h{level}", "depth": level, "ordinal": ordinal,
-                                 "tag": f"h{level}", "child_count": 0,
-                                 "text_len": len(mt.group(2)), "title": mt.group(2)[:_PREVIEW]})
+                sections.append(
+                    {
+                        "name": mt.group(2)[:_PREVIEW],
+                        "type": "heading",
+                        "path": f"h{level}",
+                        "depth": level,
+                        "ordinal": ordinal,
+                        "tag": f"h{level}",
+                        "child_count": 0,
+                        "text_len": len(mt.group(2)),
+                        "title": mt.group(2)[:_PREVIEW],
+                    }
+                )
         if s.startswith("#redirect") or s.lower().startswith("#redirect"):
             counts["redirect"] += 1
         if s.startswith(("*", "#", ";", ":", "-")) and not mh:
             counts["list_item"] += 1
         if s.startswith("{|") or s.startswith("|}") or s.startswith("|-"):
             counts["table"] += 1
-        counts["internal_link"] += len(re.findall(r"\[\[(?!File:|Image:)[^\]]+\]\]", line))
+        counts["internal_link"] += len(
+            re.findall(r"\[\[(?!File:|Image:)[^\]]+\]\]", line)
+        )
         counts["image"] += len(re.findall(r"\[\[(?:File|Image):[^\]]+\]\]", line))
         counts["external_link"] += len(re.findall(r"\[https?://[^\]]+\]", line))
-        counts["external_link"] += len(re.findall(r"\[[^\]]*\]\((?:https?://)[^)]+\)", line))
+        counts["external_link"] += len(
+            re.findall(r"\[[^\]]*\]\((?:https?://)[^)]+\)", line)
+        )
         counts["template"] += len(re.findall(r"\{\{[^}]+\}\}", line))
         counts["bold"] += line.count("'''") // 2
         counts["italic"] += line.count("''") // 2
@@ -818,8 +997,14 @@ _RE_GMI_HEAD = re.compile(r"^(#{1,3})\s+(.*)$")
 
 
 def _engine_gemtext(text: str, prof: Dict[str, Any]) -> None:
-    counts = {"heading": 0, "link": 0, "list_item": 0, "quote": 0,
-              "preformatted_block": 0, "text_line": 0}
+    counts = {
+        "heading": 0,
+        "link": 0,
+        "list_item": 0,
+        "quote": 0,
+        "preformatted_block": 0,
+        "text_line": 0,
+    }
     sections: List[Dict[str, Any]] = []
     ordinal = 0
     pre = False
@@ -838,10 +1023,19 @@ def _engine_gemtext(text: str, prof: Dict[str, Any]) -> None:
             counts["heading"] += 1
             ordinal += 1
             if len(sections) < _SECTION_BUDGET:
-                sections.append({"name": mh.group(2)[:_PREVIEW], "type": "heading",
-                                 "path": "#" * level, "depth": level, "ordinal": ordinal,
-                                 "tag": f"h{level}", "child_count": 0,
-                                 "text_len": len(mh.group(2)), "title": mh.group(2)[:_PREVIEW]})
+                sections.append(
+                    {
+                        "name": mh.group(2)[:_PREVIEW],
+                        "type": "heading",
+                        "path": "#" * level,
+                        "depth": level,
+                        "ordinal": ordinal,
+                        "tag": f"h{level}",
+                        "child_count": 0,
+                        "text_len": len(mh.group(2)),
+                        "title": mh.group(2)[:_PREVIEW],
+                    }
+                )
         elif line.startswith("=>"):
             counts["link"] += 1
         elif line.startswith("* "):
@@ -854,7 +1048,9 @@ def _engine_gemtext(text: str, prof: Dict[str, Any]) -> None:
     _emit_constructs(prof, counts)
     prof["properties"].append(("gemtext", "heading_count", counts["heading"]))
     prof["properties"].append(("gemtext", "link_count", counts["link"]))
-    prof["properties"].append(("gemtext", "preformatted_blocks", counts["preformatted_block"]))
+    prof["properties"].append(
+        ("gemtext", "preformatted_blocks", counts["preformatted_block"])
+    )
 
 
 _RE_ROFF_REQ = re.compile(r"^[.']\s*([A-Za-z0-9]+)(.*)$")
@@ -885,19 +1081,28 @@ def _engine_roff(text: str, prof: Dict[str, Any]) -> None:
         if name in ("SH", "SS") and arg:
             ordinal += 1
             if len(sections) < _SECTION_BUDGET:
-                sections.append({"name": arg.strip('"')[:_PREVIEW],
-                                 "type": "heading", "path": f".{name}",
-                                 "depth": 1 if name == "SH" else 2, "ordinal": ordinal,
-                                 "tag": f".{name}", "child_count": 0,
-                                 "text_len": len(arg), "title": arg.strip('"')[:_PREVIEW]})
+                sections.append(
+                    {
+                        "name": arg.strip('"')[:_PREVIEW],
+                        "type": "heading",
+                        "path": f".{name}",
+                        "depth": 1 if name == "SH" else 2,
+                        "ordinal": ordinal,
+                        "tag": f".{name}",
+                        "child_count": 0,
+                        "text_len": len(arg),
+                        "title": arg.strip('"')[:_PREVIEW],
+                    }
+                )
         if name == "TH" and arg and title is None:
             title = arg.strip('"')[:_PREVIEW]
     prof["sections"] = sections
     ordn = 0
     for name in sorted(macro_counts):
         ordn += 1
-        prof["elements"].append(_elrow(f".{name}", macro_counts[name], ordn,
-                                       sample=macro_sample.get(name)))
+        prof["elements"].append(
+            _elrow(f".{name}", macro_counts[name], ordn, sample=macro_sample.get(name))
+        )
     prof["metrics"]["element_count"] = total_req
     prof["metrics"]["comment_count"] = comment
     _finalize_element_metrics(prof)
@@ -914,8 +1119,16 @@ _RE_TYP_DIRECTIVE = re.compile(r"#(let|set|show|import|include)\b")
 
 
 def _engine_typst(text: str, prof: Dict[str, Any]) -> None:
-    counts = {"heading": 0, "let": 0, "set": 0, "show": 0, "import": 0,
-              "include": 0, "math_block": 0, "list_item": 0}
+    counts = {
+        "heading": 0,
+        "let": 0,
+        "set": 0,
+        "show": 0,
+        "import": 0,
+        "include": 0,
+        "math_block": 0,
+        "list_item": 0,
+    }
     func_counts: Dict[str, int] = {}
     sections: List[Dict[str, Any]] = []
     ordinal = 0
@@ -928,10 +1141,19 @@ def _engine_typst(text: str, prof: Dict[str, Any]) -> None:
             counts["heading"] += 1
             ordinal += 1
             if len(sections) < _SECTION_BUDGET:
-                sections.append({"name": mh.group(2)[:_PREVIEW], "type": "heading",
-                                 "path": "=" * level, "depth": level, "ordinal": ordinal,
-                                 "tag": f"h{level}", "child_count": 0,
-                                 "text_len": len(mh.group(2)), "title": mh.group(2)[:_PREVIEW]})
+                sections.append(
+                    {
+                        "name": mh.group(2)[:_PREVIEW],
+                        "type": "heading",
+                        "path": "=" * level,
+                        "depth": level,
+                        "ordinal": ordinal,
+                        "tag": f"h{level}",
+                        "child_count": 0,
+                        "text_len": len(mh.group(2)),
+                        "title": mh.group(2)[:_PREVIEW],
+                    }
+                )
         for dm in _RE_TYP_DIRECTIVE.finditer(line):
             counts[dm.group(1)] += 1
         for fm in _RE_TYP_FUNC.finditer(line):
@@ -957,7 +1179,9 @@ def _engine_typst(text: str, prof: Dict[str, Any]) -> None:
     prof["metrics"]["element_count"] = total
     _finalize_element_metrics(prof)
     prof["properties"].append(("typst", "heading_count", counts["heading"]))
-    prof["properties"].append(("typst", "import_count", counts["import"] + counts["include"]))
+    prof["properties"].append(
+        ("typst", "import_count", counts["import"] + counts["include"])
+    )
     prof["properties"].append(("typst", "let_count", counts["let"]))
     prof["properties"].append(("typst", "function_calls", sum(func_counts.values())))
 
@@ -989,9 +1213,19 @@ def _engine_mif(text: str, prof: Dict[str, Any]) -> None:
                 token_depth_max[name] = max(token_depth_max.get(name, depth), depth)
                 total += 1
                 if depth == 1 and len(sections) < _SECTION_BUDGET:
-                    sections.append({"name": name, "type": "token", "path": f"<{name}>",
-                                     "depth": 1, "ordinal": len(sections) + 1, "tag": name,
-                                     "child_count": 0, "text_len": 0, "title": name})
+                    sections.append(
+                        {
+                            "name": name,
+                            "type": "token",
+                            "path": f"<{name}>",
+                            "depth": 1,
+                            "ordinal": len(sections) + 1,
+                            "tag": name,
+                            "child_count": 0,
+                            "text_len": 0,
+                            "title": name,
+                        }
+                    )
                 depth += 1
                 i = mt.end()
                 continue
@@ -1003,9 +1237,15 @@ def _engine_mif(text: str, prof: Dict[str, Any]) -> None:
     ordn = 0
     for name in sorted(token_counts):
         ordn += 1
-        prof["elements"].append(_elrow(name, token_counts[name], ordn,
-                                        min_depth=token_depth_min[name],
-                                        max_depth=token_depth_max[name]))
+        prof["elements"].append(
+            _elrow(
+                name,
+                token_counts[name],
+                ordn,
+                min_depth=token_depth_min[name],
+                max_depth=token_depth_max[name],
+            )
+        )
     prof["metrics"]["element_count"] = total
     prof["metrics"]["max_depth"] = max(token_depth_max.values(), default=0)
     prof["root_element"] = "MIFFile" if "MIFFile" in token_counts else None
@@ -1023,9 +1263,19 @@ _RE_APIB_FORMAT = re.compile(r"^FORMAT:\s*(\S+)", re.IGNORECASE)
 
 
 def _engine_markdown(text: str, prof: Dict[str, Any]) -> None:
-    counts = {"heading": 0, "fenced_code": 0, "component": 0, "link": 0,
-              "image": 0, "list_item": 0, "blockquote": 0, "table_row": 0,
-              "apib_group": 0, "apib_resource": 0, "apib_action": 0}
+    counts = {
+        "heading": 0,
+        "fenced_code": 0,
+        "component": 0,
+        "link": 0,
+        "image": 0,
+        "list_item": 0,
+        "blockquote": 0,
+        "table_row": 0,
+        "apib_group": 0,
+        "apib_resource": 0,
+        "apib_action": 0,
+    }
     sections: List[Dict[str, Any]] = []
     ordinal = 0
     frontmatter = False
@@ -1062,10 +1312,19 @@ def _engine_markdown(text: str, prof: Dict[str, Any]) -> None:
             elif "[" in head and "]" in head and "/" in head:
                 counts["apib_resource"] += 1
             if len(sections) < _SECTION_BUDGET:
-                sections.append({"name": head[:_PREVIEW], "type": "heading",
-                                 "path": "#" * level, "depth": level, "ordinal": ordinal,
-                                 "tag": f"h{level}", "child_count": 0,
-                                 "text_len": len(head), "title": head[:_PREVIEW]})
+                sections.append(
+                    {
+                        "name": head[:_PREVIEW],
+                        "type": "heading",
+                        "path": "#" * level,
+                        "depth": level,
+                        "ordinal": ordinal,
+                        "tag": f"h{level}",
+                        "child_count": 0,
+                        "text_len": len(head),
+                        "title": head[:_PREVIEW],
+                    }
+                )
             continue
         mc = _RE_MDC_COMP.match(line.strip())
         if mc:
@@ -1106,8 +1365,13 @@ _RE_BOX = re.compile(r"[─-╿▀-▟=+*#|/\\_-]")
 
 def _engine_lightweight(text: str, prof: Dict[str, Any]) -> None:
     lines = text.splitlines()
-    counts = {"paragraph": 0, "blank_line": 0, "heading_underline": 0,
-              "box_drawing_line": 0, "list_item": 0}
+    counts = {
+        "paragraph": 0,
+        "blank_line": 0,
+        "heading_underline": 0,
+        "box_drawing_line": 0,
+        "list_item": 0,
+    }
     sections: List[Dict[str, Any]] = []
     ordinal = 0
     words = 0
@@ -1129,11 +1393,19 @@ def _engine_lightweight(text: str, prof: Dict[str, Any]) -> None:
             counts["heading_underline"] += 1
             ordinal += 1
             if len(sections) < _SECTION_BUDGET:
-                sections.append({"name": prev_nonblank[:_PREVIEW], "type": "heading",
-                                 "path": "underline", "depth": 1, "ordinal": ordinal,
-                                 "tag": "heading", "child_count": 0,
-                                 "text_len": len(prev_nonblank),
-                                 "title": prev_nonblank[:_PREVIEW]})
+                sections.append(
+                    {
+                        "name": prev_nonblank[:_PREVIEW],
+                        "type": "heading",
+                        "path": "underline",
+                        "depth": 1,
+                        "ordinal": ordinal,
+                        "tag": "heading",
+                        "child_count": 0,
+                        "text_len": len(prev_nonblank),
+                        "title": prev_nonblank[:_PREVIEW],
+                    }
+                )
             prev_nonblank = None
             continue
         if s.startswith(("-", "*", "o ", "> ")):
@@ -1146,9 +1418,19 @@ def _engine_lightweight(text: str, prof: Dict[str, Any]) -> None:
             counts["paragraph"] += 1
         prev_nonblank = s
     if not sections:
-        sections = [{"name": "(body)", "type": "body", "path": "/", "depth": 0,
-                     "ordinal": 1, "tag": "body",
-                     "child_count": len(lines), "text_len": chars, "title": None}]
+        sections = [
+            {
+                "name": "(body)",
+                "type": "body",
+                "path": "/",
+                "depth": 0,
+                "ordinal": 1,
+                "tag": "body",
+                "child_count": len(lines),
+                "text_len": chars,
+                "title": None,
+            }
+        ]
     prof["sections"] = sections
     _emit_constructs(prof, counts)
     prof["metrics"]["text_length"] = chars
@@ -1160,8 +1442,13 @@ def _engine_lightweight(text: str, prof: Dict[str, Any]) -> None:
     props.append(("lightweight", "longest_line", longest))
     ratio = round(nonascii / max(1, chars), 4)
     props.append(("lightweight", "non_ascii_ratio", ratio))
-    props.append(("lightweight", "looks_like_ascii_art",
-                  counts["box_drawing_line"] > max(3, counts["paragraph"])))
+    props.append(
+        (
+            "lightweight",
+            "looks_like_ascii_art",
+            counts["box_drawing_line"] > max(3, counts["paragraph"]),
+        )
+    )
 
 
 # ===========================================================================
@@ -1408,7 +1695,11 @@ _NON_XML: Dict[str, Tuple[str, str, str]] = {
     # sgml engine
     ".ofx": ("ofx", "sgml", "Open Financial Exchange"),
     # lightweight engine
-    ".ascii": ("lightweight", "lightweight", "Plain / lightweight markup text (.ascii)"),
+    ".ascii": (
+        "lightweight",
+        "lightweight",
+        "Plain / lightweight markup text (.ascii)",
+    ),
     ".utf8": ("lightweight", "lightweight", "Plain / lightweight markup text (.utf8)"),
     ".diz": ("lightweight", "lightweight", "Description-in-Zip (.diz)"),
     ".1st": ("lightweight", "lightweight", "Readme / first-run text (.1st)"),
@@ -1462,8 +1753,9 @@ def analyze(path: Path, ext: str) -> Dict[str, Any]:
     if spec is None:
         raise KeyError(f"no markup engine registered for {ext!r}")
     family, engine, label = spec
-    language = "xml" if engine in ("xml", "sgml") else (
-        "html" if engine == "html" else engine)
+    language = (
+        "xml" if engine in ("xml", "sgml") else ("html" if engine == "html" else engine)
+    )
 
     data, truncated = _read_bytes(path)
     if not data:
@@ -1477,13 +1769,19 @@ def analyze(path: Path, ext: str) -> Dict[str, Any]:
                 data = gz.read(_MAX_BYTES)
             detected_via = "gzip-magic"
         except OSError:
-            return _forensic(label, family, engine, data,
-                             "gzip magic but not a valid gzip stream")
+            return _forensic(
+                label, family, engine, data, "gzip magic but not a valid gzip stream"
+            )
     # ZIP-packaged vocabulary (IDML/INX/ODF containers): honest forensic note.
     if data[:4] == b"PK\x03\x04":
-        prof = _forensic(label, family, engine, data,
-                         "ZIP-packaged markup vocabulary; members not extracted "
-                         "in the markup plane (route via ArchiveAnalyzer to recurse)")
+        prof = _forensic(
+            label,
+            family,
+            engine,
+            data,
+            "ZIP-packaged markup vocabulary; members not extracted "
+            "in the markup plane (route via ArchiveAnalyzer to recurse)",
+        )
         prof["properties"].append(("container", "packaging", "zip"))
         return prof
 
@@ -1496,8 +1794,9 @@ def analyze(path: Path, ext: str) -> Dict[str, Any]:
     prof["line_count"] = _line_count(decoded)
 
     if engine in _BYTE_ENGINES and _looks_binary(data):
-        forensic = _forensic(label, family, engine, data,
-                             "declared markup but payload is binary")
+        forensic = _forensic(
+            label, family, engine, data, "declared markup but payload is binary"
+        )
         forensic["line_count"] = prof["line_count"]
         return forensic
 
@@ -1516,9 +1815,13 @@ def analyze(path: Path, ext: str) -> Dict[str, Any]:
         prof["properties"].append(("parse", "error", str(err)[:_PREVIEW]))
 
     if truncated:
-        prof["properties"].append(("limits", "input_truncated_at_cap_bytes", _MAX_BYTES))
+        prof["properties"].append(
+            ("limits", "input_truncated_at_cap_bytes", _MAX_BYTES)
+        )
         note = prof.get("notes")
-        prof["notes"] = (note + "; input truncated at cap") if note else "input truncated at cap"
+        prof["notes"] = (
+            (note + "; input truncated at cap") if note else "input truncated at cap"
+        )
 
     # dialect verification (honest: compares observed root to the expected one)
     prof["dialect"] = family

@@ -18,7 +18,7 @@
 #
 # Comments are '#'; strings use '"' and "'".  Bodies run to a matching 'end'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -74,25 +74,47 @@ class IconAnalyzer(RegexCodeAnalyzer):
             self._add_import(file_id, leaf, src)
 
         for m in self._RECORD.finditer(clean):
-            attr_ids = [self._add_arg(a.strip())
-                        for a in self._split_top_level(m.group(2))
-                        if a.strip()]
-            self._add_class(file_id, m.group(1), description="icon record",
-                            attr_ids=attr_ids or None)
+            attr_ids = [
+                self._add_arg(a.strip())
+                for a in self._split_top_level(m.group(2))
+                if a.strip()
+            ]
+            self._add_class(
+                file_id,
+                m.group(1),
+                description="icon record",
+                attr_ids=attr_ids or None,
+            )
 
         for m in self._CLASS.finditer(clean):
-            attr_ids = [self._add_arg(a.strip())
-                        for a in self._split_top_level(m.group(2) or "")
-                        if a.strip()]
-            self._add_class(file_id, m.group(1), description="unicon class",
-                            attr_ids=attr_ids or None)
+            attr_ids = [
+                self._add_arg(a.strip())
+                for a in self._split_top_level(m.group(2) or "")
+                if a.strip()
+            ]
+            self._add_class(
+                file_id,
+                m.group(1),
+                description="unicon class",
+                attr_ids=attr_ids or None,
+            )
 
         for m in self._PROC.finditer(clean):
-            self._add_function(file_id, m.group(1), self._args(m.group(2)),
-                               [], description="icon procedure")
+            self._add_function(
+                file_id,
+                m.group(1),
+                self._args(m.group(2)),
+                [],
+                description="icon procedure",
+            )
         for m in self._METHOD.finditer(clean):
-            self._add_function(file_id, m.group(1), self._args(m.group(2)),
-                               [], description="unicon method")
+            self._add_function(
+                file_id,
+                m.group(1),
+                self._args(m.group(2)),
+                [],
+                description="unicon method",
+            )
 
         for m in self._GLOBAL.finditer(clean):
             for nm in m.group(1).split(","):

@@ -16,17 +16,42 @@
 #
 # Comments are '--' and '{- -}'; strings use '"'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[a-z_][A-Za-z0-9_']*"
 _CID = r"[A-Z][A-Za-z0-9_']*"
 _QUAL = r"[A-Za-z_][A-Za-z0-9_'.]*"
 _KEYWORDS = {
-    "data", "type", "newtype", "class", "instance", "module", "import",
-    "where", "deriving", "infixl", "infixr", "infix", "native", "pure",
-    "do", "let", "in", "case", "of", "if", "then", "else", "forall",
-    "package", "protected", "private", "public", "abstract", "derive",
+    "data",
+    "type",
+    "newtype",
+    "class",
+    "instance",
+    "module",
+    "import",
+    "where",
+    "deriving",
+    "infixl",
+    "infixr",
+    "infix",
+    "native",
+    "pure",
+    "do",
+    "let",
+    "in",
+    "case",
+    "of",
+    "if",
+    "then",
+    "else",
+    "forall",
+    "package",
+    "protected",
+    "private",
+    "public",
+    "abstract",
+    "derive",
 }
 
 
@@ -40,7 +65,8 @@ class FregeAnalyzer(RegexCodeAnalyzer):
     _MODULE = re.compile(r"(?m)^\s*module\s+(" + _QUAL + r")\b")
     _IMPORT = re.compile(
         r"(?m)^\s*import\s+(?:qualified\s+)?(" + _QUAL + r")"
-        r"(?:\s+as\s+(" + _CID + r"))?(?:\s*\(([^)]*)\))?")
+        r"(?:\s+as\s+(" + _CID + r"))?(?:\s*\(([^)]*)\))?"
+    )
     _DATA = re.compile(r"(?m)^\s*(?:data|newtype)\s+(" + _CID + r")")
     _TYPE = re.compile(r"(?m)^\s*type\s+(" + _CID + r")")
     _CLASS = re.compile(r"(?m)^\s*class\s+(?:[^=>]*=>\s*)?(" + _CID + r")\b")
@@ -62,8 +88,9 @@ class FregeAnalyzer(RegexCodeAnalyzer):
         clean = self._strip_comments(text)
 
         for m in self._MODULE.finditer(clean):
-            self._add_class(file_id, m.group(1).split(".")[-1],
-                            description="frege module")
+            self._add_class(
+                file_id, m.group(1).split(".")[-1], description="frege module"
+            )
         for m in self._IMPORT.finditer(clean):
             src = m.group(1)
             leaf = src.split(".")[-1]
@@ -84,20 +111,21 @@ class FregeAnalyzer(RegexCodeAnalyzer):
         seen = set()
         for m in self._NATIVE.finditer(clean):
             if m.group(1) not in seen:
-                self._add_function(file_id, m.group(1), [], [],
-                                   description="frege native")
+                self._add_function(
+                    file_id, m.group(1), [], [], description="frege native"
+                )
                 seen.add(m.group(1))
         for m in self._SIG.finditer(clean):
             for nm in m.group(1).split(","):
                 nm = nm.strip()
                 if nm and nm not in _KEYWORDS and nm not in seen:
-                    self._add_function(file_id, nm, [], [],
-                                       description="frege function")
+                    self._add_function(
+                        file_id, nm, [], [], description="frege function"
+                    )
                     seen.add(nm)
         for rx in (self._DEF, self._DEF0):
             for m in rx.finditer(clean):
                 nm = m.group(1)
                 if nm not in _KEYWORDS and nm not in seen:
-                    self._add_function(file_id, nm, [], [],
-                                       description="frege binding")
+                    self._add_function(file_id, nm, [], [], description="frege binding")
                     seen.add(nm)

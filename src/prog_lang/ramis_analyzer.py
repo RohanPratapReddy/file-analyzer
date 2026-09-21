@@ -24,7 +24,7 @@
 #   * `-INCLUDE member`                              -> import
 # `-*` starts a control-line comment; keywords are case-insensitive.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_#@$][A-Za-z0-9_#@$]*"
@@ -37,12 +37,14 @@ class RamisAnalyzer(RegexCodeAnalyzer):
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ("'",)
 
-    _DEFINE = re.compile(r"(?mi)^[ \t]*(?:DEFINE|COMPUTE)\s+(" + _ID +
-                         r")\s*(?:/[^=\s]+)?\s*(?:=|$)")
+    _DEFINE = re.compile(
+        r"(?mi)^[ \t]*(?:DEFINE|COMPUTE)\s+(" + _ID + r")\s*(?:/[^=\s]+)?\s*(?:=|$)"
+    )
     _AMPER = re.compile(r"(?mi)^[ \t]*-SET\s+%+(" + _ID + r")\s*=")
     _PROC = re.compile(r"(?mi)^[ \t]*PROCEDURE\s+(" + _ID + r")\b")
-    _FILE = re.compile(r"(?mi)^[ \t]*(?:TABLE\s+FILE|REPORT\s+ON|FROM)\s+(" +
-                       _ID + r")")
+    _FILE = re.compile(
+        r"(?mi)^[ \t]*(?:TABLE\s+FILE|REPORT\s+ON|FROM)\s+(" + _ID + r")"
+    )
     _INCLUDE = re.compile(r"(?mi)^[ \t]*-INCLUDE\s+(" + _ID + r")")
 
     def _extract_entities(self, file_id, text, path):
@@ -54,8 +56,7 @@ class RamisAnalyzer(RegexCodeAnalyzer):
             if name.lower() in seen_fn:
                 continue
             seen_fn.add(name.lower())
-            self._add_function(file_id, name, [], [],
-                               description="RAMIS procedure")
+            self._add_function(file_id, name, [], [], description="RAMIS procedure")
 
         seen_v = set()
         for rx, scope in ((self._DEFINE, "field"), (self._AMPER, "amper")):

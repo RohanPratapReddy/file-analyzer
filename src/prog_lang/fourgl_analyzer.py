@@ -13,7 +13,7 @@
 #
 # Comments are '#', '--' and '{ }'; strings use '"' and '\''. Case-insensitive.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -28,17 +28,20 @@ class FourGLAnalyzer(RegexCodeAnalyzer):
 
     _IMPORT = re.compile(r"(?im)^\s*IMPORT\s+(?:FGL|JAVA|C)?\s*([\w.]+)")
     _SCHEMA = re.compile(r"(?im)^\s*(?:SCHEMA|DATABASE)\s+(" + _ID + r")")
-    _FUNC = re.compile(r"(?im)^\s*(?:PRIVATE\s+|PUBLIC\s+)?FUNCTION\s+(" + _ID +
-                       r")\s*\(([^)]*)\)")
+    _FUNC = re.compile(
+        r"(?im)^\s*(?:PRIVATE\s+|PUBLIC\s+)?FUNCTION\s+(" + _ID + r")\s*\(([^)]*)\)"
+    )
     _MAIN = re.compile(r"(?im)^\s*MAIN\b")
     _REPORT = re.compile(r"(?im)^\s*REPORT\s+(" + _ID + r")\s*\(([^)]*)\)")
     # `DEFINE name TYPE` (may list several comma-separated names before a type)
     _DEFINE = re.compile(r"(?im)^\s*DEFINE\s+([^\n]+)")
 
-    _TYPE_TOKENS = re.compile(r"(?i)\b(?:CHAR|VARCHAR|STRING|INTEGER|INT|"
-                              r"SMALLINT|BIGINT|DECIMAL|DEC|MONEY|FLOAT|SMALLFLOAT|"
-                              r"REAL|DOUBLE|DATE|DATETIME|INTERVAL|BOOLEAN|BYTE|"
-                              r"TEXT|RECORD|ARRAY|DYNAMIC|LIKE|OF|TO|DIM)\b")
+    _TYPE_TOKENS = re.compile(
+        r"(?i)\b(?:CHAR|VARCHAR|STRING|INTEGER|INT|"
+        r"SMALLINT|BIGINT|DECIMAL|DEC|MONEY|FLOAT|SMALLFLOAT|"
+        r"REAL|DOUBLE|DATE|DATETIME|INTERVAL|BOOLEAN|BYTE|"
+        r"TEXT|RECORD|ARRAY|DYNAMIC|LIKE|OF|TO|DIM)\b"
+    )
 
     def _register_types(self, file_id, text, path):
         # 4GL has no user class construct (RECORD types are inline).
@@ -55,14 +58,14 @@ class FourGLAnalyzer(RegexCodeAnalyzer):
 
         for m in self._FUNC.finditer(clean):
             args = self._simple_args(m.group(2))
-            self._add_function(file_id, m.group(1), args, [],
-                               description="4gl function")
+            self._add_function(
+                file_id, m.group(1), args, [], description="4gl function"
+            )
         for m in self._MAIN.finditer(clean):
             self._add_function(file_id, "MAIN", [], [], description="4gl main")
         for m in self._REPORT.finditer(clean):
             args = self._simple_args(m.group(2))
-            self._add_function(file_id, m.group(1), args, [],
-                               description="4gl report")
+            self._add_function(file_id, m.group(1), args, [], description="4gl report")
 
         seen = set()
         for m in self._DEFINE.finditer(clean):
@@ -74,7 +77,7 @@ class FourGLAnalyzer(RegexCodeAnalyzer):
     def _define_names(self, line):
         # everything up to the first type keyword is a comma-separated name list
         tm = self._TYPE_TOKENS.search(line)
-        head = line[:tm.start()] if tm else line
+        head = line[: tm.start()] if tm else line
         names = []
         for tok in re.split(r"[,\s]+", head.strip()):
             if re.fullmatch(_ID, tok) and tok.upper() not in ("DEFINE",):

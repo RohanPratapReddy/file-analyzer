@@ -14,13 +14,22 @@
 #
 # Comment token is '::' to end of line; Mizar has no string literals.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_']*"
-_ENV_KEYWORDS = ("vocabularies", "notations", "constructors", "requirements",
-                 "definitions", "registrations", "theorems", "schemes",
-                 "equalities", "expansions")
+_ENV_KEYWORDS = (
+    "vocabularies",
+    "notations",
+    "constructors",
+    "requirements",
+    "definitions",
+    "registrations",
+    "theorems",
+    "schemes",
+    "equalities",
+    "expansions",
+)
 
 
 class MizarAnalyzer(RegexCodeAnalyzer):
@@ -31,18 +40,15 @@ class MizarAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ()
 
     _ENVDIR = re.compile(
-        r"^[ \t]*(" + "|".join(_ENV_KEYWORDS) + r")\b([^;]*);",
-        re.MULTILINE)
-    _FUNC = re.compile(
-        r"^[ \t]*(?:redefine\s+)?func\s+(\S+)", re.MULTILINE)
-    _PRED = re.compile(
-        r"^[ \t]*(?:redefine\s+)?pred\s+(\S+)", re.MULTILINE)
-    _ATTR = re.compile(
-        r"^[ \t]*(?:redefine\s+)?attr\s+(\S+)", re.MULTILINE)
-    _MODE = re.compile(
-        r"^[ \t]*(?:redefine\s+)?mode\s+(" + _ID + r")", re.MULTILINE)
+        r"^[ \t]*(" + "|".join(_ENV_KEYWORDS) + r")\b([^;]*);", re.MULTILINE
+    )
+    _FUNC = re.compile(r"^[ \t]*(?:redefine\s+)?func\s+(\S+)", re.MULTILINE)
+    _PRED = re.compile(r"^[ \t]*(?:redefine\s+)?pred\s+(\S+)", re.MULTILINE)
+    _ATTR = re.compile(r"^[ \t]*(?:redefine\s+)?attr\s+(\S+)", re.MULTILINE)
+    _MODE = re.compile(r"^[ \t]*(?:redefine\s+)?mode\s+(" + _ID + r")", re.MULTILINE)
     _STRUCT = re.compile(
-        r"^[ \t]*struct\b(?:\s*\([^)]*\))?\s*(" + _ID + r")", re.MULTILINE)
+        r"^[ \t]*struct\b(?:\s*\([^)]*\))?\s*(" + _ID + r")", re.MULTILINE
+    )
     _SCHEME = re.compile(r"^[ \t]*scheme\s+(" + _ID + r")", re.MULTILINE)
     _RESERVE = re.compile(r"^[ \t]*reserve\s+([^;]+?)\s+for\b", re.MULTILINE)
 
@@ -66,10 +72,12 @@ class MizarAnalyzer(RegexCodeAnalyzer):
         for m in self._STRUCT.finditer(clean):
             self._add_class(file_id, m.group(1), description="mizar struct")
 
-        for rx, desc in ((self._FUNC, "mizar functor"),
-                         (self._PRED, "mizar predicate"),
-                         (self._ATTR, "mizar attribute"),
-                         (self._SCHEME, "mizar scheme")):
+        for rx, desc in (
+            (self._FUNC, "mizar functor"),
+            (self._PRED, "mizar predicate"),
+            (self._ATTR, "mizar attribute"),
+            (self._SCHEME, "mizar scheme"),
+        ):
             for m in rx.finditer(clean):
                 nm = m.group(1)
                 if nm:

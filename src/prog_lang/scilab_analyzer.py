@@ -10,7 +10,7 @@
 # Comments are '//'; strings use '"' and single-quote (also transpose -- we
 # treat only '"' as a delimiter to avoid transpose ambiguity).
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_%][A-Za-z0-9_]*"
@@ -27,10 +27,14 @@ class ScilabAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"',)
 
     # function [out1,out2] = name(args)  |  function out = name(args)  |  function name(args)
-    _FUNC = re.compile(r"(?m)^\s*function\s+"
-                       r"(?:\[([^\]]*)\]\s*=\s*|(" + _ID + r")\s*=\s*)?"
-                       r"(" + _FID + r")\s*(\([^)]*\))?")
-    _IMPORT = re.compile(r'(?m)(?:exec|getf|load|loadmatfile|getd)\s*\(\s*["\']([^"\']+)["\']')
+    _FUNC = re.compile(
+        r"(?m)^\s*function\s+"
+        r"(?:\[([^\]]*)\]\s*=\s*|(" + _ID + r")\s*=\s*)?"
+        r"(" + _FID + r")\s*(\([^)]*\))?"
+    )
+    _IMPORT = re.compile(
+        r'(?m)(?:exec|getf|load|loadmatfile|getd)\s*\(\s*["\']([^"\']+)["\']'
+    )
     _GLOBAL = re.compile(r"(?m)^\s*global\s+(.+)$")
     _ASSIGN = re.compile(r"(?m)^\s*(" + _ID + r")\s*=(?![=])")
 
@@ -58,8 +62,9 @@ class ScilabAnalyzer(RegexCodeAnalyzer):
                     if o:
                         out_ids.append(self._add_output(o))
             args = self._paren_args(m.group(4))
-            self._add_function(file_id, name, args, out_ids,
-                               description="scilab function")
+            self._add_function(
+                file_id, name, args, out_ids, description="scilab function"
+            )
 
         seen = set()
         for m in self._GLOBAL.finditer(clean):

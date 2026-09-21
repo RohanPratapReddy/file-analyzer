@@ -24,7 +24,7 @@
 # Comments run from `;` to end of line.  Identifiers are rich: letters, digits
 # and `-_?!.+*<>=` are all legal in a NetLogo name.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_?!.\-+*<>=]*"
@@ -32,7 +32,7 @@ _ID = r"[A-Za-z_][A-Za-z0-9_?!.\-+*<>=]*"
 
 class NetLogoAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "netlogo"
-    EXTENSIONS = (".nl",)       # NetLogo `.nls`/`.nlogo` siblings appended at test time
+    EXTENSIONS = (".nl",)  # NetLogo `.nls`/`.nlogo` siblings appended at test time
     LINE_COMMENTS = (";",)
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ('"',)
@@ -40,7 +40,7 @@ class NetLogoAnalyzer(RegexCodeAnalyzer):
     _PROC = re.compile(r"(?m)^\s*(to-report|to)\s+(" + _ID + r")\s*(\[[^\]]*\])?")
     _BREED = re.compile(r"(?m)^\s*breed\s*\[\s*(" + _ID + r")\s+(" + _ID + r")\s*\]")
     _GLOBALS = re.compile(r"(?m)^\s*(globals|" + _ID + r"-own)\s*\[([^\]]*)\]")
-    _INCLUDES = re.compile(r'(?m)^\s*__includes\s*\[([^\]]*)\]')
+    _INCLUDES = re.compile(r"(?m)^\s*__includes\s*\[([^\]]*)\]")
     _EXTENSIONS = re.compile(r"(?m)^\s*extensions\s*\[([^\]]*)\]")
 
     def _register_types(self, file_id, text, path):
@@ -61,8 +61,9 @@ class NetLogoAnalyzer(RegexCodeAnalyzer):
 
         for m in self._BREED.finditer(clean):
             plural, singular = m.group(1), m.group(2)
-            self._add_class(file_id, plural,
-                            description=f"NetLogo breed (singular: {singular})")
+            self._add_class(
+                file_id, plural, description=f"NetLogo breed (singular: {singular})"
+            )
 
         seen_v = set()
         for m in self._GLOBALS.finditer(clean):
@@ -84,5 +85,6 @@ class NetLogoAnalyzer(RegexCodeAnalyzer):
                     if re.fullmatch(_ID, tok):
                         arg_ids.append(self._add_arg(tok))
             outs = [self._add_output("reporter")] if kind == "to-report" else []
-            self._add_function(file_id, nm, arg_ids, outs,
-                               description="NetLogo " + kind)
+            self._add_function(
+                file_id, nm, arg_ids, outs, description="NetLogo " + kind
+            )

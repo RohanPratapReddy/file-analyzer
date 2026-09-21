@@ -1,17 +1,6 @@
 # Auto-extracted from code_analyzer.py (verbatim class body).
-import os
-import csv
-import json
-import re
-import ast
-import dis
-import inspect
-import traceback
-import subprocess
-import sqlite3
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
 from .tree_sitter_base import BaseTreeSitterAnalyzer
+
 
 class SwiftAnalyzer(BaseTreeSitterAnalyzer):
     """
@@ -21,17 +10,28 @@ class SwiftAnalyzer(BaseTreeSitterAnalyzer):
     properties, enum cases and methods, plus standalone functions.
     """
 
-    _TYPE_DECLS = ("class_declaration", "protocol_declaration", "enum_declaration",
-                   "struct_declaration", "extension_declaration")
-    _TYPE_NODES = ("user_type", "type_identifier", "optional_type", "array_type",
-                   "dictionary_type", "tuple_type")
+    _TYPE_DECLS = (
+        "class_declaration",
+        "protocol_declaration",
+        "enum_declaration",
+        "struct_declaration",
+        "extension_declaration",
+    )
+    _TYPE_NODES = (
+        "user_type",
+        "type_identifier",
+        "optional_type",
+        "array_type",
+        "dictionary_type",
+        "tuple_type",
+    )
 
     def __init__(self, **kwargs):
         super().__init__(
             lang_key="swift",
             extensions=[".swift"],
             introspection_source="Mirror(reflecting:) + Thread.callStackSymbols",
-            **kwargs
+            **kwargs,
         )
 
     def _register_types(self, root_node, source: bytes):
@@ -40,10 +40,14 @@ class SwiftAnalyzer(BaseTreeSitterAnalyzer):
     def _sw_register(self, container, source: bytes):
         for child in container.children:
             if child.type in self._TYPE_DECLS:
-                n = child.child_by_field_name("name") or self._child_of(child, "type_identifier")
+                n = child.child_by_field_name("name") or self._child_of(
+                    child, "type_identifier"
+                )
                 if n is not None:
                     self._ts_register_class(self._node_text(n, source))
-                body = self._child_of(child, "class_body", "enum_class_body", "protocol_body")
+                body = self._child_of(
+                    child, "class_body", "enum_class_body", "protocol_body"
+                )
                 if body is not None:
                     self._sw_register(body, source)
 
@@ -65,8 +69,11 @@ class SwiftAnalyzer(BaseTreeSitterAnalyzer):
 
     def _sw_import(self, file_id, node, source: bytes):
         ident = self._child_of(node, "identifier")
-        target = (self._node_text(ident, source) if ident else
-                  self._node_text(node, source).replace("import", "").strip())
+        target = (
+            self._node_text(ident, source)
+            if ident
+            else self._node_text(node, source).replace("import", "").strip()
+        )
         self._ts_add_import(file_id, target.split(".")[-1], target)
 
     def _sw_name_of_pattern(self, node, source: bytes):
@@ -82,7 +89,11 @@ class SwiftAnalyzer(BaseTreeSitterAnalyzer):
         if ta is None:
             return None
         ut = self._child_of(ta, *self._TYPE_NODES)
-        return self._node_text(ut, source) if ut else self._node_text(ta, source).lstrip(":").strip()
+        return (
+            self._node_text(ut, source)
+            if ut
+            else self._node_text(ta, source).lstrip(":").strip()
+        )
 
     def _sw_property_var(self, file_id, node, source: bytes):
         name = self._sw_name_of_pattern(node, source)
@@ -90,7 +101,9 @@ class SwiftAnalyzer(BaseTreeSitterAnalyzer):
 
     def _sw_attr(self, node, source: bytes):
         name = self._sw_name_of_pattern(node, source)
-        return [self._ts_add_arg(name or "attr", self._sw_type_annotation(node, source))]
+        return [
+            self._ts_add_arg(name or "attr", self._sw_type_annotation(node, source))
+        ]
 
     def _sw_first_type_id(self, node, source: bytes):
         if node.type == "type_identifier":
@@ -134,7 +147,9 @@ class SwiftAnalyzer(BaseTreeSitterAnalyzer):
         return self._ts_add_function(file_id, "init", arg_ids, [], class_id=class_id)
 
     def _sw_type(self, file_id, node, source: bytes):
-        name_node = node.child_by_field_name("name") or self._child_of(node, "type_identifier")
+        name_node = node.child_by_field_name("name") or self._child_of(
+            node, "type_identifier"
+        )
         if name_node is None:
             return
         name = self._node_text(name_node, source)
@@ -157,7 +172,14 @@ class SwiftAnalyzer(BaseTreeSitterAnalyzer):
                     attr_ids.extend(self._sw_attr(m, source))
                 elif m.type == "enum_entry":
                     for si in self._children_of(m, "simple_identifier"):
-                        attr_ids.append(self._ts_add_arg(self._node_text(si, source), "enum_case"))
-        self._ts_add_class(file_id, name,
-                           description=f"swift {node.type.replace('_declaration', '')}",
-                           parent_ids=parent_ids, method_ids=method_ids, attr_ids=attr_ids)
+                        attr_ids.append(
+                            self._ts_add_arg(self._node_text(si, source), "enum_case")
+                        )
+        self._ts_add_class(
+            file_id,
+            name,
+            description=f"swift {node.type.replace('_declaration', '')}",
+            parent_ids=parent_ids,
+            method_ids=method_ids,
+            attr_ids=attr_ids,
+        )

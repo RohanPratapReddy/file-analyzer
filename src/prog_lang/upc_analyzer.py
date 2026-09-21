@@ -20,7 +20,7 @@
 # `upc_forall`/`upc_barrier`/etc. are call sites, not definitions.  Comments
 # are '//' and '/* */'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -40,24 +40,56 @@ class UPCAnalyzer(RegexCodeAnalyzer):
     # typedef ... NAME;   (name is the last identifier before ';')
     _TYPEDEF = re.compile(r"(?m)^\s*typedef\b[^;{]*?\b(" + _ID + r")\s*;")
     # typedef struct/union/enum { ... } NAME;  (alias for an inline record body)
-    _TYPEDEF_ALIAS = re.compile(r"(?ms)^\s*typedef\s+(?:struct|union|enum)\b"
-                                r"[^{;]*\{(?:[^{}]|\{[^{}]*\})*\}\s*(" +
-                                _ID + r")\s*;")
+    _TYPEDEF_ALIAS = re.compile(
+        r"(?ms)^\s*typedef\s+(?:struct|union|enum)\b"
+        r"[^{;]*\{(?:[^{}]|\{[^{}]*\})*\}\s*(" + _ID + r")\s*;"
+    )
     _TYPEDEF_REC = re.compile(r"(?m)^\s*typedef\s+(?:struct|union|enum)\b")
-    _RECORD = re.compile(r"(?m)^\s*(?:typedef\s+)?(struct|union|enum)\s+(" +
-                         _ID + r")\s*(?:\{|;|" + _ID + r")")
+    _RECORD = re.compile(
+        r"(?m)^\s*(?:typedef\s+)?(struct|union|enum)\s+("
+        + _ID
+        + r")\s*(?:\{|;|"
+        + _ID
+        + r")"
+    )
     # shared/strict/relaxed-qualified or plain top-level data declarations
-    _SHARED_VAR = re.compile(r"(?m)^\s*" + _UPCQ +
-                             r"\s+[\w\*\s]*?\b(" + _ID + r")\s*(?:\[[^\]]*\])?\s*(?:=|;)")
+    _SHARED_VAR = re.compile(
+        r"(?m)^\s*"
+        + _UPCQ
+        + r"\s+[\w\*\s]*?\b("
+        + _ID
+        + r")\s*(?:\[[^\]]*\])?\s*(?:=|;)"
+    )
 
     _CALL = re.compile(r"\b(" + _ID + r")\s*\(")
-    _NOT_FUNC = {"if", "for", "while", "switch", "return", "sizeof", "defined",
-                 "upc_forall", "upc_barrier", "upc_notify", "upc_wait",
-                 "upc_fence", "upc_lock", "upc_unlock", "upc_memget",
-                 "upc_memput", "upc_memcpy", "upc_all_alloc", "upc_alloc",
-                 "upc_free", "assert", "static_assert"}
-    _STORAGE = re.compile(r"^\s*(?:static|extern|inline|register|const|volatile|"
-                          r"shared|strict|relaxed|_Noreturn)\b")
+    _NOT_FUNC = {
+        "if",
+        "for",
+        "while",
+        "switch",
+        "return",
+        "sizeof",
+        "defined",
+        "upc_forall",
+        "upc_barrier",
+        "upc_notify",
+        "upc_wait",
+        "upc_fence",
+        "upc_lock",
+        "upc_unlock",
+        "upc_memget",
+        "upc_memput",
+        "upc_memcpy",
+        "upc_all_alloc",
+        "upc_alloc",
+        "upc_free",
+        "assert",
+        "static_assert",
+    }
+    _STORAGE = re.compile(
+        r"^\s*(?:static|extern|inline|register|const|volatile|"
+        r"shared|strict|relaxed|_Noreturn)\b"
+    )
 
     def _register_types(self, file_id, text, path):
         clean = self._strip_comments(text)
@@ -116,7 +148,7 @@ class UPCAnalyzer(RegexCodeAnalyzer):
             # the token before the name must look like a return type, not a
             # control-flow keyword / another call
             line_start = clean.rfind("\n", 0, m.start()) + 1
-            pre = clean[line_start:m.start()].strip()
+            pre = clean[line_start : m.start()].strip()
             if not pre or pre.endswith((")", ",", "&&", "||", "=")):
                 continue
             key = (m.start(), bare)
@@ -128,7 +160,7 @@ class UPCAnalyzer(RegexCodeAnalyzer):
             self._add_function(file_id, bare, args, outs, description="upc function")
 
     def _paren_args(self, clean, open_paren, close):
-        body = clean[open_paren + 1:close - 1].strip()
+        body = clean[open_paren + 1 : close - 1].strip()
         if not body or body == "void":
             return []
         arg_ids = []
@@ -140,7 +172,7 @@ class UPCAnalyzer(RegexCodeAnalyzer):
             if not toks:
                 continue
             name = toks[-1]
-            atype = part[:part.rfind(name)].strip().rstrip("*&") or None
+            atype = part[: part.rfind(name)].strip().rstrip("*&") or None
             arg_ids.append(self._add_arg(name, atype))
         return arg_ids
 

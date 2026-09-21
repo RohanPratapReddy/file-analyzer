@@ -31,8 +31,17 @@ class SConsBuildAnalyzer(PythonEmbeddedAnalyzer):
 
     # SCons scripts are call-driven (Environment(), env.Program(...)); flag the
     # builder invocations as domain entry points on top of the base extraction.
-    _BUILDERS = ("Program", "Library", "SharedLibrary", "StaticLibrary",
-                 "Object", "Environment", "Install", "Alias", "Command")
+    _BUILDERS = (
+        "Program",
+        "Library",
+        "SharedLibrary",
+        "StaticLibrary",
+        "Object",
+        "Environment",
+        "Install",
+        "Alias",
+        "Command",
+    )
 
     def _dsl_enrich(self, file_id, tree, code_text):
         super()._dsl_enrich(file_id, tree, code_text)
@@ -49,9 +58,16 @@ class SConsBuildAnalyzer(PythonEmbeddedAnalyzer):
 class SpackRecipeAnalyzer(PythonEmbeddedAnalyzer):
     LANG_KEY = "spack"
     EXTENSIONS = (".spack",)
-    DSL_BASECLASSES = ("Package", "CMakePackage", "AutotoolsPackage",
-                       "MakefilePackage", "PythonPackage", "CudaPackage",
-                       "MesonPackage", "RPackage")
+    DSL_BASECLASSES = (
+        "Package",
+        "CMakePackage",
+        "AutotoolsPackage",
+        "MakefilePackage",
+        "PythonPackage",
+        "CudaPackage",
+        "MesonPackage",
+        "RPackage",
+    )
     DSL_DECORATORS = ("run_before", "run_after", "when", "on_package_attributes")
 
 

@@ -9,7 +9,7 @@
 #   function int add(int a, b); ... endfunction   -> function
 #   task run(); ... endtask                        -> function (task)
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -22,15 +22,21 @@ class VerilogAnalyzer(RegexCodeAnalyzer):
     _INCLUDE = re.compile(r'^\s*`include\s+"([^"]+)"', re.MULTILINE)
     _MODULE = re.compile(
         r"^\s*module\s+(\w+)\s*(?:#\([^)]*\)\s*)?(?:\(([^;]*?)\))?\s*;",
-        re.MULTILINE | re.DOTALL)
-    _CLASS = re.compile(r"^\s*(?:virtual\s+)?class\s+(\w+)"
-                        r"(?:\s+extends\s+(\w+))?", re.MULTILINE)
+        re.MULTILINE | re.DOTALL,
+    )
+    _CLASS = re.compile(
+        r"^\s*(?:virtual\s+)?class\s+(\w+)" r"(?:\s+extends\s+(\w+))?", re.MULTILINE
+    )
     _FUNC = re.compile(
         r"^\s*function\s+(?:automatic\s+)?(?:[\w\[\]:.]+\s+)?(\w+)\s*"
-        r"(?:\(([^;]*?)\))?\s*;", re.MULTILINE | re.DOTALL)
+        r"(?:\(([^;]*?)\))?\s*;",
+        re.MULTILINE | re.DOTALL,
+    )
     _TASK = re.compile(
         r"^\s*task\s+(?:automatic\s+)?(\w+)\s*(?:\(([^;]*?)\))?\s*;",
-        re.MULTILINE | re.DOTALL)
+        re.MULTILINE | re.DOTALL,
+    )
+
     def _parse_ports(self, text):
         """Split a port/parameter list into (name, type) pairs. The declared
         name is the LAST identifier of each comma-separated entry; the leading
@@ -45,7 +51,13 @@ class VerilogAnalyzer(RegexCodeAnalyzer):
             name = toks[-1]
             ty = " ".join(toks[:-1]) or None
             if re.match(r"^\w+$", name) and name not in (
-                    "input", "output", "inout", "wire", "reg", "logic"):
+                "input",
+                "output",
+                "inout",
+                "wire",
+                "reg",
+                "logic",
+            ):
                 pairs.append((name, ty))
         return pairs
 
@@ -68,10 +80,10 @@ class VerilogAnalyzer(RegexCodeAnalyzer):
             end = t.find("endmodule", m.end())
             end = end if end != -1 else len(t)
             module_spans.append((m.start(), end, name))
-            attr_ids = [self._add_arg(pn, pt)
-                        for pn, pt in self._parse_ports(ports)]
-            cid = self._add_class(file_id, name, description="verilog module",
-                                  attr_ids=attr_ids)
+            attr_ids = [self._add_arg(pn, pt) for pn, pt in self._parse_ports(ports)]
+            cid = self._add_class(
+                file_id, name, description="verilog module", attr_ids=attr_ids
+            )
 
         for m in self._CLASS.finditer(t):
             parents = []
@@ -79,8 +91,12 @@ class VerilogAnalyzer(RegexCodeAnalyzer):
                 pid = self._register_class(m.group(2))
                 if pid is not None:
                     parents.append(pid)
-            self._add_class(file_id, m.group(1), description="systemverilog class",
-                            parent_ids=parents)
+            self._add_class(
+                file_id,
+                m.group(1),
+                description="systemverilog class",
+                parent_ids=parents,
+            )
 
         def owner(pos):
             for a, b, name in module_spans:
@@ -89,14 +105,18 @@ class VerilogAnalyzer(RegexCodeAnalyzer):
             return None
 
         for m in self._FUNC.finditer(t):
-            self._add_function(file_id, m.group(1),
-                               [self._add_arg(n, ty) for n, ty
-                                in self._parse_ports(m.group(2) or "")],
-                               class_id=owner(m.start()),
-                               description="verilog function")
+            self._add_function(
+                file_id,
+                m.group(1),
+                [self._add_arg(n, ty) for n, ty in self._parse_ports(m.group(2) or "")],
+                class_id=owner(m.start()),
+                description="verilog function",
+            )
         for m in self._TASK.finditer(t):
-            self._add_function(file_id, m.group(1),
-                               [self._add_arg(n, ty) for n, ty
-                                in self._parse_ports(m.group(2) or "")],
-                               class_id=owner(m.start()),
-                               description="verilog task")
+            self._add_function(
+                file_id,
+                m.group(1),
+                [self._add_arg(n, ty) for n, ty in self._parse_ports(m.group(2) or "")],
+                class_id=owner(m.start()),
+                description="verilog task",
+            )

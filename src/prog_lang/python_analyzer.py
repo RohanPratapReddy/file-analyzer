@@ -1,17 +1,11 @@
 # Auto-extracted from code_analyzer.py (verbatim class body).
-import os
-import csv
-import json
-import re
 import ast
 import dis
-import inspect
-import traceback
-import subprocess
-import sqlite3
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
+
 from .base_code_analyzer import BaseCodeAnalyzer
+
 
 class PythonCodeAnalyzer(BaseCodeAnalyzer):
     """
@@ -50,7 +44,9 @@ class PythonCodeAnalyzer(BaseCodeAnalyzer):
         self.export()
         return self.get_tables()
 
-    def _process_file_ast(self, file_id: int, file_path: Path, tree: ast.AST, code_text: str):
+    def _process_file_ast(
+        self, file_id: int, file_path: Path, tree: ast.AST, code_text: str
+    ):
         # Module-level introspection (bytecode disassembly).
         try:
             compiled_code = compile(code_text, str(file_path), "exec")
@@ -64,7 +60,10 @@ class PythonCodeAnalyzer(BaseCodeAnalyzer):
             entity_type="module",
             inspection_source="inspect + dis + traceback",
             bytecode_or_ast_dump=disassembly,
-            structural_properties={"file": str(file_path), "line_count": len(code_text.splitlines())}
+            structural_properties={
+                "file": str(file_path),
+                "line_count": len(code_text.splitlines()),
+            },
         )
 
         for node in tree.body:
@@ -96,17 +95,25 @@ class PythonCodeAnalyzer(BaseCodeAnalyzer):
         elif isinstance(node, ast.ImportFrom):
             source_module = node.module or "." * node.level
             for alias in node.names:
-                imported_symbols.append((alias.asname or alias.name, f"{source_module}.{alias.name}", alias.asname))
+                imported_symbols.append(
+                    (
+                        alias.asname or alias.name,
+                        f"{source_module}.{alias.name}",
+                        alias.asname,
+                    )
+                )
 
         for name, src, alias in imported_symbols:
             import_id = self._import_counter
             self._import_counter += 1
-            self.imports_table.append({
-                "import_id": import_id,
-                "import_name": name,
-                "import_source": src,
-                "alias": alias,
-            })
+            self.imports_table.append(
+                {
+                    "import_id": import_id,
+                    "import_name": name,
+                    "import_source": src,
+                    "alias": alias,
+                }
+            )
             self._record_symbol(file_id, "import", import_id)
 
             # Projection into classes, functions, or module variables.
@@ -115,61 +122,74 @@ class PythonCodeAnalyzer(BaseCodeAnalyzer):
             # DEFINED in this run is a class regardless of casing; otherwise fall
             # back to a first-letter naming heuristic.
             known_class = (not is_module_import) and name in self._class_registry
-            if not is_module_import and (known_class or (name[0].isupper() and not name.isupper())):
+            if not is_module_import and (
+                known_class or (name[0].isupper() and not name.isupper())
+            ):
                 # Class projection
                 cls_id = self._class_counter
                 self._class_counter += 1
                 # Do not clobber a class DEFINED in this run (registered in pass 1);
                 # the imported symbol is projected as its own distinct row.
                 self._class_registry.setdefault(name, cls_id)
-                self.classes_table.append({
-                    "class_id": cls_id,
-                    "class_name": name,
-                    "class_description": f"Imported external class from `{src}`",
-                    "parent_class_ids": [],
-                    "method_ids": [],
-                    "args_ids": [],
-                    "attr_ids": [],
-                    "tensor_member_ids": [],
-                    "is_imported": True,
-                    "source_import_id": import_id
-                })
+                self.classes_table.append(
+                    {
+                        "class_id": cls_id,
+                        "class_name": name,
+                        "class_description": f"Imported external class from `{src}`",
+                        "parent_class_ids": [],
+                        "method_ids": [],
+                        "args_ids": [],
+                        "attr_ids": [],
+                        "tensor_member_ids": [],
+                        "is_imported": True,
+                        "source_import_id": import_id,
+                    }
+                )
                 self._record_symbol(file_id, "class/struct/interface", cls_id)
 
             elif (not is_module_import) and name.islower() and not name.isupper():
                 # Function projection
                 fn_id = self._func_counter
                 self._func_counter += 1
-                self.functions_table.append({
-                    "function_id": fn_id,
-                    "function_name": name,
-                    "args_ids": [],
-                    "function_outputs_ids": [],
-                    "class_id": None,
-                    "function_description": f"Imported callable/subroutine from `{src}`",
-                    "function_forward_pass": f"```pseudocode\n// Delegated call to external runtime: {src}\nRESULT = EXECUTE({name}, ARGS...)\nRETURN RESULT\n```",
-                    "function_backward_pass": f"```pseudocode\n// Upstream Autograd dispatch\nIF HAS_GRAD({name}):\n    INCOMING_GRAD = BACKPROP(UPSTREAM_GRAD)\n```",
-                    "is_imported": True,
-                    "source_import_id": import_id
-                })
+                self.functions_table.append(
+                    {
+                        "function_id": fn_id,
+                        "function_name": name,
+                        "args_ids": [],
+                        "function_outputs_ids": [],
+                        "class_id": None,
+                        "function_description": f"Imported callable/subroutine from `{src}`",
+                        "function_forward_pass": f"```pseudocode\n// Delegated call to external runtime: {src}\nRESULT = EXECUTE({name}, ARGS...)\nRETURN RESULT\n```",
+                        "function_backward_pass": f"```pseudocode\n// Upstream Autograd dispatch\nIF HAS_GRAD({name}):\n    INCOMING_GRAD = BACKPROP(UPSTREAM_GRAD)\n```",
+                        "is_imported": True,
+                        "source_import_id": import_id,
+                    }
+                )
                 self._record_symbol(file_id, "function", fn_id)
 
             else:
                 # Variable/Constant projection
                 var_id = self._var_counter
                 self._var_counter += 1
-                self.variables_table.append({
-                    "variable_id": var_id,
-                    "variable_name": name,
-                    "variable_value": (f"Imported module `{src}`" if is_module_import
-                                       else f"Imported from {src}"),
-                    "scope": "imported_module" if is_module_import else "imported",
-                    "is_imported": True,
-                    "source_import_id": import_id
-                })
+                self.variables_table.append(
+                    {
+                        "variable_id": var_id,
+                        "variable_name": name,
+                        "variable_value": (
+                            f"Imported module `{src}`"
+                            if is_module_import
+                            else f"Imported from {src}"
+                        ),
+                        "scope": "imported_module" if is_module_import else "imported",
+                        "is_imported": True,
+                        "source_import_id": import_id,
+                    }
+                )
                 self._record_symbol(file_id, "variable", var_id)
 
-    def _handle_variable(self, file_id: int, node: Union[ast.Assign, ast.AnnAssign], scope: str):
+    def _handle_variable(
+        self, file_id: int, node: Union[ast.Assign, ast.AnnAssign], scope: str
+    ):
         val_str = self._unparse_node(node.value) if node.value else None
         target_names = []
 
@@ -182,18 +202,25 @@ class PythonCodeAnalyzer(BaseCodeAnalyzer):
         for name in target_names:
             var_id = self._var_counter
             self._var_counter += 1
-            self.variables_table.append({
-                "variable_id": var_id,
-                "variable_name": name,
-                "variable_value": val_str,
-                "scope": scope,
-                "is_imported": False,
-                "source_import_id": None
-            })
+            self.variables_table.append(
+                {
+                    "variable_id": var_id,
+                    "variable_name": name,
+                    "variable_value": val_str,
+                    "scope": scope,
+                    "is_imported": False,
+                    "source_import_id": None,
+                }
+            )
             self._record_symbol(file_id, "variable", var_id)
 
-    def _handle_function(self, file_id: int, node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
-                         code_text: str, parent_class_id: Optional[int]) -> int:
+    def _handle_function(
+        self,
+        file_id: int,
+        node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
+        code_text: str,
+        parent_class_id: Optional[int],
+    ) -> int:
         func_id = self._func_counter
         self._func_counter += 1
 
@@ -205,18 +232,20 @@ class PythonCodeAnalyzer(BaseCodeAnalyzer):
         forward_pass = self._synthesize_forward_pass(node)
         backward_pass = self._synthesize_backward_pass(node)
 
-        self.functions_table.append({
-            "function_id": func_id,
-            "function_name": node.name,
-            "args_ids": arg_ids,
-            "function_outputs_ids": output_ids,
-            "class_id": parent_class_id,
-            "function_description": docstring,
-            "function_forward_pass": forward_pass,
-            "function_backward_pass": backward_pass,
-            "is_imported": False,
-            "source_import_id": None
-        })
+        self.functions_table.append(
+            {
+                "function_id": func_id,
+                "function_name": node.name,
+                "args_ids": arg_ids,
+                "function_outputs_ids": output_ids,
+                "class_id": parent_class_id,
+                "function_description": docstring,
+                "function_forward_pass": forward_pass,
+                "function_backward_pass": backward_pass,
+                "is_imported": False,
+                "source_import_id": None,
+            }
+        )
         self._record_symbol(file_id, "function", func_id)
 
         # Disassemble function subtree for introspection metadata
@@ -235,7 +264,9 @@ class PythonCodeAnalyzer(BaseCodeAnalyzer):
             entity_type="function",
             inspection_source="inspect.signature + dis.disassemble",
             bytecode_or_ast_dump=func_bytecode,
-            runtime_decorators_or_attributes={"decorators": [self._unparse_node(d) for d in node.decorator_list]}
+            runtime_decorators_or_attributes={
+                "decorators": [self._unparse_node(d) for d in node.decorator_list]
+            },
         )
         return func_id
 
@@ -254,32 +285,41 @@ class PythonCodeAnalyzer(BaseCodeAnalyzer):
 
         for item in node.body:
             if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                m_id = self._handle_function(file_id, item, code_text, parent_class_id=class_id)
+                m_id = self._handle_function(
+                    file_id, item, code_text, parent_class_id=class_id
+                )
                 method_ids.append(m_id)
 
                 if item.name == "__init__":
-                    constructor_arg_ids = [aid for aid in self._extract_function_args(item.args) if
-                                           aid not in constructor_arg_ids]
+                    constructor_arg_ids = [
+                        aid
+                        for aid in self._extract_function_args(item.args)
+                        if aid not in constructor_arg_ids
+                    ]
 
                 for sub_node in ast.walk(item):
                     if isinstance(sub_node, ast.Assign):
-                        self._inspect_class_assignment(sub_node, attr_ids, tensor_member_ids, file_id)
+                        self._inspect_class_assignment(
+                            sub_node, attr_ids, tensor_member_ids, file_id
+                        )
 
             elif isinstance(item, (ast.Assign, ast.AnnAssign)):
                 self._handle_variable(file_id, item, scope=f"class:{node.name}")
 
-        self.classes_table.append({
-            "class_id": class_id,
-            "class_name": node.name,
-            "class_description": class_docstring,
-            "parent_class_ids": parent_class_ids,
-            "method_ids": method_ids,
-            "args_ids": constructor_arg_ids,
-            "attr_ids": attr_ids,
-            "tensor_member_ids": tensor_member_ids,
-            "is_imported": False,
-            "source_import_id": None
-        })
+        self.classes_table.append(
+            {
+                "class_id": class_id,
+                "class_name": node.name,
+                "class_description": class_docstring,
+                "parent_class_ids": parent_class_ids,
+                "method_ids": method_ids,
+                "args_ids": constructor_arg_ids,
+                "attr_ids": attr_ids,
+                "tensor_member_ids": tensor_member_ids,
+                "is_imported": False,
+                "source_import_id": None,
+            }
+        )
         self._record_symbol(file_id, "class/struct/interface", class_id)
 
         self.record_introspection_metadata(
@@ -287,12 +327,16 @@ class PythonCodeAnalyzer(BaseCodeAnalyzer):
             entity_id=class_id,
             entity_type="class",
             inspection_source="inspect.getmro + Object.getPrototypeOf emulation",
-            structural_properties={"bases": [self._unparse_node(b) for b in node.bases]}
+            structural_properties={
+                "bases": [self._unparse_node(b) for b in node.bases]
+            },
         )
 
     # ================= Pass Synthesizers =================
 
-    def _synthesize_forward_pass(self, node: Union[ast.FunctionDef, ast.AsyncFunctionDef]) -> str:
+    def _synthesize_forward_pass(
+        self, node: Union[ast.FunctionDef, ast.AsyncFunctionDef]
+    ) -> str:
         """Synthesizes step-by-step algorithmic pseudocode of the function's forward execution."""
         lines = [f"// Pseudocode for: {node.name}"]
         arg_names = [a.arg for a in node.args.args]
@@ -318,7 +362,9 @@ class PythonCodeAnalyzer(BaseCodeAnalyzer):
         body_str = "\n".join(lines)
         return f"```pseudocode\n{body_str}\n```"
 
-    def _synthesize_backward_pass(self, node: Union[ast.FunctionDef, ast.AsyncFunctionDef]) -> str:
+    def _synthesize_backward_pass(
+        self, node: Union[ast.FunctionDef, ast.AsyncFunctionDef]
+    ) -> str:
         """
         Synthesizes reverse automatic differentiation, tracking how upstream gradients
         accumulate into parameters/tensors and update via an optimizer step.
@@ -335,10 +381,21 @@ class PythonCodeAnalyzer(BaseCodeAnalyzer):
 
         if assigned_targets:
             for target in reversed(assigned_targets):
-                lines.append(f"  dLoss_d_{target} = BACKPROP(dLoss_dOutput, USING Jacobian_{target})")
-                if "weight" in target.lower() or "param" in target.lower() or "bias" in target.lower() or "self." in target:
-                    lines.append(f"    --> ACCUMULATE GRADIENT: {target}.grad += dLoss_d_{target}")
-                    lines.append(f"    --> OPTIMIZER STEP: {target} = {target} - LearningRate * {target}.grad")
+                lines.append(
+                    f"  dLoss_d_{target} = BACKPROP(dLoss_dOutput, USING Jacobian_{target})"
+                )
+                if (
+                    "weight" in target.lower()
+                    or "param" in target.lower()
+                    or "bias" in target.lower()
+                    or "self." in target
+                ):
+                    lines.append(
+                        f"    --> ACCUMULATE GRADIENT: {target}.grad += dLoss_d_{target}"
+                    )
+                    lines.append(
+                        f"    --> OPTIMIZER STEP: {target} = {target} - LearningRate * {target}.grad"
+                    )
         else:
             lines.append("  PASS THROUGH: dLoss_dInput = IDENTITY(dLoss_dOutput)")
 
@@ -360,22 +417,28 @@ class PythonCodeAnalyzer(BaseCodeAnalyzer):
             arg_type = self._unparse_node(arg.annotation) if arg.annotation else "Any"
             default_val = None
             if i >= defaults_offset:
-                default_val = self._unparse_node(args_node.defaults[i - defaults_offset])
+                default_val = self._unparse_node(
+                    args_node.defaults[i - defaults_offset]
+                )
 
             arg_id = self._arg_counter
             self._arg_counter += 1
 
-            self.args_table.append({
-                "args_id": arg_id,
-                "args_name": arg_name,
-                "args_type": arg_type,
-                "default_value": default_val,
-                "permitted_values": None,
-            })
+            self.args_table.append(
+                {
+                    "args_id": arg_id,
+                    "args_name": arg_name,
+                    "args_type": arg_type,
+                    "default_value": default_val,
+                    "permitted_values": None,
+                }
+            )
             ids.append(arg_id)
         return ids
 
-    def _extract_function_outputs(self, node: Union[ast.FunctionDef, ast.AsyncFunctionDef]) -> List[int]:
+    def _extract_function_outputs(
+        self, node: Union[ast.FunctionDef, ast.AsyncFunctionDef]
+    ) -> List[int]:
         ids = []
         return_type = self._unparse_node(node.returns) if node.returns else None
 
@@ -387,49 +450,78 @@ class PythonCodeAnalyzer(BaseCodeAnalyzer):
         if return_type or returns_encountered:
             out_id = self._output_counter
             self._output_counter += 1
-            self.outputs_table.append({
-                "output_id": out_id,
-                "output_type": return_type or "Inferred",
-                "description": ", ".join(returns_encountered) if returns_encountered else None,
-            })
+            self.outputs_table.append(
+                {
+                    "output_id": out_id,
+                    "output_type": return_type or "Inferred",
+                    "description": (
+                        ", ".join(returns_encountered) if returns_encountered else None
+                    ),
+                }
+            )
             ids.append(out_id)
         return ids
 
-    def _inspect_class_assignment(self, node: ast.Assign, attr_ids: List[int], tensor_member_ids: List[int],
-                                  file_id: int):
+    def _inspect_class_assignment(
+        self,
+        node: ast.Assign,
+        attr_ids: List[int],
+        tensor_member_ids: List[int],
+        file_id: int,
+    ):
         for target in node.targets:
-            if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == "self":
+            if (
+                isinstance(target, ast.Attribute)
+                and isinstance(target.value, ast.Name)
+                and target.value.id == "self"
+            ):
                 attr_name = target.attr
                 val_repr = self._unparse_node(node.value)
                 lower_val = val_repr.lower()
 
-                is_tensor_member = any(term in lower_val for term in
-                                       ["parameter", "buffer", "weight", "bias", "torch.tensor", "tf.variable"])
+                is_tensor_member = any(
+                    term in lower_val
+                    for term in [
+                        "parameter",
+                        "buffer",
+                        "weight",
+                        "bias",
+                        "torch.tensor",
+                        "tf.variable",
+                    ]
+                )
 
                 if is_tensor_member:
                     member_id = self._member_counter
                     self._member_counter += 1
-                    kind = "parameter" if "parameter" in lower_val else (
-                        "buffer" if "buffer" in lower_val else "weight/bias")
-                    self.tensor_members_table.append({
-                        "member_id": member_id,
-                        "kind": kind,
-                        "name": attr_name,
-                        "count": None,
-                        "shape": None,
-                    })
+                    kind = (
+                        "parameter"
+                        if "parameter" in lower_val
+                        else ("buffer" if "buffer" in lower_val else "weight/bias")
+                    )
+                    self.tensor_members_table.append(
+                        {
+                            "member_id": member_id,
+                            "kind": kind,
+                            "name": attr_name,
+                            "count": None,
+                            "shape": None,
+                        }
+                    )
                     tensor_member_ids.append(member_id)
                     self._record_symbol(file_id, "tensor_member/field", member_id)
                 else:
                     arg_id = self._arg_counter
                     self._arg_counter += 1
-                    self.args_table.append({
-                        "args_id": arg_id,
-                        "args_name": attr_name,
-                        "args_type": "Attribute",
-                        "default_value": val_repr,
-                        "permitted_values": None,
-                    })
+                    self.args_table.append(
+                        {
+                            "args_id": arg_id,
+                            "args_name": attr_name,
+                            "args_type": "Attribute",
+                            "default_value": val_repr,
+                            "permitted_values": None,
+                        }
+                    )
                     attr_ids.append(arg_id)
 
     @staticmethod

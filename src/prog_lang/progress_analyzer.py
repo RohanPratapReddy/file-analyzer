@@ -15,11 +15,11 @@
 #
 # Case-insensitive keywords. Comments '/* */' (nestable) and '//'; strings "'".
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
-_QUAL = r"[A-Za-z_][A-Za-z0-9_.]*"        # dotted class path
+_QUAL = r"[A-Za-z_][A-Za-z0-9_.]*"  # dotted class path
 
 
 class ProgressAnalyzer(RegexCodeAnalyzer):
@@ -31,25 +31,34 @@ class ProgressAnalyzer(RegexCodeAnalyzer):
 
     _USING = re.compile(r"(?im)^\s*USING\s+(" + _QUAL + r"(?:\.\*)?)\s*\.")
     _INCLUDE = re.compile(r"\{([A-Za-z0-9_./\\-]+\.(?:i|w|p))\b")
-    _CLASS = re.compile(r"(?im)^\s*CLASS\s+(" + _QUAL + r")"
-                        r"(?:\s+INHERITS\s+(" + _QUAL + r"))?"
-                        r"(?:\s+IMPLEMENTS\s+([\w.,\s]+?))?"
-                        r"(?:\s+(?:FINAL|ABSTRACT|SERIALIZABLE|WIDGET-POOL))*\s*:")
-    _INTERFACE = re.compile(r"(?im)^\s*INTERFACE\s+(" + _QUAL + r")"
-                            r"(?:\s+INHERITS\s+([\w.,\s]+?))?\s*:")
-    _METHOD = re.compile(r"(?im)^\s*METHOD\s+"
-                         r"(?:(?:PUBLIC|PRIVATE|PROTECTED|STATIC|ABSTRACT|"
-                         r"OVERRIDE|FINAL)\s+)*"
-                         r"(" + _QUAL + r")\s+(" + _ID + r")\s*\(([^)]*)\)")
+    _CLASS = re.compile(
+        r"(?im)^\s*CLASS\s+(" + _QUAL + r")"
+        r"(?:\s+INHERITS\s+(" + _QUAL + r"))?"
+        r"(?:\s+IMPLEMENTS\s+([\w.,\s]+?))?"
+        r"(?:\s+(?:FINAL|ABSTRACT|SERIALIZABLE|WIDGET-POOL))*\s*:"
+    )
+    _INTERFACE = re.compile(
+        r"(?im)^\s*INTERFACE\s+(" + _QUAL + r")" r"(?:\s+INHERITS\s+([\w.,\s]+?))?\s*:"
+    )
+    _METHOD = re.compile(
+        r"(?im)^\s*METHOD\s+"
+        r"(?:(?:PUBLIC|PRIVATE|PROTECTED|STATIC|ABSTRACT|"
+        r"OVERRIDE|FINAL)\s+)*"
+        r"(" + _QUAL + r")\s+(" + _ID + r")\s*\(([^)]*)\)"
+    )
     _PROCEDURE = re.compile(r"(?im)^\s*PROCEDURE\s+(" + _ID + r")")
-    _FUNCTION = re.compile(r"(?im)^\s*FUNCTION\s+(" + _ID + r")\s+RETURNS?\s+"
-                           r"(" + _QUAL + r"(?:\s+EXTENT)?)\s*(\([^)]*\))?")
-    _DEFVAR = re.compile(r"(?im)^\s*DEFINE\s+"
-                         r"(?:(?:NEW\s+|GLOBAL\s+|SHARED\s+|PUBLIC\s+|"
-                         r"PRIVATE\s+|PROTECTED\s+|STATIC\s+)*)"
-                         r"(?:VARIABLE|PROPERTY|"
-                         r"(?:INPUT|OUTPUT|INPUT-OUTPUT|RETURN)?\s*PARAMETER)\s+"
-                         r"(" + _ID + r")\b")
+    _FUNCTION = re.compile(
+        r"(?im)^\s*FUNCTION\s+(" + _ID + r")\s+RETURNS?\s+"
+        r"(" + _QUAL + r"(?:\s+EXTENT)?)\s*(\([^)]*\))?"
+    )
+    _DEFVAR = re.compile(
+        r"(?im)^\s*DEFINE\s+"
+        r"(?:(?:NEW\s+|GLOBAL\s+|SHARED\s+|PUBLIC\s+|"
+        r"PRIVATE\s+|PROTECTED\s+|STATIC\s+)*)"
+        r"(?:VARIABLE|PROPERTY|"
+        r"(?:INPUT|OUTPUT|INPUT-OUTPUT|RETURN)?\s*PARAMETER)\s+"
+        r"(" + _ID + r")\b"
+    )
 
     def _register_types(self, file_id, text, path):
         clean = self._strip_comments(text)
@@ -80,8 +89,9 @@ class ProgressAnalyzer(RegexCodeAnalyzer):
                     p = p.strip()
                     if p:
                         pids.append(self._register_class(p.split(".")[-1]))
-            self._add_class(file_id, name, description="abl class",
-                            parent_ids=pids or None)
+            self._add_class(
+                file_id, name, description="abl class", parent_ids=pids or None
+            )
         for m in self._INTERFACE.finditer(clean):
             name = m.group(1).split(".")[-1]
             cid = self._register_class(name)
@@ -93,16 +103,34 @@ class ProgressAnalyzer(RegexCodeAnalyzer):
             args = self._abl_args(m.group(3))
             ret = m.group(1).upper()
             outs = [] if ret == "VOID" else [self._add_output(m.group(1))]
-            self._add_function(file_id, m.group(2), args, outs, class_id=cls_id,
-                               description="abl method")
+            self._add_function(
+                file_id,
+                m.group(2),
+                args,
+                outs,
+                class_id=cls_id,
+                description="abl method",
+            )
         for m in self._PROCEDURE.finditer(clean):
-            self._add_function(file_id, m.group(1), [], [], class_id=cls_id,
-                               description="abl procedure")
+            self._add_function(
+                file_id,
+                m.group(1),
+                [],
+                [],
+                class_id=cls_id,
+                description="abl procedure",
+            )
         for m in self._FUNCTION.finditer(clean):
             args = self._abl_args(m.group(3)[1:-1] if m.group(3) else "")
             outs = [self._add_output(m.group(2).split()[0])]
-            self._add_function(file_id, m.group(1), args, outs, class_id=cls_id,
-                               description="abl function")
+            self._add_function(
+                file_id,
+                m.group(1),
+                args,
+                outs,
+                class_id=cls_id,
+                description="abl function",
+            )
 
         seen = set()
         for m in self._DEFVAR.finditer(clean):

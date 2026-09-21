@@ -107,10 +107,18 @@ class MarkupAnalyzer:
         self.markup_properties_table: List[Dict[str, Any]] = []
         self.markup_file_index: List[Dict[str, Any]] = []
 
-        self._ids = {k: 0 for k in (
-            "file", "element", "attribute", "namespace", "section",
-            "property", "mfi",
-        )}
+        self._ids = {
+            k: 0
+            for k in (
+                "file",
+                "element",
+                "attribute",
+                "namespace",
+                "section",
+                "property",
+                "mfi",
+            )
+        }
         # per-file map: element qualified-name -> markup_element_id (so the
         # attribute rows can point at the element row they belong to).
         self._elem_id_by_qname: Dict[str, int] = {}
@@ -176,8 +184,9 @@ class MarkupAnalyzer:
     # ==================================================================
     # Row builders
     # ==================================================================
-    def _emit_file(self, path: Path, ext: str, profile: Dict[str, Any],
-                   local_fid: int) -> None:
+    def _emit_file(
+        self, path: Path, ext: str, profile: Dict[str, Any], local_fid: int
+    ) -> None:
         self._elem_id_by_qname = {}
         markup_file_id = self._next("file")
         status = self._as_text(profile.get("status")) or "ok"
@@ -202,9 +211,15 @@ class MarkupAnalyzer:
             "root_element": self._as_text(profile.get("root_element")),
             "namespace_count": self._as_int(metrics.get("namespace_count")) or 0,
             "element_count": self._as_int(metrics.get("element_count")) or 0,
-            "distinct_element_count": self._as_int(metrics.get("distinct_element_count")) or 0,
+            "distinct_element_count": self._as_int(
+                metrics.get("distinct_element_count")
+            )
+            or 0,
             "attribute_count": self._as_int(metrics.get("attribute_count")) or 0,
-            "distinct_attribute_count": self._as_int(metrics.get("distinct_attribute_count")) or 0,
+            "distinct_attribute_count": self._as_int(
+                metrics.get("distinct_attribute_count")
+            )
+            or 0,
             "max_depth": self._as_int(metrics.get("max_depth")) or 0,
             "comment_count": self._as_int(metrics.get("comment_count")) or 0,
             "pi_count": self._as_int(metrics.get("pi_count")) or 0,
@@ -218,114 +233,126 @@ class MarkupAnalyzer:
         }
         self.markup_files_table.append(file_row)
 
-        for el in (profile.get("elements") or []):
+        for el in profile.get("elements") or []:
             self._emit_element(markup_file_id, el, local_fid)
 
         attr_count = 0
-        for at in (profile.get("attributes") or []):
+        for at in profile.get("attributes") or []:
             if self._emit_attribute(markup_file_id, at, local_fid):
                 attr_count += 1
 
         ns_count = 0
-        for ns in (profile.get("namespaces") or []):
+        for ns in profile.get("namespaces") or []:
             self._emit_namespace(markup_file_id, ns, local_fid)
             ns_count += 1
 
         sec_count = 0
-        for sec in (profile.get("sections") or []):
+        for sec in profile.get("sections") or []:
             self._emit_section(markup_file_id, sec, local_fid)
             sec_count += 1
 
         prop_count = 0
-        for entry in (profile.get("properties") or []):
+        for entry in profile.get("properties") or []:
             if self._emit_property(markup_file_id, entry, local_fid):
                 prop_count += 1
 
         file_row["section_count"] = sec_count
         file_row["property_count"] = prop_count
         # keep the counts self-consistent with the child rows actually emitted
-        file_row["distinct_attribute_count"] = attr_count or file_row["distinct_attribute_count"]
+        file_row["distinct_attribute_count"] = (
+            attr_count or file_row["distinct_attribute_count"]
+        )
         file_row["namespace_count"] = ns_count or file_row["namespace_count"]
 
     def _emit_element(self, mfid: int, el: Dict[str, Any], local_fid: int) -> int:
         element_id = self._next("element")
         qname = self._as_text(el.get("qname")) or self._as_text(el.get("tag"))
         attr_names = el.get("attr_names") or []
-        self.markup_elements_table.append({
-            "markup_element_id": element_id,
-            "markup_file_id": mfid,
-            "tag_name": self._as_text(el.get("tag")),
-            "qualified_name": qname,
-            "namespace_prefix": self._as_text(el.get("ns_prefix")),
-            "namespace_uri": self._as_text(el.get("ns_uri")),
-            "occurrence_count": self._as_int(el.get("count")) or 0,
-            "min_depth": self._as_int(el.get("min_depth")) or 0,
-            "max_depth": self._as_int(el.get("max_depth")) or 0,
-            "total_child_count": self._as_int(el.get("total_children")) or 0,
-            "max_children": self._as_int(el.get("max_children")) or 0,
-            "leaf_count": self._as_int(el.get("leaf_count")) or 0,
-            "text_bearing_count": self._as_int(el.get("text_count")) or 0,
-            "total_text_length": self._as_int(el.get("total_text_len")) or 0,
-            "distinct_attribute_count": len(attr_names),
-            "attribute_names": ", ".join(str(a) for a in attr_names)[:2048] or None,
-            "sample_text": self._as_text(el.get("sample_text")),
-            "is_root": self._as_bool(el.get("is_root")),
-            "ordinal": self._as_int(el.get("ordinal")),
-            "file_id": local_fid,
-        })
+        self.markup_elements_table.append(
+            {
+                "markup_element_id": element_id,
+                "markup_file_id": mfid,
+                "tag_name": self._as_text(el.get("tag")),
+                "qualified_name": qname,
+                "namespace_prefix": self._as_text(el.get("ns_prefix")),
+                "namespace_uri": self._as_text(el.get("ns_uri")),
+                "occurrence_count": self._as_int(el.get("count")) or 0,
+                "min_depth": self._as_int(el.get("min_depth")) or 0,
+                "max_depth": self._as_int(el.get("max_depth")) or 0,
+                "total_child_count": self._as_int(el.get("total_children")) or 0,
+                "max_children": self._as_int(el.get("max_children")) or 0,
+                "leaf_count": self._as_int(el.get("leaf_count")) or 0,
+                "text_bearing_count": self._as_int(el.get("text_count")) or 0,
+                "total_text_length": self._as_int(el.get("total_text_len")) or 0,
+                "distinct_attribute_count": len(attr_names),
+                "attribute_names": ", ".join(str(a) for a in attr_names)[:2048] or None,
+                "sample_text": self._as_text(el.get("sample_text")),
+                "is_root": self._as_bool(el.get("is_root")),
+                "ordinal": self._as_int(el.get("ordinal")),
+                "file_id": local_fid,
+            }
+        )
         if qname is not None and qname not in self._elem_id_by_qname:
             self._elem_id_by_qname[qname] = element_id
         return element_id
 
     def _emit_attribute(self, mfid: int, at: Dict[str, Any], local_fid: int) -> bool:
-        elem_qname = self._as_text(at.get("element_qname")) or self._as_text(at.get("element_tag"))
+        elem_qname = self._as_text(at.get("element_qname")) or self._as_text(
+            at.get("element_tag")
+        )
         element_id = self._elem_id_by_qname.get(elem_qname)
-        self.markup_attributes_table.append({
-            "markup_attribute_id": self._next("attribute"),
-            "markup_file_id": mfid,
-            "markup_element_id": element_id,
-            "element_tag": self._as_text(at.get("element_tag")),
-            "attribute_name": self._as_text(at.get("name")),
-            "namespace_prefix": self._as_text(at.get("ns_prefix")),
-            "occurrence_count": self._as_int(at.get("count")) or 0,
-            "distinct_value_count": self._as_int(at.get("distinct_values")) or 0,
-            "value_type": self._as_text(at.get("value_type")) or "STRING",
-            "sample_value": self._as_text(at.get("sample")),
-            "min_length": self._as_int(at.get("min_len")) or 0,
-            "max_length": self._as_int(at.get("max_len")) or 0,
-            "file_id": local_fid,
-        })
+        self.markup_attributes_table.append(
+            {
+                "markup_attribute_id": self._next("attribute"),
+                "markup_file_id": mfid,
+                "markup_element_id": element_id,
+                "element_tag": self._as_text(at.get("element_tag")),
+                "attribute_name": self._as_text(at.get("name")),
+                "namespace_prefix": self._as_text(at.get("ns_prefix")),
+                "occurrence_count": self._as_int(at.get("count")) or 0,
+                "distinct_value_count": self._as_int(at.get("distinct_values")) or 0,
+                "value_type": self._as_text(at.get("value_type")) or "STRING",
+                "sample_value": self._as_text(at.get("sample")),
+                "min_length": self._as_int(at.get("min_len")) or 0,
+                "max_length": self._as_int(at.get("max_len")) or 0,
+                "file_id": local_fid,
+            }
+        )
         return True
 
     def _emit_namespace(self, mfid: int, ns: Dict[str, Any], local_fid: int) -> int:
         namespace_id = self._next("namespace")
-        self.markup_namespaces_table.append({
-            "markup_namespace_id": namespace_id,
-            "markup_file_id": mfid,
-            "prefix": self._as_text(ns.get("prefix")),
-            "uri": self._as_text(ns.get("uri")),
-            "is_default": self._as_bool(ns.get("is_default")),
-            "element_usage_count": self._as_int(ns.get("usage")) or 0,
-            "file_id": local_fid,
-        })
+        self.markup_namespaces_table.append(
+            {
+                "markup_namespace_id": namespace_id,
+                "markup_file_id": mfid,
+                "prefix": self._as_text(ns.get("prefix")),
+                "uri": self._as_text(ns.get("uri")),
+                "is_default": self._as_bool(ns.get("is_default")),
+                "element_usage_count": self._as_int(ns.get("usage")) or 0,
+                "file_id": local_fid,
+            }
+        )
         return namespace_id
 
     def _emit_section(self, mfid: int, sec: Dict[str, Any], local_fid: int) -> int:
         section_id = self._next("section")
-        self.markup_sections_table.append({
-            "markup_section_id": section_id,
-            "markup_file_id": mfid,
-            "section_name": self._as_text(sec.get("name")),
-            "section_type": self._as_text(sec.get("type")),
-            "section_path": self._as_text(sec.get("path")),
-            "depth": self._as_int(sec.get("depth")) or 0,
-            "ordinal": self._as_int(sec.get("ordinal")),
-            "element_tag": self._as_text(sec.get("tag")),
-            "child_count": self._as_int(sec.get("child_count")) or 0,
-            "text_length": self._as_int(sec.get("text_len")) or 0,
-            "title": self._as_text(sec.get("title")),
-            "file_id": local_fid,
-        })
+        self.markup_sections_table.append(
+            {
+                "markup_section_id": section_id,
+                "markup_file_id": mfid,
+                "section_name": self._as_text(sec.get("name")),
+                "section_type": self._as_text(sec.get("type")),
+                "section_path": self._as_text(sec.get("path")),
+                "depth": self._as_int(sec.get("depth")) or 0,
+                "ordinal": self._as_int(sec.get("ordinal")),
+                "element_tag": self._as_text(sec.get("tag")),
+                "child_count": self._as_int(sec.get("child_count")) or 0,
+                "text_length": self._as_int(sec.get("text_len")) or 0,
+                "title": self._as_text(sec.get("title")),
+                "file_id": local_fid,
+            }
+        )
         return section_id
 
     def _emit_property(self, mfid: int, entry: Any, local_fid: int) -> bool:
@@ -346,15 +373,17 @@ class MarkupAnalyzer:
             pv, vtype = str(value), "str"
         if pv is None:
             return False
-        self.markup_properties_table.append({
-            "property_id": self._next("property"),
-            "markup_file_id": mfid,
-            "property_name": str(name)[:256],
-            "property_value": pv[:2048],
-            "value_type": vtype,
-            "group_name": str(group_name)[:128],
-            "file_id": local_fid,
-        })
+        self.markup_properties_table.append(
+            {
+                "property_id": self._next("property"),
+                "markup_file_id": mfid,
+                "property_name": str(name)[:256],
+                "property_value": pv[:2048],
+                "value_type": vtype,
+                "group_name": str(group_name)[:128],
+                "file_id": local_fid,
+            }
+        )
         return True
 
     # ------------------------------------------------------------------
@@ -401,7 +430,9 @@ class MarkupAnalyzer:
     # ==================================================================
     def link_repository(
         self,
-        repository_tables: Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]],
+        repository_tables: Tuple[
+            List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]
+        ],
         analyzed_file_paths: Optional[List[Union[str, Path]]] = None,
     ) -> List[Dict[str, Any]]:
         folders, extensions, files = repository_tables
@@ -417,7 +448,9 @@ class MarkupAnalyzer:
             deepest = location[-1] if location else 1
             folder_path = folder_by_id.get(deepest, ".")
             fname = f["file_name"] + (f".{ext}" if ext else "")
-            relpath = fname if folder_path in (".", "", None) else f"{folder_path}/{fname}"
+            relpath = (
+                fname if folder_path in (".", "", None) else f"{folder_path}/{fname}"
+            )
             repo_by_relpath.setdefault(relpath, f["file_id"])
             repo_by_basename.setdefault(Path(relpath).name, []).append(f["file_id"])
 
@@ -452,10 +485,14 @@ class MarkupAnalyzer:
                 repo_id = local_to_repo.get(row.get("file_id"))
                 row["file_id"] = repo_id
                 if repo_id is not None:
-                    self.markup_file_index.append({
-                        "mfi_id": self._next("mfi"), "file_id": repo_id,
-                        "entity_kind": kind, "entity_id": row[id_key],
-                    })
+                    self.markup_file_index.append(
+                        {
+                            "mfi_id": self._next("mfi"),
+                            "file_id": repo_id,
+                            "entity_kind": kind,
+                            "entity_id": row[id_key],
+                        }
+                    )
         return self.markup_file_index
 
     # ==================================================================

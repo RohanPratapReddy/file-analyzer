@@ -17,15 +17,35 @@
 #
 # Comments are '#'; strings use '"'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
 
-_CLASS_KW = {"view", "explore", "model", "dashboard", "datagroup", "map_layer",
-             "access_grant", "named_value_format", "query", "test"}
-_FUNC_KW = {"dimension", "dimension_group", "measure", "filter", "parameter",
-            "join", "element", "field", "action", "form_param"}
+_CLASS_KW = {
+    "view",
+    "explore",
+    "model",
+    "dashboard",
+    "datagroup",
+    "map_layer",
+    "access_grant",
+    "named_value_format",
+    "query",
+    "test",
+}
+_FUNC_KW = {
+    "dimension",
+    "dimension_group",
+    "measure",
+    "filter",
+    "parameter",
+    "join",
+    "element",
+    "field",
+    "action",
+    "form_param",
+}
 _VAR_KW = {"set", "constant"}
 
 
@@ -40,8 +60,18 @@ class LookMLAnalyzer(RegexCodeAnalyzer):
     _BLOCK = re.compile(r"(?m)^\s*(" + _ID + r")\s*:\s*(" + _ID + r")\s*\{")
     # top-level scalar params (connection:, project_name:, label:, ...): no name+brace
     _TOPPARAM = re.compile(r"(?m)^(" + _ID + r")\s*:\s*(?!\s*(?:" + _ID + r"\s*)?\{)\S")
-    _TOP_SKIP = {"include", "dimension", "measure", "dimension_group", "filter",
-                 "parameter", "set", "sql", "html", "type"}
+    _TOP_SKIP = {
+        "include",
+        "dimension",
+        "measure",
+        "dimension_group",
+        "filter",
+        "parameter",
+        "set",
+        "sql",
+        "html",
+        "type",
+    }
 
     def _register_types(self, file_id, text, path):
         clean = self._strip_comments(text)
@@ -62,8 +92,7 @@ class LookMLAnalyzer(RegexCodeAnalyzer):
             if kw in _CLASS_KW:
                 self._add_class(file_id, name, description="lookml " + kw)
             elif kw in _FUNC_KW:
-                self._add_function(file_id, name, [], [],
-                                   description="lookml " + kw)
+                self._add_function(file_id, name, [], [], description="lookml " + kw)
             elif kw in _VAR_KW:
                 self._add_variable(file_id, name, scope=kw)
 

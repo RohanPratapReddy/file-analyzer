@@ -34,6 +34,7 @@ length, an SSH key's standard SHA-256 fingerprint -- are recorded), the raw
 payload is never stored, and a partial parse is reported ``partial`` -- never
 stubbed or invented.
 """
+
 from __future__ import annotations
 
 import base64
@@ -81,18 +82,27 @@ class DocumentTypeParser:
         return self.LABELS.get(ext, (self.KIND, ext.lstrip(".") or self.KIND))
 
     # child API -------------------------------------------------------------
-    def parse(self, path: Path, data: bytes, text: str, ext: str,
-              encoding: str, line_count: int) -> Dict[str, Any]:
+    def parse(
+        self,
+        path: Path,
+        data: bytes,
+        text: str,
+        ext: str,
+        encoding: str,
+        line_count: int,
+    ) -> Dict[str, Any]:
         raise NotImplementedError
 
     # helpers ---------------------------------------------------------------
-    def _forensic(self, ext: str, data: bytes, note: str,
-                  via: str = "extension") -> Dict[str, Any]:
+    def _forensic(
+        self, ext: str, data: bytes, note: str, via: str = "extension"
+    ) -> Dict[str, Any]:
         fam, label = self.meta(ext)
         return _forensic(self.KIND, fam, label, data, len(data), note, via=via)
 
-    def _auto(self, text: str, ext: str, byte_size: int, encoding: str,
-              lc: int) -> Dict[str, Any]:
+    def _auto(
+        self, text: str, ext: str, byte_size: int, encoding: str, lc: int
+    ) -> Dict[str, Any]:
         """Delegate to the shared content-sniffing structural parser."""
         fam, label = self.meta(ext)
         prof = tf._e_auto(text, self.KIND, fam, label, byte_size, encoding, lc)
@@ -117,11 +127,36 @@ class ManifestParser(DocumentTypeParser):
 
     KIND = "manifest"
     EXTENSIONS = (
-        ".appcache", ".appinstaller", ".bagit", ".bower", ".chartlock",
-        ".composer", ".delta", ".dvc", ".f4m", ".gemspec", ".hackage",
-        ".hoodie", ".iceberg", ".ism", ".ismc", ".jad", ".lockb", ".manifest",
-        ".mlflow", ".mpd", ".mpdstream", ".onetoc2", ".podspec", ".psd1",
-        ".pubspec", ".sum", ".torrent", ".vcpkg", ".vpm", ".webmanifest",
+        ".appcache",
+        ".appinstaller",
+        ".bagit",
+        ".bower",
+        ".chartlock",
+        ".composer",
+        ".delta",
+        ".dvc",
+        ".f4m",
+        ".gemspec",
+        ".hackage",
+        ".hoodie",
+        ".iceberg",
+        ".ism",
+        ".ismc",
+        ".jad",
+        ".lockb",
+        ".manifest",
+        ".mlflow",
+        ".mpd",
+        ".mpdstream",
+        ".onetoc2",
+        ".podspec",
+        ".psd1",
+        ".pubspec",
+        ".sum",
+        ".torrent",
+        ".vcpkg",
+        ".vpm",
+        ".webmanifest",
     )
     LABELS = {
         ".appcache": ("appcache", "HTML5 application cache manifest"),
@@ -164,12 +199,16 @@ class ManifestParser(DocumentTypeParser):
             if prof is not None:
                 return prof
         if ext in self._BINARY or tf._looks_binary(data):
-            return self._forensic(ext, data, f"{label}: binary manifest, forensic profile only")
+            return self._forensic(
+                ext, data, f"{label}: binary manifest, forensic profile only"
+            )
         byte_size, lc = len(data), line_count
         if ext == ".appcache":
             return self._appcache(text, ext, byte_size, encoding, lc)
         if ext == ".jad":
-            return self._kv_colon(text, ext, byte_size, encoding, lc, "midlet-attribute")
+            return self._kv_colon(
+                text, ext, byte_size, encoding, lc, "midlet-attribute"
+            )
         if ext == ".bagit":
             return self._kv_colon(text, ext, byte_size, encoding, lc, "bag-declaration")
         if ext == ".psd1":
@@ -202,8 +241,13 @@ class ManifestParser(DocumentTypeParser):
             return v
 
         info = value.get(b"info", {}) if isinstance(value.get(b"info"), dict) else {}
-        for key in (b"announce", b"created by", b"creation date", b"comment",
-                    b"encoding"):
+        for key in (
+            b"announce",
+            b"created by",
+            b"creation date",
+            b"comment",
+            b"encoding",
+        ):
             if key in value:
                 props.append(("torrent", _s(key), _s(value[key])))
         # info dictionary -> one record with typed fields
@@ -211,10 +255,13 @@ class ManifestParser(DocumentTypeParser):
         ordv = 0
         for k in (b"name", b"piece length", b"length", b"private", b"source"):
             if k in info:
-                fields.append(_field(_s(k), _s(info[k]), ordv)); ordv += 1
+                fields.append(_field(_s(k), _s(info[k]), ordv))
+                ordv += 1
         if b"pieces" in info and isinstance(info[b"pieces"], bytes):
-            fields.append(_field("piece_count", len(info[b"pieces"]) // 20, ordv,
-                                 ftype="INT")); ordv += 1
+            fields.append(
+                _field("piece_count", len(info[b"pieces"]) // 20, ordv, ftype="INT")
+            )
+            ordv += 1
         top["records"].append(_record("info", _s(info.get(b"name")), fields))
         # multi-file torrents
         flist = info.get(b"files")
@@ -223,16 +270,28 @@ class ManifestParser(DocumentTypeParser):
                 if not isinstance(fe, dict):
                     continue
                 pth = fe.get(b"path")
-                name = "/".join(_s(p) for p in pth) if isinstance(pth, list) else _s(pth)
-                ff = [_field("path", name, 0),
-                      _field("length", _s(fe.get(b"length")), 1, ftype="INT")]
+                name = (
+                    "/".join(_s(p) for p in pth) if isinstance(pth, list) else _s(pth)
+                )
+                ff = [
+                    _field("path", name, 0),
+                    _field("length", _s(fe.get(b"length")), 1, ftype="INT"),
+                ]
                 files_sec["records"].append(_record("file", name, ff))
                 if i >= tf._RECORD_BUDGET:
                     break
         sections = [top] + ([files_sec] if files_sec["records"] else [])
-        return _profile(self.KIND, fam, label, "bencode", sections=sections,
-                        detected_via="content", byte_size=len(data),
-                        line_count=0, properties=props)
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "bencode",
+            sections=sections,
+            detected_via="content",
+            byte_size=len(data),
+            line_count=0,
+            properties=props,
+        )
 
     # --- HTML5 AppCache --------------------------------------------------
     def _appcache(self, text, ext, byte_size, encoding, lc):
@@ -258,11 +317,18 @@ class ManifestParser(DocumentTypeParser):
                 flds = [_field("online_url", a, 0), _field("fallback_url", b, 1)]
             else:
                 flds = [_field("url", line, 0)]
-            sec["records"].append(_record(cur.lower() + "-entry", line, flds,
-                                          start_line=ln, text=line))
-        return _profile(self.KIND, fam, label, "appcache",
-                        sections=list(secs.values()), byte_size=byte_size,
-                        line_count=lc)
+            sec["records"].append(
+                _record(cur.lower() + "-entry", line, flds, start_line=ln, text=line)
+            )
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "appcache",
+            sections=list(secs.values()),
+            byte_size=byte_size,
+            line_count=lc,
+        )
 
     # --- key: value manifests (JAD, BagIt) ------------------------------
     def _kv_colon(self, text, ext, byte_size, encoding, lc, rtype):
@@ -278,11 +344,17 @@ class ManifestParser(DocumentTypeParser):
             k, v = k.strip(), v.strip()
             if not k:
                 continue
-            sec["records"].append(_record(rtype, k,
-                                          [_field(k, v, 0)], start_line=ln))
-        return _profile(self.KIND, fam, label, "keyvalue", sections=[sec],
-                        byte_size=byte_size, line_count=lc,
-                        status="ok" if sec["records"] else "partial")
+            sec["records"].append(_record(rtype, k, [_field(k, v, 0)], start_line=ln))
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "keyvalue",
+            sections=[sec],
+            byte_size=byte_size,
+            line_count=lc,
+            status="ok" if sec["records"] else "partial",
+        )
 
     # --- PowerShell data (.psd1) ----------------------------------------
     _PSD1_KV = re.compile(r"(?m)^\s*([A-Za-z_][\w]*)\s*=\s*(.+?)\s*$")
@@ -296,16 +368,23 @@ class ManifestParser(DocumentTypeParser):
             sec["records"].append(_record("entry", k, [_field(k, v, 0)]))
             if len(sec["records"]) >= tf._RECORD_BUDGET:
                 break
-        return _profile(self.KIND, fam, label, "psd1", sections=[sec],
-                        byte_size=byte_size, line_count=lc,
-                        status="ok" if sec["records"] else "partial")
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "psd1",
+            sections=[sec],
+            byte_size=byte_size,
+            line_count=lc,
+            status="ok" if sec["records"] else "partial",
+        )
 
     # --- Ruby gem / pod specs -------------------------------------------
-    _SPEC_ASSIGN = re.compile(
-        r"(?m)^\s*(?:\w+)\.(\w+)\s*=\s*(['\"])(.*?)\2")
+    _SPEC_ASSIGN = re.compile(r"(?m)^\s*(?:\w+)\.(\w+)\s*=\s*(['\"])(.*?)\2")
     _SPEC_DEP = re.compile(
         r"(?m)^\s*(?:\w+)\.(?:add_(?:runtime_|development_)?dependency|dependency)\s*"
-        r"(['\"])(.*?)\1\s*(?:,\s*(['\"])(.*?)\3)?")
+        r"(['\"])(.*?)\1\s*(?:,\s*(['\"])(.*?)\3)?"
+    )
 
     def _ruby_spec(self, text, ext, byte_size, encoding, lc):
         fam, label = self.meta(ext)
@@ -316,12 +395,24 @@ class ManifestParser(DocumentTypeParser):
             meta["records"].append(_record("attribute", attr, [_field(attr, val, 0)]))
         for m in self._SPEC_DEP.finditer(text):
             name, ver = m.group(2), m.group(4) or ""
-            deps["records"].append(_record("dependency", name, [
-                _field("name", name, 0), _field("requirement", ver, 1)]))
+            deps["records"].append(
+                _record(
+                    "dependency",
+                    name,
+                    [_field("name", name, 0), _field("requirement", ver, 1)],
+                )
+            )
         secs = [s for s in (meta, deps) if s["records"]]
-        return _profile(self.KIND, fam, label, "ruby-dsl", sections=secs,
-                        byte_size=byte_size, line_count=lc,
-                        status="ok" if secs else "partial")
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "ruby-dsl",
+            sections=secs,
+            byte_size=byte_size,
+            line_count=lc,
+            status="ok" if secs else "partial",
+        )
 
     # --- go.sum ----------------------------------------------------------
     def _gosum(self, text, ext, byte_size, encoding, lc):
@@ -332,16 +423,35 @@ class ManifestParser(DocumentTypeParser):
             if len(parts) != 3:
                 continue
             module, version, h = parts
-            sec["records"].append(_record("checksum", module, [
-                _field("module", module, 0),
-                _field("version", version, 1),
-                _field("hash", h, 2, ftype="HEX" if h.startswith("h1:") else "STRING"),
-            ], start_line=ln))
+            sec["records"].append(
+                _record(
+                    "checksum",
+                    module,
+                    [
+                        _field("module", module, 0),
+                        _field("version", version, 1),
+                        _field(
+                            "hash",
+                            h,
+                            2,
+                            ftype="HEX" if h.startswith("h1:") else "STRING",
+                        ),
+                    ],
+                    start_line=ln,
+                )
+            )
             if len(sec["records"]) >= tf._RECORD_BUDGET:
                 break
-        return _profile(self.KIND, fam, label, "gosum", sections=[sec],
-                        byte_size=byte_size, line_count=lc,
-                        status="ok" if sec["records"] else "partial")
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "gosum",
+            sections=[sec],
+            byte_size=byte_size,
+            line_count=lc,
+            status="ok" if sec["records"] else "partial",
+        )
 
     # --- cabal (.hackage) ------------------------------------------------
     _CABAL_KV = re.compile(r"(?m)^([A-Za-z][\w-]*)\s*:\s*(.*)$")
@@ -351,18 +461,38 @@ class ManifestParser(DocumentTypeParser):
         sec = _section("package", "cabal-field", 1)
         for m in self._CABAL_KV.finditer(text):
             k, v = m.group(1).strip(), m.group(2).strip()
-            if not k or k[0].islower() and k not in (
-                    "name", "version", "license", "author", "maintainer",
-                    "synopsis", "category", "build-type", "cabal-version"):
+            if (
+                not k
+                or k[0].islower()
+                and k
+                not in (
+                    "name",
+                    "version",
+                    "license",
+                    "author",
+                    "maintainer",
+                    "synopsis",
+                    "category",
+                    "build-type",
+                    "cabal-version",
+                )
+            ):
                 # keep only top-level fields (indented continuations skipped)
                 if m.start() != 0 and text[m.start() - 1] not in "\n":
                     continue
             sec["records"].append(_record("field", k, [_field(k, v, 0)]))
             if len(sec["records"]) >= tf._RECORD_BUDGET:
                 break
-        return _profile(self.KIND, fam, label, "cabal", sections=[sec],
-                        byte_size=byte_size, line_count=lc,
-                        status="ok" if sec["records"] else "partial")
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "cabal",
+            sections=[sec],
+            byte_size=byte_size,
+            line_count=lc,
+            status="ok" if sec["records"] else "partial",
+        )
 
 
 # ===========================================================================
@@ -379,8 +509,20 @@ class QueryParser(DocumentTypeParser):
     """
 
     KIND = "query"
-    EXTENSIONS = (".aql", ".dax", ".dml", ".esql", ".kql", ".ksql",
-                  ".migration", ".n1ql", ".plsql", ".promql", ".spl", ".tsql")
+    EXTENSIONS = (
+        ".aql",
+        ".dax",
+        ".dml",
+        ".esql",
+        ".kql",
+        ".ksql",
+        ".migration",
+        ".n1ql",
+        ".plsql",
+        ".promql",
+        ".spl",
+        ".tsql",
+    )
     LABELS = {
         ".aql": ("aql", "ArangoDB AQL query"),
         ".dax": ("dax", "Power BI DAX query"),
@@ -396,12 +538,22 @@ class QueryParser(DocumentTypeParser):
         ".tsql": ("tsql", "T-SQL (SQL Server) script"),
     }
     _PIPE = {".kql", ".spl"}
-    _SQLISH = {".dml", ".esql", ".ksql", ".migration", ".n1ql", ".plsql",
-               ".tsql", ".aql"}
+    _SQLISH = {
+        ".dml",
+        ".esql",
+        ".ksql",
+        ".migration",
+        ".n1ql",
+        ".plsql",
+        ".tsql",
+        ".aql",
+    }
     _VERB = re.compile(r"^\s*(\w+)")
     _IDENT_AFTER = re.compile(
         r"\b(?:FROM|JOIN|INTO|UPDATE|TABLE|VIEW|INDEX|DATABASE|STREAM|DELETE\s+FROM)\s+"
-        r"([`\"\[]?[\w.$#]+[`\"\]]?)", re.IGNORECASE)
+        r"([`\"\[]?[\w.$#]+[`\"\]]?)",
+        re.IGNORECASE,
+    )
 
     def parse(self, path, data, text, ext, encoding, line_count):
         if tf._looks_binary(data):
@@ -431,9 +583,12 @@ class QueryParser(DocumentTypeParser):
                 if c == in_s:
                     in_s = None
                 elif c == "\\" and i + 1 < n:
-                    buf.append(text[i + 1]); i += 2; continue
+                    buf.append(text[i + 1])
+                    i += 2
+                    continue
             elif c in "'\"":
-                in_s = c; buf.append(c)
+                in_s = c
+                buf.append(c)
             elif c == ";":
                 stmt = "".join(buf).strip()
                 if stmt:
@@ -455,7 +610,7 @@ class QueryParser(DocumentTypeParser):
         verbs: Dict[str, int] = {}
         for idx, stmt in enumerate(self._split_statements(clean)):
             m = self._VERB.match(stmt)
-            verb = (m.group(1).upper() if m else "STATEMENT")
+            verb = m.group(1).upper() if m else "STATEMENT"
             verbs[verb] = verbs.get(verb, 0) + 1
             idents = []
             for im in self._IDENT_AFTER.finditer(stmt):
@@ -465,15 +620,24 @@ class QueryParser(DocumentTypeParser):
             fields = [_field("statement_type", verb, 0)]
             for j, ident in enumerate(_uniq(idents)[:32]):
                 fields.append(_field("references", ident, j + 1))
-            sec["records"].append(_record(verb.lower(), verb, fields,
-                                          text=stmt[:_PREVIEW]))
+            sec["records"].append(
+                _record(verb.lower(), verb, fields, text=stmt[:_PREVIEW])
+            )
             if idx >= tf._RECORD_BUDGET:
                 break
         for v, c in sorted(verbs.items()):
             props.append(("statement_verbs", v, c))
-        return _profile(self.KIND, fam, label, "sql", sections=[sec],
-                        byte_size=byte_size, line_count=lc, properties=props,
-                        status="ok" if sec["records"] else "partial")
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "sql",
+            sections=[sec],
+            byte_size=byte_size,
+            line_count=lc,
+            properties=props,
+            status="ok" if sec["records"] else "partial",
+        )
 
     # --- pipe dialects (KQL / SPL) --------------------------------------
     def _pipe(self, text, ext, byte_size, encoding, lc):
@@ -486,29 +650,44 @@ class QueryParser(DocumentTypeParser):
             s = line.strip()
             if not s or s.startswith("//") or s.startswith("#"):
                 if cur:
-                    blocks.append("\n".join(cur)); cur = []
+                    blocks.append("\n".join(cur))
+                    cur = []
                 continue
             cur.append(line)
         if cur:
             blocks.append("\n".join(cur))
         for qi, block in enumerate(blocks):
-            stages = [st.strip() for st in re.split(r"(?<!\|)\|(?!\|)", block)
-                      if st.strip()]
+            stages = [
+                st.strip() for st in re.split(r"(?<!\|)\|(?!\|)", block) if st.strip()
+            ]
             fields = [_field("stage_count", len(stages), 0, ftype="INT")]
             for si, st in enumerate(stages[:64]):
-                op = (self._VERB.match(st).group(1) if self._VERB.match(st)
-                      else st.split()[0] if st.split() else "stage")
+                op = (
+                    self._VERB.match(st).group(1)
+                    if self._VERB.match(st)
+                    else st.split()[0] if st.split() else "stage"
+                )
                 fields.append(_field(f"stage{si}", op, si + 1))
-            sec["records"].append(_record("query", f"query{qi + 1}", fields,
-                                          text=block[:_PREVIEW]))
+            sec["records"].append(
+                _record("query", f"query{qi + 1}", fields, text=block[:_PREVIEW])
+            )
             if qi >= tf._RECORD_BUDGET:
                 break
-        return _profile(self.KIND, fam, label, "pipe", sections=[sec],
-                        byte_size=byte_size, line_count=lc,
-                        status="ok" if sec["records"] else "partial")
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "pipe",
+            sections=[sec],
+            byte_size=byte_size,
+            line_count=lc,
+            status="ok" if sec["records"] else "partial",
+        )
 
     # --- DAX -------------------------------------------------------------
-    _DAX_DEF = re.compile(r"(?im)^\s*(DEFINE|EVALUATE|ORDER\s+BY|MEASURE|VAR|COLUMN|TABLE)\b")
+    _DAX_DEF = re.compile(
+        r"(?im)^\s*(DEFINE|EVALUATE|ORDER\s+BY|MEASURE|VAR|COLUMN|TABLE)\b"
+    )
 
     def _dax(self, text, ext, byte_size, encoding, lc):
         fam, label = self.meta(ext)
@@ -518,21 +697,40 @@ class QueryParser(DocumentTypeParser):
             if not m:
                 continue
             kw = re.sub(r"\s+", " ", m.group(1).upper())
-            sec["records"].append(_record(kw.lower().replace(" ", "_"), kw,
-                                          [_field("keyword", kw, 0)],
-                                          start_line=ln, text=raw.strip()[:_PREVIEW]))
+            sec["records"].append(
+                _record(
+                    kw.lower().replace(" ", "_"),
+                    kw,
+                    [_field("keyword", kw, 0)],
+                    start_line=ln,
+                    text=raw.strip()[:_PREVIEW],
+                )
+            )
         if not sec["records"]:
             # a bare measure expression -> single record
-            sec["records"].append(_record("expression", None,
-                                          [_field("expression", text.strip()[:2048], 0)]))
-        return _profile(self.KIND, fam, label, "dax", sections=[sec],
-                        byte_size=byte_size, line_count=lc)
+            sec["records"].append(
+                _record(
+                    "expression", None, [_field("expression", text.strip()[:2048], 0)]
+                )
+            )
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "dax",
+            sections=[sec],
+            byte_size=byte_size,
+            line_count=lc,
+        )
 
     # --- PromQL ----------------------------------------------------------
     _METRIC = re.compile(r"\b([a-zA-Z_:][a-zA-Z0-9_:]*)\s*(?:\{|\()")
-    _FUNC = re.compile(r"\b(rate|sum|avg|min|max|count|increase|histogram_quantile|"
-                       r"irate|delta|deriv|predict_linear|topk|bottomk|quantile|"
-                       r"stddev|stdvar|absent|label_replace|by|without)\b", re.IGNORECASE)
+    _FUNC = re.compile(
+        r"\b(rate|sum|avg|min|max|count|increase|histogram_quantile|"
+        r"irate|delta|deriv|predict_linear|topk|bottomk|quantile|"
+        r"stddev|stdvar|absent|label_replace|by|without)\b",
+        re.IGNORECASE,
+    )
 
     def _promql(self, text, ext, byte_size, encoding, lc):
         fam, label = self.meta(ext)
@@ -548,13 +746,21 @@ class QueryParser(DocumentTypeParser):
                 fields.append(_field("metric", mtr, i + 1))
             for i, fn in enumerate(funcs[:32]):
                 fields.append(_field("function", fn, 100 + i))
-            sec["records"].append(_record("expression", None, fields,
-                                          start_line=ln, text=expr[:_PREVIEW]))
+            sec["records"].append(
+                _record("expression", None, fields, start_line=ln, text=expr[:_PREVIEW])
+            )
             if len(sec["records"]) >= tf._RECORD_BUDGET:
                 break
-        return _profile(self.KIND, fam, label, "promql", sections=[sec],
-                        byte_size=byte_size, line_count=lc,
-                        status="ok" if sec["records"] else "partial")
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "promql",
+            sections=[sec],
+            byte_size=byte_size,
+            line_count=lc,
+            status="ok" if sec["records"] else "partial",
+        )
 
 
 # ===========================================================================
@@ -582,11 +788,14 @@ class MakefileParser(DocumentTypeParser):
     _RULE = re.compile(r"^([^\t:#=][^:=]*?):(?!=)\s*(.*)$")
     _DIRECTIVE = re.compile(
         r"^\s*(include|-include|sinclude|ifeq|ifneq|ifdef|ifndef|else|endif|"
-        r"define|endef|vpath|export|unexport|override)\b\s*(.*)$")
+        r"define|endef|vpath|export|unexport|override)\b\s*(.*)$"
+    )
 
     def parse(self, path, data, text, ext, encoding, line_count):
         if tf._looks_binary(data):
-            return self._forensic(ext, data, "binary payload under a makefile extension")
+            return self._forensic(
+                ext, data, "binary payload under a makefile extension"
+            )
         fam, label = self.meta(ext)
         v_sec = _section("variables", "assignment", 1)
         r_sec = _section("rules", "rule", 2)
@@ -599,20 +808,33 @@ class MakefileParser(DocumentTypeParser):
             i += 1
             if not line.strip() or line.lstrip().startswith("#"):
                 continue
-            if raw.startswith("\t"):        # a recipe line without a preceding rule
+            if raw.startswith("\t"):  # a recipe line without a preceding rule
                 continue
             dm = self._DIRECTIVE.match(line)
             if dm:
                 kw, rest = dm.group(1), dm.group(2).strip()
-                d_sec["records"].append(_record("directive", kw,
-                    [_field("directive", kw, 0), _field("argument", rest, 1)]))
+                d_sec["records"].append(
+                    _record(
+                        "directive",
+                        kw,
+                        [_field("directive", kw, 0), _field("argument", rest, 1)],
+                    )
+                )
                 continue
             am = self._ASSIGN.match(line)
             if am:
                 name, op, val = am.group(1), am.group(2), am.group(3).strip()
-                v_sec["records"].append(_record("variable", name, [
-                    _field("name", name, 0), _field("operator", op, 1),
-                    _field("value", val, 2)]))
+                v_sec["records"].append(
+                    _record(
+                        "variable",
+                        name,
+                        [
+                            _field("name", name, 0),
+                            _field("operator", op, 1),
+                            _field("value", val, 2),
+                        ],
+                    )
+                )
                 continue
             rm = self._RULE.match(line)
             if rm and ":" in line:
@@ -621,19 +843,30 @@ class MakefileParser(DocumentTypeParser):
                 # count following tab-indented recipe lines
                 recipe = 0
                 while i < n and (lines[i].startswith("\t")):
-                    recipe += 1; i += 1
+                    recipe += 1
+                    i += 1
                 for t in targets:
-                    fields = [_field("target", t, 0),
-                              _field("recipe_lines", recipe, 1, ftype="INT")]
+                    fields = [
+                        _field("target", t, 0),
+                        _field("recipe_lines", recipe, 1, ftype="INT"),
+                    ]
                     for j, p in enumerate(prereqs[:64]):
                         fields.append(_field("prerequisite", p, j + 2))
-                    r_sec["records"].append(_record("rule", t, fields,
-                                                    text=line[:_PREVIEW]))
+                    r_sec["records"].append(
+                        _record("rule", t, fields, text=line[:_PREVIEW])
+                    )
                 continue
         secs = [s for s in (v_sec, r_sec, d_sec) if s["records"]]
-        return _profile(self.KIND, fam, label, "make", sections=secs,
-                        byte_size=len(data), line_count=line_count,
-                        status="ok" if secs else "partial")
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "make",
+            sections=secs,
+            byte_size=len(data),
+            line_count=line_count,
+            status="ok" if secs else "partial",
+        )
 
 
 # ===========================================================================
@@ -658,14 +891,17 @@ class CertificateTextParser(DocumentTypeParser):
         ".pem": ("pem", "PEM container"),
     }
     _PEM = re.compile(
-        r"-----BEGIN ([A-Z0-9 ]+)-----\s*(.*?)\s*-----END \1-----", re.DOTALL)
+        r"-----BEGIN ([A-Z0-9 ]+)-----\s*(.*?)\s*-----END \1-----", re.DOTALL
+    )
 
     def parse(self, path, data, text, ext, encoding, line_count):
         byte_size = len(data)
         if ext in (".pem", ".csr"):
             return self._pem(text, ext, byte_size, encoding, line_count)
         if ext == ".authorized_keys":
-            return self._ssh_keys(text, ext, byte_size, encoding, line_count, host=False)
+            return self._ssh_keys(
+                text, ext, byte_size, encoding, line_count, host=False
+            )
         if ext == ".known_hosts":
             return self._ssh_keys(text, ext, byte_size, encoding, line_count, host=True)
         return self._minisig(text, ext, byte_size, encoding, line_count)
@@ -682,23 +918,40 @@ class CertificateTextParser(DocumentTypeParser):
             except (binascii.Error, ValueError):
                 der_len = None
             secret = "PRIVATE KEY" in btype
-            fields = [_field("block_type", btype, 0),
-                      _field("base64_chars", len(body), 1, ftype="INT")]
+            fields = [
+                _field("block_type", btype, 0),
+                _field("base64_chars", len(body), 1, ftype="INT"),
+            ]
             if der_len is not None:
                 fields.append(_field("der_bytes", der_len, 2, ftype="INT"))
             if secret:
                 fields.append(_field("redacted", "private key body not decoded", 3))
             sec["records"].append(_record("pem_block", btype, fields))
         status = "ok" if sec["records"] else "partial"
-        return _profile(self.KIND, fam, label, "pem", sections=[sec],
-                        byte_size=byte_size, line_count=lc, status=status)
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "pem",
+            sections=[sec],
+            byte_size=byte_size,
+            line_count=lc,
+            status=status,
+        )
 
     def _ssh_keys(self, text, ext, byte_size, encoding, lc, host):
         fam, label = self.meta(ext)
         sec = _section("keys", "ssh-key", 1)
-        keytypes = ("ssh-rsa", "ssh-dss", "ssh-ed25519", "ecdsa-sha2-nistp256",
-                    "ecdsa-sha2-nistp384", "ecdsa-sha2-nistp521",
-                    "sk-ssh-ed25519@openssh.com", "sk-ecdsa-sha2-nistp256@openssh.com")
+        keytypes = (
+            "ssh-rsa",
+            "ssh-dss",
+            "ssh-ed25519",
+            "ecdsa-sha2-nistp256",
+            "ecdsa-sha2-nistp384",
+            "ecdsa-sha2-nistp521",
+            "sk-ssh-ed25519@openssh.com",
+            "sk-ecdsa-sha2-nistp256@openssh.com",
+        )
         for ln, raw in enumerate(_lines(text), start=1):
             line = raw.strip()
             if not line or line.startswith("#"):
@@ -710,20 +963,26 @@ class CertificateTextParser(DocumentTypeParser):
                 continue
             ktype = parts[idx]
             blob = parts[idx + 1]
-            comment = " ".join(parts[idx + 2:]) if idx + 2 < len(parts) else ""
+            comment = " ".join(parts[idx + 2 :]) if idx + 2 < len(parts) else ""
             fields = [_field("key_type", ktype, 0)]
             if host:
                 hosts = parts[0]
-                fields.insert(0, _field("host", hosts, 0,
-                              ftype="STRING"))
-                fields.append(_field("hashed", str(hosts.startswith("|1|")).lower(),
-                                     9, ftype="BOOL"))
+                fields.insert(0, _field("host", hosts, 0, ftype="STRING"))
+                fields.append(
+                    _field(
+                        "hashed", str(hosts.startswith("|1|")).lower(), 9, ftype="BOOL"
+                    )
+                )
             try:
                 dec = base64.b64decode(blob, validate=False)
                 fp = hashlib.sha256(dec).digest()
-                fields.append(_field("fingerprint_sha256",
-                                     "SHA256:" + base64.b64encode(fp).decode().rstrip("="),
-                                     5))
+                fields.append(
+                    _field(
+                        "fingerprint_sha256",
+                        "SHA256:" + base64.b64encode(fp).decode().rstrip("="),
+                        5,
+                    )
+                )
                 fields.append(_field("key_bytes", len(dec), 6, ftype="INT"))
             except (binascii.Error, ValueError):
                 pass
@@ -733,19 +992,42 @@ class CertificateTextParser(DocumentTypeParser):
             if len(sec["records"]) >= tf._RECORD_BUDGET:
                 break
         status = "ok" if sec["records"] else "partial"
-        return _profile(self.KIND, fam, label, "ssh", sections=[sec],
-                        byte_size=byte_size, line_count=lc, status=status)
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "ssh",
+            sections=[sec],
+            byte_size=byte_size,
+            line_count=lc,
+            status=status,
+        )
 
     def _minisig(self, text, ext, byte_size, encoding, lc):
         fam, label = self.meta(ext)
         sec = _section("signature", "minisign", 1)
         lines = [l for l in _lines(text) if l.strip()]
-        untrusted = next((l.split(":", 1)[1].strip() for l in lines
-                          if l.startswith("untrusted comment:")), "")
-        trusted = next((l.split(":", 1)[1].strip() for l in lines
-                        if l.startswith("trusted comment:")), "")
-        b64 = [l for l in lines if not l.startswith(("untrusted comment:",
-                                                     "trusted comment:"))]
+        untrusted = next(
+            (
+                l.split(":", 1)[1].strip()
+                for l in lines
+                if l.startswith("untrusted comment:")
+            ),
+            "",
+        )
+        trusted = next(
+            (
+                l.split(":", 1)[1].strip()
+                for l in lines
+                if l.startswith("trusted comment:")
+            ),
+            "",
+        )
+        b64 = [
+            l
+            for l in lines
+            if not l.startswith(("untrusted comment:", "trusted comment:"))
+        ]
         algo = ""
         if b64:
             try:
@@ -753,12 +1035,21 @@ class CertificateTextParser(DocumentTypeParser):
                 algo = raw[:2].decode("ascii", "replace")
             except (binascii.Error, ValueError):
                 pass
-        fields = [_field("algorithm", algo or "unknown", 0),
-                  _field("untrusted_comment", untrusted, 1),
-                  _field("trusted_comment", trusted, 2)]
+        fields = [
+            _field("algorithm", algo or "unknown", 0),
+            _field("untrusted_comment", untrusted, 1),
+            _field("trusted_comment", trusted, 2),
+        ]
         sec["records"].append(_record("signature", algo or None, fields))
-        return _profile(self.KIND, fam, label, "minisign", sections=[sec],
-                        byte_size=byte_size, line_count=lc)
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "minisign",
+            sections=[sec],
+            byte_size=byte_size,
+            line_count=lc,
+        )
 
 
 # ===========================================================================
@@ -783,9 +1074,11 @@ class NotebookParser(DocumentTypeParser):
         ".wxm": ("maxima", "wxMaxima worksheet"),
     }
     _NB_CELL = re.compile(r'Cell\[[^,\]]*,\s*"([A-Za-z]+)"')
-    _WXM_CELL = re.compile(r"/\*\s*\[wxMaxima:\s*([\w ]+?)\s+start\s*\]\s*\*/(.*?)"
-                           r"/\*\s*\[wxMaxima:\s*[\w ]+?\s+end\s*\]\s*\*/",
-                           re.DOTALL)
+    _WXM_CELL = re.compile(
+        r"/\*\s*\[wxMaxima:\s*([\w ]+?)\s+start\s*\]\s*\*/(.*?)"
+        r"/\*\s*\[wxMaxima:\s*[\w ]+?\s+end\s*\]\s*\*/",
+        re.DOTALL,
+    )
 
     def parse(self, path, data, text, ext, encoding, line_count):
         byte_size = len(data)
@@ -807,13 +1100,23 @@ class NotebookParser(DocumentTypeParser):
         for m in self._NB_CELL.finditer(text):
             ctype = m.group(1)
             counts[ctype] = counts.get(ctype, 0) + 1
-            sec["records"].append(_record("cell", ctype, [_field("cell_type", ctype, 0)]))
+            sec["records"].append(
+                _record("cell", ctype, [_field("cell_type", ctype, 0)])
+            )
             if len(sec["records"]) >= tf._RECORD_BUDGET:
                 break
         props = [("cell_types", k, v) for k, v in sorted(counts.items())]
-        return _profile(self.KIND, fam, label, "mathematica", sections=[sec],
-                        byte_size=byte_size, line_count=lc, properties=props,
-                        status="ok" if sec["records"] else "partial")
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "mathematica",
+            sections=[sec],
+            byte_size=byte_size,
+            line_count=lc,
+            properties=props,
+            status="ok" if sec["records"] else "partial",
+        )
 
     def _wxmaxima(self, text, ext, byte_size, encoding, lc):
         fam, label = self.meta(ext)
@@ -821,13 +1124,23 @@ class NotebookParser(DocumentTypeParser):
         for m in self._WXM_CELL.finditer(text):
             ctype = m.group(1).strip()
             body = m.group(2).strip()
-            sec["records"].append(_record("cell", ctype,
-                [_field("cell_type", ctype, 0)], text=body[:_PREVIEW]))
+            sec["records"].append(
+                _record(
+                    "cell", ctype, [_field("cell_type", ctype, 0)], text=body[:_PREVIEW]
+                )
+            )
             if len(sec["records"]) >= tf._RECORD_BUDGET:
                 break
-        return _profile(self.KIND, fam, label, "wxmaxima", sections=[sec],
-                        byte_size=byte_size, line_count=lc,
-                        status="ok" if sec["records"] else "partial")
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "wxmaxima",
+            sections=[sec],
+            byte_size=byte_size,
+            line_count=lc,
+            status="ok" if sec["records"] else "partial",
+        )
 
     def _sagews(self, text, ext, byte_size, encoding, lc):
         fam, label = self.meta(ext)
@@ -840,15 +1153,34 @@ class NotebookParser(DocumentTypeParser):
             if not chunk:
                 continue
             idx += 1
-            sec["records"].append(_record("cell", f"cell{idx}",
-                [_field("index", idx, 0, ftype="INT")], text=chunk[:_PREVIEW]))
+            sec["records"].append(
+                _record(
+                    "cell",
+                    f"cell{idx}",
+                    [_field("index", idx, 0, ftype="INT")],
+                    text=chunk[:_PREVIEW],
+                )
+            )
             if idx >= tf._RECORD_BUDGET:
                 break
-        if not sec["records"]:      # no markers -> treat whole file as one cell
-            sec["records"].append(_record("cell", "cell1",
-                [_field("index", 1, 0, ftype="INT")], text=text[:_PREVIEW]))
-        return _profile(self.KIND, fam, label, "sage", sections=[sec],
-                        byte_size=byte_size, line_count=lc)
+        if not sec["records"]:  # no markers -> treat whole file as one cell
+            sec["records"].append(
+                _record(
+                    "cell",
+                    "cell1",
+                    [_field("index", 1, 0, ftype="INT")],
+                    text=text[:_PREVIEW],
+                )
+            )
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "sage",
+            sections=[sec],
+            byte_size=byte_size,
+            line_count=lc,
+        )
 
     def _maple(self, text, data, ext, byte_size, encoding, lc):
         fam, label = self.meta(ext)
@@ -858,14 +1190,32 @@ class NotebookParser(DocumentTypeParser):
         # Classic .mws: line-oriented; capture executable-group markers.
         sec = _section("groups", "maple-group", 1)
         for ln, raw in enumerate(_lines(text), start=1):
-            if raw.strip().startswith("{") or "MPLDOC" in raw or raw.strip().startswith(">"):
-                sec["records"].append(_record("group", None,
-                    [_field("text", raw.strip()[:512], 0)], start_line=ln))
+            if (
+                raw.strip().startswith("{")
+                or "MPLDOC" in raw
+                or raw.strip().startswith(">")
+            ):
+                sec["records"].append(
+                    _record(
+                        "group",
+                        None,
+                        [_field("text", raw.strip()[:512], 0)],
+                        start_line=ln,
+                    )
+                )
             if len(sec["records"]) >= tf._RECORD_BUDGET:
                 break
         status = "ok" if sec["records"] else "partial"
-        return _profile(self.KIND, fam, label, "maple", sections=[sec],
-                        byte_size=byte_size, line_count=lc, status=status)
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "maple",
+            sections=[sec],
+            byte_size=byte_size,
+            line_count=lc,
+            status=status,
+        )
 
 
 # ===========================================================================
@@ -887,9 +1237,11 @@ class DocumentFileParser(DocumentTypeParser):
         ".gslides": ("json", "Google Slides shortcut"),
         ".pml": ("pml", "Palm Markup Language"),
     }
-    _FDF_FIELD = re.compile(r"/T\s*\((?P<t>(?:\\.|[^()\\])*)\)"
-                            r"(?:.*?/V\s*(?:\((?P<v>(?:\\.|[^()\\])*)\)|/(?P<vn>\w+)))?",
-                            re.DOTALL)
+    _FDF_FIELD = re.compile(
+        r"/T\s*\((?P<t>(?:\\.|[^()\\])*)\)"
+        r"(?:.*?/V\s*(?:\((?P<v>(?:\\.|[^()\\])*)\)|/(?P<vn>\w+)))?",
+        re.DOTALL,
+    )
 
     def parse(self, path, data, text, ext, encoding, line_count):
         byte_size = len(data)
@@ -909,14 +1261,26 @@ class DocumentFileParser(DocumentTypeParser):
             val = m.group("v")
             if val is None and m.group("vn"):
                 val = "/" + m.group("vn")
-            sec["records"].append(_record("field", name, [
-                _field("field_name", name, 0),
-                _field("value", (val or ""), 1)]))
+            sec["records"].append(
+                _record(
+                    "field",
+                    name,
+                    [_field("field_name", name, 0), _field("value", (val or ""), 1)],
+                )
+            )
             if len(sec["records"]) >= tf._RECORD_BUDGET:
                 break
         status = "ok" if sec["records"] else "partial"
-        return _profile(self.KIND, fam, label, "fdf", sections=[sec],
-                        byte_size=byte_size, line_count=lc, status=status)
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "fdf",
+            sections=[sec],
+            byte_size=byte_size,
+            line_count=lc,
+            status=status,
+        )
 
     _PML_TAG = re.compile(r"\\(\w)")
 
@@ -933,15 +1297,31 @@ class DocumentFileParser(DocumentTypeParser):
             tags = self._PML_TAG.findall(line)
             for t in tags:
                 tagcount[t] = tagcount.get(t, 0) + 1
-            sec["records"].append(_record("line", None,
-                [_field("text", line[:512], 0),
-                 _field("tag_count", len(tags), 1, ftype="INT")], start_line=ln))
+            sec["records"].append(
+                _record(
+                    "line",
+                    None,
+                    [
+                        _field("text", line[:512], 0),
+                        _field("tag_count", len(tags), 1, ftype="INT"),
+                    ],
+                    start_line=ln,
+                )
+            )
             if len(sec["records"]) >= tf._RECORD_BUDGET:
                 break
         props = [("pml_tags", t, c) for t, c in sorted(tagcount.items())]
-        return _profile(self.KIND, fam, label, "pml", sections=[sec],
-                        byte_size=byte_size, line_count=lc, properties=props,
-                        status="ok" if sec["records"] else "partial")
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "pml",
+            sections=[sec],
+            byte_size=byte_size,
+            line_count=lc,
+            properties=props,
+            status="ok" if sec["records"] else "partial",
+        )
 
 
 # ===========================================================================
@@ -966,7 +1346,8 @@ class LicenseParser(DocumentTypeParser):
     _SPDX = re.compile(r"SPDX-License-Identifier:\s*([^\s]+)")
     _COPYRIGHT = re.compile(
         r"(?im)^\s*(?:Copyright|\(c\)|©)\s*(?:\(c\)|©)?\s*"
-        r"((?:\d{4}(?:\s*[-,]\s*\d{4})*)?\s*.+?)\s*$")
+        r"((?:\d{4}(?:\s*[-,]\s*\d{4})*)?\s*.+?)\s*$"
+    )
     _FAMILIES = [
         ("Apache-2.0", "Apache License"),
         ("MIT", "Permission is hereby granted, free of charge"),
@@ -976,7 +1357,10 @@ class LicenseParser(DocumentTypeParser):
         ("MPL-2.0", "Mozilla Public License Version 2.0"),
         ("BSD", "Redistribution and use in source and binary forms"),
         ("ISC", "ISC License"),
-        ("Unlicense", "This is free and unencumbered software released into the public domain"),
+        (
+            "Unlicense",
+            "This is free and unencumbered software released into the public domain",
+        ),
     ]
 
     def parse(self, path, data, text, ext, encoding, line_count):
@@ -1011,9 +1395,17 @@ class LicenseParser(DocumentTypeParser):
                 break
         secs = [sec] if sec["records"] else []
         status = "ok" if (secs or props) else "partial"
-        return _profile(self.KIND, fam, label, "license", sections=secs,
-                        byte_size=byte_size, line_count=line_count,
-                        properties=props, status=status)
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "license",
+            sections=secs,
+            byte_size=byte_size,
+            line_count=line_count,
+            properties=props,
+            status=status,
+        )
 
     def _dep5(self, text, ext, byte_size, encoding, lc):
         fam, label = self.meta(ext)
@@ -1024,16 +1416,24 @@ class LicenseParser(DocumentTypeParser):
             ordv = 0
             for fm in re.finditer(r"(?m)^([A-Za-z][\w-]*):\s*(.*)$", para):
                 k, v = fm.group(1), fm.group(2).strip()
-                fields.append(_field(k, v, ordv)); ordv += 1
+                fields.append(_field(k, v, ordv))
+                ordv += 1
                 if k in ("Files", "License", "Format") and label_field is None:
                     label_field = f"{k}={v}"
             if fields:
                 sec["records"].append(_record("paragraph", label_field, fields))
             if pi >= tf._RECORD_BUDGET:
                 break
-        return _profile(self.KIND, fam, label, "dep5", sections=[sec],
-                        byte_size=byte_size, line_count=lc,
-                        status="ok" if sec["records"] else "partial")
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "dep5",
+            sections=[sec],
+            byte_size=byte_size,
+            line_count=lc,
+            status="ok" if sec["records"] else "partial",
+        )
 
 
 # ===========================================================================
@@ -1120,48 +1520,65 @@ class DiffParser(DocumentTypeParser):
                     _field("new_start", ns_, 2, ftype="INT"),
                     _field("new_count", nc, 3, ftype="INT"),
                 ]
-                rec = _record("hunk", f"@@ -{os_},{oc} +{ns_},{nc} @@", fields,
-                              start_line=ln, text=raw.strip()[:_PREVIEW])
+                rec = _record(
+                    "hunk",
+                    f"@@ -{os_},{oc} +{ns_},{nc} @@",
+                    fields,
+                    start_line=ln,
+                    text=raw.strip()[:_PREVIEW],
+                )
                 cur["records"].append(rec)
                 cur_hunk = rec
                 continue
             if cur_hunk is not None:
                 if raw.startswith("+") and not raw.startswith("+++"):
-                    add += 1; total_add += 1
+                    add += 1
+                    total_add += 1
                 elif raw.startswith("-") and not raw.startswith("---"):
-                    rem += 1; total_del += 1
+                    rem += 1
+                    total_del += 1
         _close_hunk()
         for s in sections:
             s.pop("_named", None)
-        props = [("diff", "files_changed", len(sections)),
-                 ("diff", "hunks", total_hunks),
-                 ("diff", "lines_added", total_add),
-                 ("diff", "lines_removed", total_del)]
+        props = [
+            ("diff", "files_changed", len(sections)),
+            ("diff", "hunks", total_hunks),
+            ("diff", "lines_added", total_add),
+            ("diff", "lines_removed", total_del),
+        ]
         status = "ok" if sections else "partial"
-        return _profile(self.KIND, fam, label, "diff", sections=sections,
-                        byte_size=len(data), line_count=line_count,
-                        properties=props, status=status)
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "diff",
+            sections=sections,
+            byte_size=len(data),
+            line_count=line_count,
+            properties=props,
+            status=status,
+        )
 
 
 # ===========================================================================
 # bencode decoder (stdlib-only, for .torrent)
 # ===========================================================================
 def _bdecode(data: bytes, i: int) -> Tuple[Any, int]:
-    c = data[i:i + 1]
+    c = data[i : i + 1]
     if c == b"i":
         j = data.index(b"e", i)
-        return int(data[i + 1:j]), j + 1
+        return int(data[i + 1 : j]), j + 1
     if c == b"l":
         i += 1
         out = []
-        while data[i:i + 1] != b"e":
+        while data[i : i + 1] != b"e":
             v, i = _bdecode(data, i)
             out.append(v)
         return out, i + 1
     if c == b"d":
         i += 1
         out = {}
-        while data[i:i + 1] != b"e":
+        while data[i : i + 1] != b"e":
             k, i = _bdecode(data, i)
             v, i = _bdecode(data, i)
             out[k] = v
@@ -1170,7 +1587,7 @@ def _bdecode(data: bytes, i: int) -> Tuple[Any, int]:
         colon = data.index(b":", i)
         length = int(data[i:colon])
         start = colon + 1
-        return data[start:start + length], start + length
+        return data[start : start + length], start + length
     raise ValueError(f"invalid bencode at {i}")
 
 
@@ -1187,8 +1604,14 @@ def _uniq(seq) -> List[str]:
 # registry
 # ===========================================================================
 _PARSER_CLASSES = (
-    ManifestParser, QueryParser, MakefileParser, CertificateTextParser,
-    NotebookParser, DocumentFileParser, LicenseParser, DiffParser,
+    ManifestParser,
+    QueryParser,
+    MakefileParser,
+    CertificateTextParser,
+    NotebookParser,
+    DocumentFileParser,
+    LicenseParser,
+    DiffParser,
 )
 
 
@@ -1202,6 +1625,7 @@ def build_registry() -> Dict[str, DocumentTypeParser]:
             if e in reg:
                 raise RuntimeError(
                     f"document extension {e} claimed by both "
-                    f"{reg[e].__class__.__name__} and {cls.__name__}")
+                    f"{reg[e].__class__.__name__} and {cls.__name__}"
+                )
             reg[e] = inst
     return reg

@@ -12,7 +12,7 @@
 #     (func (export "sub") (param i32 i32) (result i32) ...)      -> function
 #     (start $main))
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -20,29 +20,42 @@ class WatAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "wat"
     EXTENSIONS = (".wat", ".wast")
     LINE_COMMENTS = (";;",)
-    BLOCK_COMMENTS = ()          # nested (; ;) handled below
+    BLOCK_COMMENTS = ()  # nested (; ;) handled below
     STRING_DELIMS = ('"',)
 
     def _strip_block(self, text):
         out, i, n, depth = [], 0, len(text), 0
         while i < n:
             if depth == 0 and text[i] == '"':
-                out.append('"'); i += 1
+                out.append('"')
+                i += 1
                 while i < n:
-                    c = text[i]; out.append(c)
+                    c = text[i]
+                    out.append(c)
                     if c == "\\" and i + 1 < n:
-                        out.append(text[i + 1]); i += 2; continue
+                        out.append(text[i + 1])
+                        i += 2
+                        continue
                     i += 1
                     if c == '"':
                         break
                 continue
-            if text[i:i + 2] == "(;":
-                depth += 1; out.append("  "); i += 2; continue
-            if text[i:i + 2] == ";)" and depth > 0:
-                depth -= 1; out.append("  "); i += 2; continue
+            if text[i : i + 2] == "(;":
+                depth += 1
+                out.append("  ")
+                i += 2
+                continue
+            if text[i : i + 2] == ";)" and depth > 0:
+                depth -= 1
+                out.append("  ")
+                i += 2
+                continue
             if depth > 0:
-                out.append("\n" if text[i] == "\n" else " "); i += 1; continue
-            out.append(text[i]); i += 1
+                out.append("\n" if text[i] == "\n" else " ")
+                i += 1
+                continue
+            out.append(text[i])
+            i += 1
         return "".join(out)
 
     def _clean(self, text):
@@ -63,8 +76,9 @@ class WatAnalyzer(RegexCodeAnalyzer):
             mod, name = m.group(1), m.group(2)
             self._add_import(file_id, name or mod, f"{mod}/{name}")
             open_pos = text.rfind("(", 0, m.end())
-            import_spans.append((open_pos,
-                                 self._find_matching(text, open_pos, "(", ")")))
+            import_spans.append(
+                (open_pos, self._find_matching(text, open_pos, "(", ")"))
+            )
 
         def _in_import(pos):
             return any(a <= pos < b for a, b in import_spans)

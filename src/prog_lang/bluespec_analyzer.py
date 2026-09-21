@@ -17,7 +17,7 @@
 #
 # Comments are '//' and '/* */'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -30,17 +30,17 @@ class BluespecAnalyzer(RegexCodeAnalyzer):
 
     _IMPORT = re.compile(r"^[ \t]*import\s+([A-Za-z_]\w*)\s*::", re.MULTILINE)
     _INTERFACE = re.compile(r"^[ \t]*interface\s+([A-Za-z_]\w*)", re.MULTILINE)
-    _MODULE = re.compile(r"^[ \t]*module\s+([A-Za-z_]\w*)\s*(?:#\([^)]*\))?\s*"
-                         r"(?:\(([^;]*)\))?", re.MULTILINE)
+    _MODULE = re.compile(
+        r"^[ \t]*module\s+([A-Za-z_]\w*)\s*(?:#\([^)]*\))?\s*" r"(?:\(([^;]*)\))?",
+        re.MULTILINE,
+    )
     # The return type may itself contain `#( ... )` type parameters (e.g.
     # `function a#(n) adjustSize(a#(m) x)`), so the pre-name portion must be
     # allowed to contain parens.  The declared name is the identifier that is
     # directly followed by the argument-list `(` -- a `(` never immediately
     # preceded by `#` (which introduces a type-parameter list instead).
-    _FUNC = re.compile(r"^[ \t]*function\b[^;{]*?([A-Za-z_]\w*)\s*\(",
-                       re.MULTILINE)
-    _METHOD = re.compile(r"^[ \t]*method\b[^;{]*?([A-Za-z_]\w*)\s*(\(|;)",
-                         re.MULTILINE)
+    _FUNC = re.compile(r"^[ \t]*function\b[^;{]*?([A-Za-z_]\w*)\s*\(", re.MULTILINE)
+    _METHOD = re.compile(r"^[ \t]*method\b[^;{]*?([A-Za-z_]\w*)\s*(\(|;)", re.MULTILINE)
     _RULE = re.compile(r"^[ \t]*rule\s+([A-Za-z_]\w*)", re.MULTILINE)
     _TYPEDEF = re.compile(r"^[ \t]*typedef\b", re.MULTILINE)
 
@@ -99,24 +99,32 @@ class BluespecAnalyzer(RegexCodeAnalyzer):
                 self._add_class(file_id, nm, description="bluespec typedef")
 
         for m in self._MODULE.finditer(clean):
-            self._add_function(file_id, m.group(1),
-                               self._split_params(m.group(2)), [],
-                               description="bluespec module")
+            self._add_function(
+                file_id,
+                m.group(1),
+                self._split_params(m.group(2)),
+                [],
+                description="bluespec module",
+            )
         for m in self._FUNC.finditer(clean):
             lp = m.end() - 1  # position of the arg-list '('
             rp = self._find_matching(clean, lp, "(", ")")
-            self._add_function(file_id, m.group(1),
-                               self._split_params(clean[lp + 1:rp - 1]), [],
-                               description="bluespec function")
+            self._add_function(
+                file_id,
+                m.group(1),
+                self._split_params(clean[lp + 1 : rp - 1]),
+                [],
+                description="bluespec function",
+            )
         for m in self._METHOD.finditer(clean):
             if m.group(2) == "(":
                 lp = m.end() - 1
                 rp = self._find_matching(clean, lp, "(", ")")
-                arg_ids = self._split_params(clean[lp + 1:rp - 1])
+                arg_ids = self._split_params(clean[lp + 1 : rp - 1])
             else:
                 arg_ids = []
-            self._add_function(file_id, m.group(1), arg_ids, [],
-                               description="bluespec method")
+            self._add_function(
+                file_id, m.group(1), arg_ids, [], description="bluespec method"
+            )
         for m in self._RULE.finditer(clean):
-            self._add_function(file_id, m.group(1), [], [],
-                               description="bluespec rule")
+            self._add_function(file_id, m.group(1), [], [], description="bluespec rule")

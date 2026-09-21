@@ -21,7 +21,7 @@
 # `//` and `/* ... */` are the inline-C# comments; the directive is a single
 # `<%@ ... %>` tag.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -35,19 +35,23 @@ class AspNetAshxAnalyzer(RegexCodeAnalyzer):
     BLOCK_COMMENTS = (("/*", "*/"),)
     STRING_DELIMS = ('"',)
 
-    _CLASS_ATTR = re.compile(r'(?is)<%@\s*WebHandler\b[^%]*?'
-                             r'\bClass\s*=\s*"([^"]+)"')
-    _CODE_ATTR = re.compile(r'(?is)<%@\s*WebHandler\b[^%]*?'
-                            r'\b(?:CodeBehind|CodeFile|Src)\s*=\s*"([^"]+)"')
+    _CLASS_ATTR = re.compile(
+        r"(?is)<%@\s*WebHandler\b[^%]*?" r'\bClass\s*=\s*"([^"]+)"'
+    )
+    _CODE_ATTR = re.compile(
+        r"(?is)<%@\s*WebHandler\b[^%]*?"
+        r'\b(?:CodeBehind|CodeFile|Src)\s*=\s*"([^"]+)"'
+    )
     _USING = re.compile(r"(?m)^[ \t]*using\s+(?:static\s+)?(" + _QUAL + r")\s*;")
     _NS = re.compile(r"(?m)^[ \t]*namespace\s+(" + _QUAL + r")\b")
-    _CLASS = re.compile(r"(?m)\b(?:class|struct|interface|enum)\s+(" + _ID +
-                        r")\b")
-    _METHOD = re.compile(r"(?m)^[ \t]*(?:\[[^\]]*\]\s*)*"
-                         r"(?:public|private|protected|internal|static|"
-                         r"virtual|override|async|sealed|new|\s)+"
-                         r"(?:" + _QUAL + r"(?:<[^>]+>)?(?:\[\])?)\s+"
-                         r"(" + _ID + r")\s*\(")
+    _CLASS = re.compile(r"(?m)\b(?:class|struct|interface|enum)\s+(" + _ID + r")\b")
+    _METHOD = re.compile(
+        r"(?m)^[ \t]*(?:\[[^\]]*\]\s*)*"
+        r"(?:public|private|protected|internal|static|"
+        r"virtual|override|async|sealed|new|\s)+"
+        r"(?:" + _QUAL + r"(?:<[^>]+>)?(?:\[\])?)\s+"
+        r"(" + _ID + r")\s*\("
+    )
 
     def _extract_entities(self, file_id, text, path):
         seen_c = set()
@@ -63,8 +67,7 @@ class AspNetAshxAnalyzer(RegexCodeAnalyzer):
             src = m.group(1)
             if src not in seen_i:
                 seen_i.add(src)
-                self._add_import(file_id, src.replace("\\", "/").split("/")[-1],
-                                 src)
+                self._add_import(file_id, src.replace("\\", "/").split("/")[-1], src)
 
         clean = self._strip_comments(text)
 
@@ -82,8 +85,21 @@ class AspNetAshxAnalyzer(RegexCodeAnalyzer):
                     self._add_class(file_id, name, description=desc)
 
         seen_fn = set()
-        _KW = {"if", "for", "foreach", "while", "switch", "catch", "using",
-               "lock", "return", "get", "set", "new", "fixed"}
+        _KW = {
+            "if",
+            "for",
+            "foreach",
+            "while",
+            "switch",
+            "catch",
+            "using",
+            "lock",
+            "return",
+            "get",
+            "set",
+            "new",
+            "fixed",
+        }
         for m in self._METHOD.finditer(clean):
             name = m.group(1)
             if name in _KW or name in seen_fn:

@@ -16,16 +16,29 @@
 # Program(...) construction and get_qc(...)/QuantumComputer connections are the
 # domain entry points; they are tagged in addition to the full Python pass.
 import ast
+
 from .python_embedded_base import PythonEmbeddedAnalyzer
 
 
 class PyQuilAnalyzer(PythonEmbeddedAnalyzer):
     LANG_KEY = "pyquil"
     EXTENSIONS = (".pyquil",)
-    DSL_BASECLASSES = ("AbstractCompiler", "pyquil.AbstractCompiler",
-                       "AbstractGate", "Gate", "QuantumComputer")
-    _CTORS = {"Program", "get_qc", "QuantumComputer", "QubitPlaceholder",
-              "Pragma", "DefGate", "DefPermutationGate"}
+    DSL_BASECLASSES = (
+        "AbstractCompiler",
+        "pyquil.AbstractCompiler",
+        "AbstractGate",
+        "Gate",
+        "QuantumComputer",
+    )
+    _CTORS = {
+        "Program",
+        "get_qc",
+        "QuantumComputer",
+        "QubitPlaceholder",
+        "Pragma",
+        "DefGate",
+        "DefPermutationGate",
+    }
 
     def _dsl_enrich(self, file_id, tree, code_text):
         super()._dsl_enrich(file_id, tree, code_text)

@@ -12,7 +12,7 @@
 #
 # Comments are '//' and '#' (line) and '/* */' (block); strings use '"'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -26,16 +26,15 @@ class IoAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"',)
 
     _PROTO = re.compile(
-        r"^[ \t]*(" + _ID + r")\s*:?=\s*(" + _ID + r")\s+clone\b", re.MULTILINE)
-    _METHOD = re.compile(
-        r"^[ \t]*(" + _ID + r")\s*:?=\s*method\s*\(", re.MULTILINE)
-    _SETSLOT = re.compile(
-        r'\bsetSlot\(\s*"(' + _ID + r')"', re.MULTILINE)
+        r"^[ \t]*(" + _ID + r")\s*:?=\s*(" + _ID + r")\s+clone\b", re.MULTILINE
+    )
+    _METHOD = re.compile(r"^[ \t]*(" + _ID + r")\s*:?=\s*method\s*\(", re.MULTILINE)
+    _SETSLOT = re.compile(r'\bsetSlot\(\s*"(' + _ID + r')"', re.MULTILINE)
     _ASSIGN = re.compile(
-        r"^[ \t]*(" + _ID + r")\s*:?=\s*(?!method\b)(?:(" + _ID +
-        r")\s+clone\b)?", re.MULTILINE)
-    _DOFILE = re.compile(
-        r'\b(?:doFile|doRelativeFile|ifFileExists)\(\s*"([^"]+)"')
+        r"^[ \t]*(" + _ID + r")\s*:?=\s*(?!method\b)(?:(" + _ID + r")\s+clone\b)?",
+        re.MULTILINE,
+    )
+    _DOFILE = re.compile(r'\b(?:doFile|doRelativeFile|ifFileExists)\(\s*"([^"]+)"')
 
     def _method_args(self, blob):
         """Io method(...) leading identifiers are the parameter names; the final
@@ -71,9 +70,10 @@ class IoAnalyzer(RegexCodeAnalyzer):
             method_pos.add(m.start())
             lp = m.end() - 1
             rp = self._find_matching(clean, lp, "(", ")")
-            arg_ids = self._method_args(clean[lp + 1:rp - 1])
-            self._add_function(file_id, m.group(1), arg_ids, [],
-                               description="io method")
+            arg_ids = self._method_args(clean[lp + 1 : rp - 1])
+            self._add_function(
+                file_id, m.group(1), arg_ids, [], description="io method"
+            )
 
         for m in self._SETSLOT.finditer(clean):
             self._add_variable(file_id, m.group(1))

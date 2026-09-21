@@ -14,6 +14,7 @@ class StataAnalyzer(ShellScriptBase):
     ``local x ...`` / ``global x ...`` / ``scalar x = ...`` / ``tempvar x`` -> variable
     ``do file`` / ``run file`` / ``include file``                          -> import
     """
+
     LANG_KEY = "stata"
     EXTENSIONS = (".ado", ".do")
     LINE_COMMENTS = ("//", "*")
@@ -21,8 +22,10 @@ class StataAnalyzer(ShellScriptBase):
     STRING_DELIMS = ('"',)
 
     _PROGRAM = re.compile(r"(?m)^[ \t]*program[ \t]+(?:define[ \t]+|drop[ \t]+)?(\w+)")
-    _LOCAL = re.compile(r"(?m)^[ \t]*(local|global|tempvar|tempname|tempfile|scalar)"
-                        r"[ \t]+(\w+)(?:[ \t=]+(.*))?")
+    _LOCAL = re.compile(
+        r"(?m)^[ \t]*(local|global|tempvar|tempname|tempfile|scalar)"
+        r"[ \t]+(\w+)(?:[ \t=]+(.*))?"
+    )
     _INCLUDE = re.compile(r"(?m)^[ \t]*(?:do|run|include)[ \t]+([^\s,]+)")
     _ARGS = re.compile(r"(?m)^[ \t]*(?:syntax|args)[ \t]+(.+)$")
 
@@ -43,8 +46,9 @@ class StataAnalyzer(ShellScriptBase):
             if name in seen_var:
                 continue
             seen_var.add(name)
-            self._add_variable(file_id, name, (val or "").strip()[:120] or None,
-                               scope=kind)
+            self._add_variable(
+                file_id, name, (val or "").strip()[:120] or None, scope=kind
+            )
 
         seen_imp = set()
         for m in self._INCLUDE.finditer(clean):
@@ -54,8 +58,10 @@ class StataAnalyzer(ShellScriptBase):
                 self._add_sourced(file_id, tgt, keyword="do")
 
         self._record_module_meta(
-            file_id, kind="ado-program" if path.suffix.lower() == ".ado" else "do-file",
-            programs=len(seen_fn), macros=len(seen_var),
+            file_id,
+            kind="ado-program" if path.suffix.lower() == ".ado" else "do-file",
+            programs=len(seen_fn),
+            macros=len(seen_var),
         )
 
 
@@ -68,9 +74,10 @@ class SasAnalyzer(ShellScriptBase):
     ``%let var = value;``                 -> variable
     ``%include 'file';``                  -> import
     """
+
     LANG_KEY = "sas"
     EXTENSIONS = (".sas",)
-    LINE_COMMENTS = ("*",)          # `* comment ;` (statement comment)
+    LINE_COMMENTS = ("*",)  # `* comment ;` (statement comment)
     BLOCK_COMMENTS = (("/*", "*/"),)
     STRING_DELIMS = ('"', "'")
 
@@ -96,14 +103,16 @@ class SasAnalyzer(ShellScriptBase):
             seen_fn.add(name)
             params = self._split_top_level(m.group(2) or "")
             params = [p.split("=")[0].strip() for p in params]
-            self._add_shell_function(file_id, name, params=params,
-                                     description="sas macro")
+            self._add_shell_function(
+                file_id, name, params=params, description="sas macro"
+            )
         procs = self._uniq(m.group(1).lower() for m in self._PROC.finditer(clean))
         for name in procs:
             if name not in seen_fn:
                 seen_fn.add(name)
-                self._add_shell_function(file_id, "proc_" + name,
-                                         description="sas procedure step")
+                self._add_shell_function(
+                    file_id, "proc_" + name, description="sas procedure step"
+                )
 
         seen_ds = set()
         for m in self._DATA.finditer(clean):
@@ -117,8 +126,9 @@ class SasAnalyzer(ShellScriptBase):
             name = m.group(1)
             if name not in seen_var:
                 seen_var.add(name)
-                self._add_variable(file_id, name, m.group(2).strip()[:120] or None,
-                                   scope="macro")
+                self._add_variable(
+                    file_id, name, m.group(2).strip()[:120] or None, scope="macro"
+                )
 
         seen_imp = set()
         for m in self._INCLUDE.finditer(clean):
@@ -128,8 +138,10 @@ class SasAnalyzer(ShellScriptBase):
                 self._add_sourced(file_id, tgt, keyword="include")
 
         self._record_module_meta(
-            file_id, macros=len([f for f in seen_fn if not f.startswith("proc_")]),
-            data_steps=len(seen_ds), procedures=procs or None,
+            file_id,
+            macros=len([f for f in seen_fn if not f.startswith("proc_")]),
+            data_steps=len(seen_ds),
+            procedures=procs or None,
         )
 
 
@@ -140,6 +152,7 @@ class SpssAnalyzer(ShellScriptBase):
     ``COMPUTE var = expr.``                  -> variable
     ``INCLUDE FILE='x'.`` / ``INSERT FILE=`` -> import
     """
+
     LANG_KEY = "spss"
     EXTENSIONS = (".sps",)
     LINE_COMMENTS = ("*",)
@@ -148,7 +161,9 @@ class SpssAnalyzer(ShellScriptBase):
 
     _DEFINE = re.compile(r"(?mi)^[ \t]*define[ \t]+!?(\w+)[ \t]*\(([^)]*)\)")
     _COMPUTE = re.compile(r"(?mi)^[ \t]*compute[ \t]+(\w+)[ \t]*=[ \t]*([^.]*)")
-    _INCLUDE = re.compile(r"(?mi)^[ \t]*(?:include|insert)[ \t]+file[ \t]*=[ \t]*([^\s.]+)")
+    _INCLUDE = re.compile(
+        r"(?mi)^[ \t]*(?:include|insert)[ \t]+file[ \t]*=[ \t]*([^\s.]+)"
+    )
     _GET = re.compile(r"(?mi)^[ \t]*get[ \t]+file[ \t]*=[ \t]*([^\s.]+)")
 
     def _extract_entities(self, file_id, text, path):
@@ -160,18 +175,22 @@ class SpssAnalyzer(ShellScriptBase):
             if name in seen_fn:
                 continue
             seen_fn.add(name)
-            params = [p.split("=")[0].strip().lstrip("!")
-                      for p in self._split_top_level(m.group(2) or "")]
-            self._add_shell_function(file_id, name, params=[p for p in params if p],
-                                     description="spss macro")
+            params = [
+                p.split("=")[0].strip().lstrip("!")
+                for p in self._split_top_level(m.group(2) or "")
+            ]
+            self._add_shell_function(
+                file_id, name, params=[p for p in params if p], description="spss macro"
+            )
 
         seen_var = set()
         for m in self._COMPUTE.finditer(clean):
             name = m.group(1)
             if name not in seen_var:
                 seen_var.add(name)
-                self._add_variable(file_id, name, m.group(2).strip()[:120] or None,
-                                   scope="computed")
+                self._add_variable(
+                    file_id, name, m.group(2).strip()[:120] or None, scope="computed"
+                )
 
         seen_imp = set()
         for rx, kw in ((self._INCLUDE, "include"), (self._GET, "get")):
@@ -181,5 +200,6 @@ class SpssAnalyzer(ShellScriptBase):
                     seen_imp.add(tgt)
                     self._add_sourced(file_id, tgt, keyword=kw)
 
-        self._record_module_meta(file_id, macros=len(seen_fn),
-                                 computed_vars=len(seen_var))
+        self._record_module_meta(
+            file_id, macros=len(seen_fn), computed_vars=len(seen_var)
+        )

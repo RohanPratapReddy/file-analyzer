@@ -9,7 +9,7 @@
 #   :- use_module(library(lists)).                             -> import
 #   area(R, A) :- A is pi*R*R.                                  -> predicate clause (method)
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ENTITY = ("object", "protocol", "category")
@@ -24,17 +24,19 @@ class LogtalkAnalyzer(RegexCodeAnalyzer):
 
     _OPEN = re.compile(
         r":-\s*(object|protocol|category)\(\s*([a-z]\w*)(.*?)\)\.",
-        re.IGNORECASE | re.DOTALL)
+        re.IGNORECASE | re.DOTALL,
+    )
     _CLOSE = re.compile(r":-\s*end_(object|protocol|category)\.", re.IGNORECASE)
     _PRED_DIRECTIVE = re.compile(
-        r":-\s*(?:public|protected|private)\(\s*(.+?)\s*\)\.",
-        re.IGNORECASE | re.DOTALL)
+        r":-\s*(?:public|protected|private)\(\s*(.+?)\s*\)\.", re.IGNORECASE | re.DOTALL
+    )
     _USE = re.compile(
-        r":-\s*(?:use_module|uses)\(\s*(?:library\(\s*)?([a-z]\w*)",
-        re.IGNORECASE)
+        r":-\s*(?:use_module|uses)\(\s*(?:library\(\s*)?([a-z]\w*)", re.IGNORECASE
+    )
     _RELATION = re.compile(
         r"\b(extends|implements|imports|instantiates|specializes)\(\s*([^)]*)\)",
-        re.IGNORECASE)
+        re.IGNORECASE,
+    )
     # a clause head:  name(args) :-   OR fact  name(args).   at column 0
     _CLAUSE = re.compile(r"^([a-z]\w*)\((.*?)\)\s*(?::-|\.)", re.MULTILINE | re.DOTALL)
     _FACT0 = re.compile(r"^([a-z]\w*)\s*(?::-|\.)", re.MULTILINE)
@@ -52,8 +54,10 @@ class LogtalkAnalyzer(RegexCodeAnalyzer):
             self._add_import(file_id, m.group(1), m.group(1))
 
         # entity spans
-        opens = [(m.start(), m.end(), m.group(1).lower(), m.group(2), m.group(3))
-                 for m in self._OPEN.finditer(text)]
+        opens = [
+            (m.start(), m.end(), m.group(1).lower(), m.group(2), m.group(3))
+            for m in self._OPEN.finditer(text)
+        ]
         closes = [m.start() for m in self._CLOSE.finditer(text)]
 
         for idx, (ostart, oend, kind, name, rel) in enumerate(opens):
@@ -75,27 +79,51 @@ class LogtalkAnalyzer(RegexCodeAnalyzer):
                     nm = re.match(r"([a-z]\w*)\s*/\s*\d+", spec.strip())
                     if nm and nm.group(1) not in seen:
                         seen.add(nm.group(1))
-                        methods.append(self._add_function(
-                            file_id, nm.group(1), [], [], class_id=cid,
-                            description=f"logtalk {kind} predicate"))
+                        methods.append(
+                            self._add_function(
+                                file_id,
+                                nm.group(1),
+                                [],
+                                [],
+                                class_id=cid,
+                                description=f"logtalk {kind} predicate",
+                            )
+                        )
             # defined clauses (predicate heads)
             for cm in self._CLAUSE.finditer(body):
                 nm = cm.group(1)
                 if nm in seen:
                     continue
                 seen.add(nm)
-                arity = len(self._split_top_level(cm.group(2))) if cm.group(2).strip() else 0
+                arity = (
+                    len(self._split_top_level(cm.group(2)))
+                    if cm.group(2).strip()
+                    else 0
+                )
                 arg_ids = [self._add_arg(f"arg{i+1}") for i in range(arity)]
-                methods.append(self._add_function(
-                    file_id, nm, arg_ids, [], class_id=cid,
-                    description=f"logtalk {kind} clause"))
-            self._add_class(file_id, name, description=f"logtalk {kind}",
-                            parent_ids=parents, method_ids=methods)
+                methods.append(
+                    self._add_function(
+                        file_id,
+                        nm,
+                        arg_ids,
+                        [],
+                        class_id=cid,
+                        description=f"logtalk {kind} clause",
+                    )
+                )
+            self._add_class(
+                file_id,
+                name,
+                description=f"logtalk {kind}",
+                parent_ids=parents,
+                method_ids=methods,
+            )
 
         # clauses outside any entity -> free predicates (dedup by name)
-        entity_ranges = [(opens[i][0],
-                          next((c for c in closes if c > opens[i][1]), len(text)))
-                         for i in range(len(opens))]
+        entity_ranges = [
+            (opens[i][0], next((c for c in closes if c > opens[i][1]), len(text)))
+            for i in range(len(opens))
+        ]
 
         def inside(pos):
             return any(a <= pos < b for a, b in entity_ranges)
@@ -108,6 +136,10 @@ class LogtalkAnalyzer(RegexCodeAnalyzer):
             if nm in free_seen:
                 continue
             free_seen.add(nm)
-            arity = len(self._split_top_level(cm.group(2))) if cm.group(2).strip() else 0
+            arity = (
+                len(self._split_top_level(cm.group(2))) if cm.group(2).strip() else 0
+            )
             arg_ids = [self._add_arg(f"arg{i+1}") for i in range(arity)]
-            self._add_function(file_id, nm, arg_ids, [], description="logtalk predicate")
+            self._add_function(
+                file_id, nm, arg_ids, [], description="logtalk predicate"
+            )

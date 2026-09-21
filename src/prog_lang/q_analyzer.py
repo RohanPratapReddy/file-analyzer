@@ -15,7 +15,7 @@
 # of a line and begins with an identifier, leading-'/' comment lines never
 # produce a false symbol, so comment handling is left to anchoring.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _NAME = r"[A-Za-z_][\w.]*"
@@ -29,10 +29,8 @@ class QAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"',)
 
     _LOAD = re.compile(r"^[ \t]*\\l\s+(\S+)", re.MULTILINE)
-    _FUNC = re.compile(
-        r"^[ \t]*(" + _NAME + r")\s*::?\s*\{(\[[^\]]*\])?", re.MULTILINE)
-    _VAR = re.compile(
-        r"^[ \t]*(" + _NAME + r")\s*::?(?!\s*\{)", re.MULTILINE)
+    _FUNC = re.compile(r"^[ \t]*(" + _NAME + r")\s*::?\s*\{(\[[^\]]*\])?", re.MULTILINE)
+    _VAR = re.compile(r"^[ \t]*(" + _NAME + r")\s*::?(?!\s*\{)", re.MULTILINE)
 
     def _args(self, bracket):
         ids = []
@@ -57,8 +55,13 @@ class QAnalyzer(RegexCodeAnalyzer):
 
         fn_names = set()
         for m in self._FUNC.finditer(clean):
-            self._add_function(file_id, m.group(1), self._args(m.group(2)), [],
-                               description="q function")
+            self._add_function(
+                file_id,
+                m.group(1),
+                self._args(m.group(2)),
+                [],
+                description="q function",
+            )
             fn_names.add((m.group(1), m.start()))
 
         # variable assignments whose RHS is not a lambda

@@ -14,7 +14,7 @@
 # Koka identifiers may contain '-' (e.g. list-map).  Comments are '//', '///'
 # and '/* */' (block comments nest, but a flat strip is adequate); strings '"'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 # Value identifiers start lowercase and may embed dashes; a trailing dash is not
@@ -22,8 +22,9 @@ from .regex_base import RegexCodeAnalyzer
 _LID = r"[a-z_][A-Za-z0-9_]*(?:-[A-Za-z0-9_]+)*"
 _CID = r"[a-z_][A-Za-z0-9_]*(?:-[A-Za-z0-9_]+)*"
 _PATH = r"[A-Za-z_][A-Za-z0-9_/]*"
-_TQUAL = "|".join(["value", "reference", "co", "rec", "open", "extend", "div",
-                   "linear"])
+_TQUAL = "|".join(
+    ["value", "reference", "co", "rec", "open", "extend", "div", "linear"]
+)
 
 
 class KokaAnalyzer(RegexCodeAnalyzer):
@@ -33,19 +34,34 @@ class KokaAnalyzer(RegexCodeAnalyzer):
     BLOCK_COMMENTS = (("/*", "*/"),)
     STRING_DELIMS = ('"',)
 
-    _MODULE = re.compile(r"(?m)^\s*(?:pub\s+)?module\s+(?:interface\s+)?(" + _PATH + r")")
+    _MODULE = re.compile(
+        r"(?m)^\s*(?:pub\s+)?module\s+(?:interface\s+)?(" + _PATH + r")"
+    )
     _IMPORT = re.compile(
-        r"(?m)^\s*import\s+(?:(" + _LID + r")\s*=\s*)?(" + _PATH + r")")
+        r"(?m)^\s*import\s+(?:(" + _LID + r")\s*=\s*)?(" + _PATH + r")"
+    )
     _FUN = re.compile(
         r"(?m)^\s*(?:pub\s+|inline\s+|noinline\s+|extern\s+|"
         r"private\s+|abstract\s+|fip\s+|fbip\s+|tail\s+)*"
-        r"(?:fun|fn)\s+(" + _LID + r")")
+        r"(?:fun|fn)\s+(" + _LID + r")"
+    )
     _TYPE = re.compile(
-        r"(?m)^\s*(?:pub\s+|private\s+|abstract\s+)*(?:(?:" + _TQUAL +
-        r")\s+)*type\s+(" + _CID + r")")
-    _STRUCT = re.compile(r"(?m)^\s*(?:pub\s+|private\s+|abstract\s+)*(?:(?:" + _TQUAL +
-                         r")\s+)*struct\s+(" + _CID + r")")
-    _EFFECT = re.compile(r"(?m)^\s*(?:pub\s+)?(?:named\s+|raw\s+|linear\s+)*effect\s+(" + _CID + r")")
+        r"(?m)^\s*(?:pub\s+|private\s+|abstract\s+)*(?:(?:"
+        + _TQUAL
+        + r")\s+)*type\s+("
+        + _CID
+        + r")"
+    )
+    _STRUCT = re.compile(
+        r"(?m)^\s*(?:pub\s+|private\s+|abstract\s+)*(?:(?:"
+        + _TQUAL
+        + r")\s+)*struct\s+("
+        + _CID
+        + r")"
+    )
+    _EFFECT = re.compile(
+        r"(?m)^\s*(?:pub\s+)?(?:named\s+|raw\s+|linear\s+)*effect\s+(" + _CID + r")"
+    )
     _ALIAS = re.compile(r"(?m)^\s*(?:pub\s+)?alias\s+(" + _CID + r")")
     _VAL = re.compile(r"(?m)^\s*(?:pub\s+)?val\s+(" + _LID + r")")
 
@@ -61,8 +77,9 @@ class KokaAnalyzer(RegexCodeAnalyzer):
         clean = self._strip_comments(text)
 
         for m in self._MODULE.finditer(clean):
-            self._add_class(file_id, m.group(1).split("/")[-1],
-                            description="koka module")
+            self._add_class(
+                file_id, m.group(1).split("/")[-1], description="koka module"
+            )
         for m in self._IMPORT.finditer(clean):
             src = m.group(2)
             self._add_import(file_id, src.split("/")[-1], src, alias=m.group(1))
@@ -79,5 +96,4 @@ class KokaAnalyzer(RegexCodeAnalyzer):
             self._add_variable(file_id, m.group(1), scope="module")
 
         for m in self._FUN.finditer(clean):
-            self._add_function(file_id, m.group(1), [], [],
-                               description="koka function")
+            self._add_function(file_id, m.group(1), [], [], description="koka function")

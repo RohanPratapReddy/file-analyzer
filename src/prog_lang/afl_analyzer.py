@@ -13,7 +13,7 @@
 #
 # C-like: comments '//' and '/* */'; strings '"' and "'". No classes.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -27,8 +27,9 @@ class AFLAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"', "'")
 
     _INCLUDE = re.compile(r'(?im)^\s*#\s*include(?:_once)?\s+[<"]([^>"]+)[>"]')
-    _FUNC = re.compile(r"(?im)^\s*(?:function|procedure)\s+(" + _ID +
-                       r")\s*\(([^)]*)\)")
+    _FUNC = re.compile(
+        r"(?im)^\s*(?:function|procedure)\s+(" + _ID + r")\s*\(([^)]*)\)"
+    )
     _SECTION = re.compile(r'(?i)_SECTION_BEGIN\s*\(\s*"([^"]*)"')
     # top-level simple assignment (skip '==', '<=', '>=', '!=')
     _ASSIGN = re.compile(r"(?m)^\s*(" + _ID + r")\s*=(?![=])")
@@ -46,8 +47,9 @@ class AFLAnalyzer(RegexCodeAnalyzer):
         func_names = set()
         for m in self._FUNC.finditer(clean):
             args = self._afl_args(m.group(2))
-            self._add_function(file_id, m.group(1), args, [],
-                               description="afl function")
+            self._add_function(
+                file_id, m.group(1), args, [], description="afl function"
+            )
             func_names.add(m.group(1).lower())
 
         seen = set()

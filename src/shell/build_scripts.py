@@ -13,11 +13,12 @@ class M4Analyzer(ShellScriptBase):
     ``include(`file')`` / ``m4_include`` / ``sinclude``               -> import
     ``AC_INIT`` / ``AM_INIT_AUTOMAKE`` and other top macros           -> metadata
     """
+
     LANG_KEY = "m4"
     EXTENSIONS = (".m4", ".ac")
-    LINE_COMMENTS = ("dnl",)        # `dnl` = m4 "delete to newline"
+    LINE_COMMENTS = ("dnl",)  # `dnl` = m4 "delete to newline"
     BLOCK_COMMENTS = ()
-    STRING_DELIMS = ()              # m4 quotes are `...' -- handled by regex
+    STRING_DELIMS = ()  # m4 quotes are `...' -- handled by regex
 
     _DEFINE = re.compile(r"(?m)(?:m4_)?define\(\s*[`\[]?\s*([A-Za-z_]\w*)")
     _ACDEFUN = re.compile(r"(?m)AC_DEFUN\(\s*\[?\s*([A-Za-z_]\w*)")
@@ -45,8 +46,11 @@ class M4Analyzer(ShellScriptBase):
 
         macros = self._uniq(m.group(1) for m in self._ACINIT.finditer(clean))
         self._record_module_meta(
-            file_id, kind="autoconf" if path.suffix.lower() == ".ac" else "m4",
-            macros_defined=len(seen_fn), config_macros=macros or None)
+            file_id,
+            kind="autoconf" if path.suffix.lower() == ".ac" else "m4",
+            macros_defined=len(seen_fn),
+            config_macros=macros or None,
+        )
 
 
 class JenkinsfileAnalyzer(ShellScriptBase):
@@ -58,6 +62,7 @@ class JenkinsfileAnalyzer(ShellScriptBase):
     ``@Library('x')`` / ``import x``     -> import
     ``environment { KEY = 'v' }``        -> variable
     """
+
     LANG_KEY = "jenkins"
     EXTENSIONS = (".jenkinsfile",)
     LINE_COMMENTS = ("//",)
@@ -90,10 +95,14 @@ class JenkinsfileAnalyzer(ShellScriptBase):
             if name in seen_fn:
                 continue
             seen_fn.add(name)
-            params = [p.strip().split()[-1]
-                      for p in self._split_top_level(m.group(2) or "") if p.strip()]
-            self._add_shell_function(file_id, name, params=params,
-                                     description="jenkins def")
+            params = [
+                p.strip().split()[-1]
+                for p in self._split_top_level(m.group(2) or "")
+                if p.strip()
+            ]
+            self._add_shell_function(
+                file_id, name, params=params, description="jenkins def"
+            )
 
         seen_imp = set()
         for rx, kw in ((self._LIBRARY, "@Library"), (self._IMPORT, "import")):
@@ -108,13 +117,16 @@ class JenkinsfileAnalyzer(ShellScriptBase):
             name = m.group(1)
             if name not in seen_var:
                 seen_var.add(name)
-                self._add_variable(file_id, name, m.group(2).strip()[:120] or None,
-                                   scope="environment")
+                self._add_variable(
+                    file_id, name, m.group(2).strip()[:120] or None, scope="environment"
+                )
 
         self._record_module_meta(
-            file_id, stages=len([s for s in seen_fn if s.startswith("stage:")]),
+            file_id,
+            stages=len([s for s in seen_fn if s.startswith("stage:")]),
             functions=len([s for s in seen_fn if not s.startswith("stage:")]),
-            env_vars=len(seen_var))
+            env_vars=len(seen_var),
+        )
 
 
 class VagrantfileAnalyzer(ShellScriptBase):
@@ -126,6 +138,7 @@ class VagrantfileAnalyzer(ShellScriptBase):
     ``require 'x'`` / ``require_relative 'y'``       -> import
     ``config.vm.box = "..."`` and ``x = y``          -> variable
     """
+
     LANG_KEY = "vagrant"
     EXTENSIONS = (".vagrantfile",)
     LINE_COMMENTS = ("#",)
@@ -143,8 +156,11 @@ class VagrantfileAnalyzer(ShellScriptBase):
 
         m = self._CONFIGURE.search(clean)
         if m:
-            self._add_class(file_id, "Vagrant.configure",
-                            description="vagrant config v" + m.group(1))
+            self._add_class(
+                file_id,
+                "Vagrant.configure",
+                description="vagrant config v" + m.group(1),
+            )
 
         seen_fn = set()
         for m in self._DEFINE.finditer(clean):
@@ -172,10 +188,16 @@ class VagrantfileAnalyzer(ShellScriptBase):
             if name in seen_var or "==" in m.group(0):
                 continue
             seen_var.add(name)
-            self._add_variable(file_id, name, m.group(2).strip()[:120] or None,
-                               scope="config" if name.startswith("config") else "ruby")
+            self._add_variable(
+                file_id,
+                name,
+                m.group(2).strip()[:120] or None,
+                scope="config" if name.startswith("config") else "ruby",
+            )
 
         self._record_module_meta(
-            file_id, vms=len([f for f in seen_fn if f.startswith("vm:")]),
+            file_id,
+            vms=len([f for f in seen_fn if f.startswith("vm:")]),
             functions=len([f for f in seen_fn if not f.startswith("vm:")]),
-            settings=len(seen_var))
+            settings=len(seen_var),
+        )

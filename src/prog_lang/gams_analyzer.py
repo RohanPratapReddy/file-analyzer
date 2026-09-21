@@ -16,31 +16,39 @@
 #
 # Comments are '*' in column 1 and '$ontext/$offtext' blocks; strings use quotes.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z][A-Za-z0-9_]*"
 _DECL_KW = {
-    "set": "set", "sets": "set",
-    "scalar": "scalar", "scalars": "scalar",
-    "parameter": "param", "parameters": "param",
-    "variable": "var", "variables": "var",
+    "set": "set",
+    "sets": "set",
+    "scalar": "scalar",
+    "scalars": "scalar",
+    "parameter": "param",
+    "parameters": "param",
+    "variable": "var",
+    "variables": "var",
     "table": "table",
 }
-_VARQUAL = r"(?:positive|negative|binary|integer|free|nonnegative|sos1|sos2|semicont|semiint)"
+_VARQUAL = (
+    r"(?:positive|negative|binary|integer|free|nonnegative|sos1|sos2|semicont|semiint)"
+)
 
 
 class GAMSAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "gams"
     EXTENSIONS = (".gms",)
-    LINE_COMMENTS = ()          # '*' comments handled explicitly (column 1 only)
+    LINE_COMMENTS = ()  # '*' comments handled explicitly (column 1 only)
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ('"', "'")
 
     _INCLUDE = re.compile(r'(?im)^\s*\$(?:bat)?include\s+(?:"([^"]+)"|(\S+))')
     _DECL = re.compile(
         r"(?is)^[ \t]*(" + _VARQUAL + r"\s+)?(sets?|scalars?|parameters?|"
-        r"variables?|equations?|table)\b(.*?);", re.MULTILINE)
+        r"variables?|equations?|table)\b(.*?);",
+        re.MULTILINE,
+    )
     _MODEL = re.compile(r"(?is)^[ \t]*models?\b(.*?);", re.MULTILINE)
     _EQDEF = re.compile(r"(?m)^\s*(" + _ID + r")\s*(?:\([^)]*\))?\s*\.\.")
 
@@ -98,8 +106,9 @@ class GAMSAnalyzer(RegexCodeAnalyzer):
             if kw.startswith("equation"):
                 for nm in self._entry_names(body):
                     if nm.lower() not in seen_fn:
-                        self._add_function(file_id, nm, [], [],
-                                           description="gams equation")
+                        self._add_function(
+                            file_id, nm, [], [], description="gams equation"
+                        )
                         seen_fn.add(nm.lower())
             else:
                 scope = _DECL_KW.get(kw, "gams")
@@ -109,8 +118,9 @@ class GAMSAnalyzer(RegexCodeAnalyzer):
         for m in self._EQDEF.finditer(clean):
             nm = m.group(1)
             if nm.lower() not in seen_fn:
-                self._add_function(file_id, nm, [], [],
-                                   description="gams equation definition")
+                self._add_function(
+                    file_id, nm, [], [], description="gams equation definition"
+                )
                 seen_fn.add(nm.lower())
 
         for m in self._MODEL.finditer(clean):

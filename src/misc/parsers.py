@@ -25,6 +25,7 @@ sniffed first, an inherently-binary payload degrades to an honest forensic byte
 profile with *no fabricated records*, the raw payload is never stored, and a
 partial parse is reported ``partial`` -- never stubbed or invented.
 """
+
 from __future__ import annotations
 
 import json
@@ -82,18 +83,27 @@ class MiscTypeParser:
     def meta(self, ext: str) -> Tuple[str, str]:
         return self.LABELS.get(ext, (self.KIND, ext.lstrip(".") or self.KIND))
 
-    def parse(self, path: Path, data: bytes, text: str, ext: str,
-              encoding: str, line_count: int) -> Dict[str, Any]:
+    def parse(
+        self,
+        path: Path,
+        data: bytes,
+        text: str,
+        ext: str,
+        encoding: str,
+        line_count: int,
+    ) -> Dict[str, Any]:
         raise NotImplementedError
 
     # helpers ---------------------------------------------------------------
-    def _forensic(self, ext: str, data: bytes, note: str,
-                  via: str = "extension") -> Dict[str, Any]:
+    def _forensic(
+        self, ext: str, data: bytes, note: str, via: str = "extension"
+    ) -> Dict[str, Any]:
         fam, label = self.meta(ext)
         return _forensic(self.KIND, fam, label, data, len(data), note, via=via)
 
-    def _auto(self, text: str, ext: str, byte_size: int, encoding: str,
-              lc: int) -> Dict[str, Any]:
+    def _auto(
+        self, text: str, ext: str, byte_size: int, encoding: str, lc: int
+    ) -> Dict[str, Any]:
         fam, label = self.meta(ext)
         prof = tf._e_auto(text, self.KIND, fam, label, byte_size, encoding, lc)
         prof["format"] = label
@@ -148,7 +158,7 @@ class StylesheetParser(MiscTypeParser):
                     elif clean[j] == "}":
                         depth -= 1
                     j += 1
-                body = clean[i + 1:j - 1]
+                body = clean[i + 1 : j - 1]
                 self._emit_rule(rules_sec, selector, body, properties_seen)
                 if selector:
                     for part in selector.split(","):
@@ -180,9 +190,17 @@ class StylesheetParser(MiscTypeParser):
         for prop, cnt in sorted(properties_seen.items()):
             props.append(("property_histogram", prop, cnt))
         status = "ok" if rules_sec["records"] else "partial"
-        return _profile(self.KIND, fam, label, "qss", sections=[rules_sec],
-                        byte_size=len(data), line_count=line_count,
-                        properties=props, status=status)
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "qss",
+            sections=[rules_sec],
+            byte_size=len(data),
+            line_count=line_count,
+            properties=props,
+            status=status,
+        )
 
     def _emit_rule(self, sec, selector, body, properties_seen):
         fields = []
@@ -200,8 +218,9 @@ class StylesheetParser(MiscTypeParser):
             fields.append(_field(prop, val, decls))
         # ordinal-0 field carries the declaration count for the record
         head = [_field("declaration_count", decls, 0, ftype="INT")] + fields
-        sec["records"].append(_record(
-            "rule", selector or None, head, text=(selector or "")[:_PREVIEW]))
+        sec["records"].append(
+            _record("rule", selector or None, head, text=(selector or "")[:_PREVIEW])
+        )
 
 
 # ===========================================================================
@@ -234,9 +253,17 @@ class VideoProjectParser(MiscTypeParser):
             return self._forensic(ext, data, f"invalid JSON project: {exc}")
         if not isinstance(doc, dict):
             fam, label = self.meta(ext)
-            return _profile(self.KIND, fam, label, "json", sections=[],
-                            byte_size=len(data), line_count=line_count,
-                            status="partial", notes="JSON root is not an object")
+            return _profile(
+                self.KIND,
+                fam,
+                label,
+                "json",
+                sections=[],
+                byte_size=len(data),
+                line_count=line_count,
+                status="partial",
+                notes="JSON root is not an object",
+            )
         if ext == ".osp":
             return self._openshot(doc, ext, len(data), encoding, line_count)
         return self._camtasia(doc, ext, len(data), encoding, line_count)
@@ -249,9 +276,11 @@ class VideoProjectParser(MiscTypeParser):
         effects = doc.get("effects") if isinstance(doc.get("effects"), list) else []
         layers = doc.get("layers") if isinstance(doc.get("layers"), list) else []
         # effects may also be embedded per-clip
-        embedded_fx = sum(len(c.get("effects", []))
-                          for c in clips if isinstance(c, dict)
-                          and isinstance(c.get("effects"), list))
+        embedded_fx = sum(
+            len(c.get("effects", []))
+            for c in clips
+            if isinstance(c, dict) and isinstance(c.get("effects"), list)
+        )
 
         clips_sec = _section("clips", "timeline-clip", 1)
         for idx, c in enumerate(clips):
@@ -277,7 +306,9 @@ class VideoProjectParser(MiscTypeParser):
             fields = [
                 _field("id", f.get("id"), 0),
                 _field("path", f.get("path") or reader.get("path"), 1),
-                _field("media_type", f.get("media_type") or reader.get("media_type"), 2),
+                _field(
+                    "media_type", f.get("media_type") or reader.get("media_type"), 2
+                ),
             ]
             files_sec["records"].append(_record("file", f.get("id"), fields))
             if len(files_sec["records"]) >= tf._RECORD_BUDGET:
@@ -287,10 +318,16 @@ class VideoProjectParser(MiscTypeParser):
         for e in effects:
             if not isinstance(e, dict):
                 continue
-            fx_sec["records"].append(_record("effect", e.get("id"), [
-                _field("id", e.get("id"), 0),
-                _field("type", e.get("type") or e.get("class_name"), 1),
-            ]))
+            fx_sec["records"].append(
+                _record(
+                    "effect",
+                    e.get("id"),
+                    [
+                        _field("id", e.get("id"), 0),
+                        _field("type", e.get("type") or e.get("class_name"), 1),
+                    ],
+                )
+            )
             if len(fx_sec["records"]) >= tf._RECORD_BUDGET:
                 break
 
@@ -303,8 +340,11 @@ class VideoProjectParser(MiscTypeParser):
                 fps_val = None
         version = doc.get("version")
         if isinstance(version, dict):
-            version = version.get("openshot-qt") or version.get("libopenshot") \
+            version = (
+                version.get("openshot-qt")
+                or version.get("libopenshot")
                 or json.dumps(version)
+            )
         props = [
             ("project", "clip_count", len(clips_sec["records"])),
             ("project", "file_count", len(files_sec["records"])),
@@ -319,10 +359,18 @@ class VideoProjectParser(MiscTypeParser):
             ("project", "version", version),
         ]
         secs = [s for s in (clips_sec, files_sec, fx_sec) if s["records"]]
-        return _profile(self.KIND, fam, label, "openshot", sections=secs,
-                        detected_via="content", byte_size=byte_size,
-                        line_count=lc, properties=props,
-                        status="ok" if secs else "partial")
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "openshot",
+            sections=secs,
+            detected_via="content",
+            byte_size=byte_size,
+            line_count=lc,
+            properties=props,
+            status="ok" if secs else "partial",
+        )
 
     # --- Camtasia -------------------------------------------------------
     def _camtasia(self, doc, ext, byte_size, encoding, lc):
@@ -347,8 +395,16 @@ class VideoProjectParser(MiscTypeParser):
         tracks_sec = _section("tracks", "timeline-track", 2)
         scene_count = track_count = media_count = 0
         timeline = doc.get("timeline") if isinstance(doc.get("timeline"), dict) else {}
-        scene_track = timeline.get("sceneTrack") if isinstance(timeline.get("sceneTrack"), dict) else {}
-        scenes = scene_track.get("scenes") if isinstance(scene_track.get("scenes"), list) else []
+        scene_track = (
+            timeline.get("sceneTrack")
+            if isinstance(timeline.get("sceneTrack"), dict)
+            else {}
+        )
+        scenes = (
+            scene_track.get("scenes")
+            if isinstance(scene_track.get("scenes"), list)
+            else []
+        )
         for scene in scenes:
             if not isinstance(scene, dict):
                 continue
@@ -361,15 +417,26 @@ class VideoProjectParser(MiscTypeParser):
                 track_count += 1
                 medias = tr.get("medias") if isinstance(tr.get("medias"), list) else []
                 media_count += len(medias)
-                tracks_sec["records"].append(_record("track", tr.get("trackIndex", ti), [
-                    _field("track_index", tr.get("trackIndex", ti), 0, ftype="INT"),
-                    _field("media_count", len(medias), 1, ftype="INT"),
-                ]))
+                tracks_sec["records"].append(
+                    _record(
+                        "track",
+                        tr.get("trackIndex", ti),
+                        [
+                            _field(
+                                "track_index", tr.get("trackIndex", ti), 0, ftype="INT"
+                            ),
+                            _field("media_count", len(medias), 1, ftype="INT"),
+                        ],
+                    )
+                )
                 if len(tracks_sec["records"]) >= tf._RECORD_BUDGET:
                     break
 
-        authoring = doc.get("authoringClientName") if isinstance(
-            doc.get("authoringClientName"), dict) else {}
+        authoring = (
+            doc.get("authoringClientName")
+            if isinstance(doc.get("authoringClientName"), dict)
+            else {}
+        )
         props = [
             ("project", "width", doc.get("width")),
             ("project", "height", doc.get("height")),
@@ -383,10 +450,18 @@ class VideoProjectParser(MiscTypeParser):
             ("project", "authoring_version", authoring.get("version")),
         ]
         secs = [s for s in (src_sec, tracks_sec) if s["records"]]
-        return _profile(self.KIND, fam, label, "camtasia", sections=secs,
-                        detected_via="content", byte_size=byte_size,
-                        line_count=lc, properties=props,
-                        status="ok" if secs else "partial")
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "camtasia",
+            sections=secs,
+            detected_via="content",
+            byte_size=byte_size,
+            line_count=lc,
+            properties=props,
+            status="ok" if secs else "partial",
+        )
 
 
 def _basename(reader: Any) -> Optional[str]:
@@ -418,18 +493,31 @@ class SqlDumpParser(MiscTypeParser):
 
     _CREATE_TABLE = re.compile(
         r"^\s*CREATE\s+(?:UNLOGGED\s+|TEMP(?:ORARY)?\s+)?TABLE\s+"
-        r"(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)", re.IGNORECASE)
+        r"(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)",
+        re.IGNORECASE,
+    )
     _COPY = re.compile(
-        r"^\s*COPY\s+([^\s(]+)\s*(?:\(([^)]*)\))?.*\bFROM\s+stdin;\s*$",
-        re.IGNORECASE)
-    _CONSTRAINT_KW = {"CONSTRAINT", "PRIMARY", "FOREIGN", "UNIQUE", "CHECK",
-                      "EXCLUDE", "LIKE"}
+        r"^\s*COPY\s+([^\s(]+)\s*(?:\(([^)]*)\))?.*\bFROM\s+stdin;\s*$", re.IGNORECASE
+    )
+    _CONSTRAINT_KW = {
+        "CONSTRAINT",
+        "PRIMARY",
+        "FOREIGN",
+        "UNIQUE",
+        "CHECK",
+        "EXCLUDE",
+        "LIKE",
+    }
     _DOLLAR = re.compile(r"\$[A-Za-z_]*\$")
 
     def parse(self, path, data, text, ext, encoding, line_count):
         if tf._looks_binary(data):
-            return self._forensic(ext, data, "binary payload under a .pgdump extension "
-                                              "(pg_dump custom/tar format is not plain SQL)")
+            return self._forensic(
+                ext,
+                data,
+                "binary payload under a .pgdump extension "
+                "(pg_dump custom/tar format is not plain SQL)",
+            )
         fam, label = self.meta(ext)
         lines = _lines(text)
         n = len(lines)
@@ -439,10 +527,18 @@ class SqlDumpParser(MiscTypeParser):
         stmt_sec = _section("statements", "sql-statement", 3)
 
         verbs: Dict[str, int] = {}
-        counts = {"create_table": 0, "copy": 0, "copy_rows_total": 0,
-                  "alter": 0, "insert": 0, "create_index": 0,
-                  "create_sequence": 0, "create_function": 0,
-                  "create_view": 0, "total_statements": 0}
+        counts = {
+            "create_table": 0,
+            "copy": 0,
+            "copy_rows_total": 0,
+            "alter": 0,
+            "insert": 0,
+            "create_index": 0,
+            "create_sequence": 0,
+            "create_function": 0,
+            "create_view": 0,
+            "total_statements": 0,
+        }
 
         i = 0
         buf: List[str] = []
@@ -455,8 +551,11 @@ class SqlDumpParser(MiscTypeParser):
                 cm = self._COPY.match(line)
                 if cm:
                     table = cm.group(1)
-                    cols = [c.strip().strip('"') for c in (cm.group(2) or "").split(",")
-                            if c.strip()]
+                    cols = [
+                        c.strip().strip('"')
+                        for c in (cm.group(2) or "").split(",")
+                        if c.strip()
+                    ]
                     rows = 0
                     while i < n and lines[i].rstrip() != r"\.":
                         rows += 1
@@ -467,9 +566,11 @@ class SqlDumpParser(MiscTypeParser):
                     counts["copy_rows_total"] += rows
                     counts["total_statements"] += 1
                     verbs["COPY"] = verbs.get("COPY", 0) + 1
-                    fields = [_field("table", table, 0),
-                              _field("column_count", len(cols), 1, ftype="INT"),
-                              _field("row_count", rows, 2, ftype="INT")]
+                    fields = [
+                        _field("table", table, 0),
+                        _field("column_count", len(cols), 1, ftype="INT"),
+                        _field("row_count", rows, 2, ftype="INT"),
+                    ]
                     for j, c in enumerate(cols[:64]):
                         fields.append(_field("column", c, j + 3))
                     copy_sec["records"].append(_record("copy", table, fields))
@@ -503,9 +604,17 @@ class SqlDumpParser(MiscTypeParser):
             props.append(("statement_verbs", verb, c))
         secs = [s for s in (tables_sec, copy_sec, stmt_sec) if s["records"]]
         status = "ok" if secs else "partial"
-        return _profile(self.KIND, fam, label, "pgdump", sections=secs,
-                        byte_size=len(data), line_count=line_count,
-                        properties=props, status=status)
+        return _profile(
+            self.KIND,
+            fam,
+            label,
+            "pgdump",
+            sections=secs,
+            byte_size=len(data),
+            line_count=line_count,
+            properties=props,
+            status=status,
+        )
 
     def _classify(self, stmt, tables_sec, stmt_sec, verbs, counts):
         counts["total_statements"] += 1
@@ -535,12 +644,18 @@ class SqlDumpParser(MiscTypeParser):
             counts["insert"] += 1
 
         target = self._target(stmt, verb, obj)
-        stmt_sec["records"].append(_record(
-            verb.lower(), (f"{verb} {obj}".strip() or verb),
-            [_field("statement_type", verb, 0),
-             _field("object", obj, 1),
-             _field("target", target, 2)],
-            text=re.sub(r"\s+", " ", stmt)[:_PREVIEW]))
+        stmt_sec["records"].append(
+            _record(
+                verb.lower(),
+                (f"{verb} {obj}".strip() or verb),
+                [
+                    _field("statement_type", verb, 0),
+                    _field("object", obj, 1),
+                    _field("target", target, 2),
+                ],
+                text=re.sub(r"\s+", " ", stmt)[:_PREVIEW],
+            )
+        )
 
     def _emit_table(self, name, stmt, tables_sec):
         name = name.strip().strip('"')
@@ -557,7 +672,7 @@ class SqlDumpParser(MiscTypeParser):
                     if depth == 0:
                         end = k
                         break
-            body = stmt[start + 1:end]
+            body = stmt[start + 1 : end]
             for part in _split_top_commas(body):
                 part = part.strip()
                 if not part:
@@ -566,19 +681,24 @@ class SqlDumpParser(MiscTypeParser):
                 if first.upper() in self._CONSTRAINT_KW:
                     continue
                 cols.append(first.strip('"'))
-        fields = [_field("table_name", name, 0),
-                  _field("column_count", len(cols), 1, ftype="INT")]
+        fields = [
+            _field("table_name", name, 0),
+            _field("column_count", len(cols), 1, ftype="INT"),
+        ]
         for j, c in enumerate(cols[:256]):
             fields.append(_field("column", c, j + 2))
-        tables_sec["records"].append(_record(
-            "table", name, fields, text=re.sub(r"\s+", " ", stmt)[:_PREVIEW]))
+        tables_sec["records"].append(
+            _record("table", name, fields, text=re.sub(r"\s+", " ", stmt)[:_PREVIEW])
+        )
 
     @staticmethod
     def _target(stmt: str, verb: str, obj: str) -> Optional[str]:
         m = re.search(
             r"(?is)\b(?:TABLE|INDEX|SEQUENCE|VIEW|FUNCTION|PROCEDURE|INTO|ON|SCHEMA|"
             r"EXTENSION|TYPE|TRIGGER)\s+(?:IF\s+NOT\s+EXISTS\s+)?"
-            r"([\"\w.]+)", stmt)
+            r"([\"\w.]+)",
+            stmt,
+        )
         return m.group(1).strip('"') if m else None
 
 
@@ -598,6 +718,7 @@ def build_registry() -> Dict[str, MiscTypeParser]:
             if e in reg:
                 raise RuntimeError(
                     f"misc extension {e} claimed by both "
-                    f"{reg[e].__class__.__name__} and {cls.__name__}")
+                    f"{reg[e].__class__.__name__} and {cls.__name__}"
+                )
             reg[e] = inst
     return reg

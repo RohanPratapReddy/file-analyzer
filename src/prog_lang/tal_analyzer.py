@@ -14,12 +14,14 @@
 #
 # Comments '!' (to EOL or matching '!') and '--'; strings '"'. Case-insensitive.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
-_ID = r"[A-Za-z_\^][A-Za-z0-9_\^]*"      # TAL allows '^' in identifiers
-_TYPE = (r"(?:INT|STRING|FIXED|REAL|UNSIGNED|BYTE|CHAR|"
-         r"INT\(32\)|INT\(64\)|REAL\(64\)|FIXED\([^)]*\))")
+_ID = r"[A-Za-z_\^][A-Za-z0-9_\^]*"  # TAL allows '^' in identifiers
+_TYPE = (
+    r"(?:INT|STRING|FIXED|REAL|UNSIGNED|BYTE|CHAR|"
+    r"INT\(32\)|INT\(64\)|REAL\(64\)|FIXED\([^)]*\))"
+)
 
 
 class TALAnalyzer(RegexCodeAnalyzer):
@@ -31,13 +33,22 @@ class TALAnalyzer(RegexCodeAnalyzer):
 
     _SOURCE = re.compile(r"(?im)^\s*\?SOURCE\s+(\S+?)(?:\s*\(([^)]*)\))?\s*$")
     _NAME = re.compile(r"(?im)^\s*NAME\s+(" + _ID + r")\s*;")
-    _PROC = re.compile(r"(?im)^\s*(?:" + _TYPE + r"\s+)?"
-                       r"(?:PROC|SUBPROC)\s+(" + _ID + r")"
-                       r"\s*(\([^)]*\))?", )
+    _PROC = re.compile(
+        r"(?im)^\s*(?:" + _TYPE + r"\s+)?"
+        r"(?:PROC|SUBPROC)\s+(" + _ID + r")"
+        r"\s*(\([^)]*\))?",
+    )
     _STRUCT = re.compile(r"(?im)^\s*STRUCT\s+\.?(" + _ID + r")")
     _LITERAL = re.compile(r"(?im)^\s*(?:LITERAL|DEFINE)\s+(" + _ID + r")")
-    _VAR = re.compile(r"(?im)^\s*(" + _TYPE + r")\s+(\.?(?:EXT\s+)?" + _ID +
-                      r"(?:\s*,\s*\.?" + _ID + r")*)")
+    _VAR = re.compile(
+        r"(?im)^\s*("
+        + _TYPE
+        + r")\s+(\.?(?:EXT\s+)?"
+        + _ID
+        + r"(?:\s*,\s*\.?"
+        + _ID
+        + r")*)"
+    )
 
     def _register_types(self, file_id, text, path):
         clean = self._strip_comments(text)
@@ -64,8 +75,7 @@ class TALAnalyzer(RegexCodeAnalyzer):
 
         for m in self._PROC.finditer(clean):
             args = self._tal_args(m.group(2))
-            self._add_function(file_id, m.group(1), args, [],
-                               description="tal proc")
+            self._add_function(file_id, m.group(1), args, [], description="tal proc")
 
         seen = set()
         for m in self._LITERAL.finditer(clean):

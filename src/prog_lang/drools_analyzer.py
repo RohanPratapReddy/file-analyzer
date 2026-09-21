@@ -17,7 +17,7 @@
 #
 # Comments are '//' and '/* */'; strings use '"'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_$][A-Za-z0-9_$]*"
@@ -34,14 +34,16 @@ class DroolsAnalyzer(RegexCodeAnalyzer):
 
     _IMPORT = re.compile(r"(?m)^\s*import\s+(?:function\s+|static\s+)?(" + _QUAL + r")")
     _GLOBAL = re.compile(r"(?m)^\s*global\s+(" + _TYPE + r")\s+(" + _ID + r")\s*;?")
-    _DECLARE = re.compile(
-        r"(?ms)^\s*declare\s+(" + _ID + r")(.*?)^\s*end\b")
+    _DECLARE = re.compile(r"(?ms)^\s*declare\s+(" + _ID + r")(.*?)^\s*end\b")
     _FIELD = re.compile(r"(?m)^\s*(" + _ID + r")\s*:\s*(" + _TYPE + r")")
     _FUNCTION = re.compile(
-        r"(?m)^\s*function\s+(" + _TYPE + r")\s+(" + _ID + r")\s*\(([^)]*)\)")
+        r"(?m)^\s*function\s+(" + _TYPE + r")\s+(" + _ID + r")\s*\(([^)]*)\)"
+    )
     _RULE = re.compile(r'(?m)^\s*rule\s+"([^"]+)"')
     _RULE_ID = re.compile(r"(?m)^\s*rule\s+(" + _ID + r")\b")
-    _QUERY = re.compile(r'(?m)^\s*query\s+(?:"([^"]+)"|(' + _ID + r'))\s*(?:\(([^)]*)\))?')
+    _QUERY = re.compile(
+        r'(?m)^\s*query\s+(?:"([^"]+)"|(' + _ID + r"))\s*(?:\(([^)]*)\))?"
+    )
 
     def _args(self, inner):
         ids = []
@@ -71,15 +73,26 @@ class DroolsAnalyzer(RegexCodeAnalyzer):
             self._add_variable(file_id, m.group(2), scope="global")
 
         for m in self._DECLARE.finditer(clean):
-            attrs = [self._add_arg(fm.group(1), arg_type=fm.group(2))
-                     for fm in self._FIELD.finditer(m.group(2))]
-            self._add_class(file_id, m.group(1), description="drools fact type",
-                            attr_ids=attrs or None)
+            attrs = [
+                self._add_arg(fm.group(1), arg_type=fm.group(2))
+                for fm in self._FIELD.finditer(m.group(2))
+            ]
+            self._add_class(
+                file_id,
+                m.group(1),
+                description="drools fact type",
+                attr_ids=attrs or None,
+            )
 
         for m in self._FUNCTION.finditer(clean):
             out = [self._add_output(m.group(1))] if m.group(1) != "void" else []
-            self._add_function(file_id, m.group(2), self._args(m.group(3)), out,
-                               description="drools function")
+            self._add_function(
+                file_id,
+                m.group(2),
+                self._args(m.group(3)),
+                out,
+                description="drools function",
+            )
 
         for m in self._RULE.finditer(clean):
             self._add_function(file_id, m.group(1), [], [], description="drools rule")
@@ -87,5 +100,10 @@ class DroolsAnalyzer(RegexCodeAnalyzer):
             self._add_function(file_id, m.group(1), [], [], description="drools rule")
         for m in self._QUERY.finditer(clean):
             name = m.group(1) or m.group(2)
-            self._add_function(file_id, name, self._args(m.group(3) or ""), [],
-                               description="drools query")
+            self._add_function(
+                file_id,
+                name,
+                self._args(m.group(3) or ""),
+                [],
+                description="drools query",
+            )

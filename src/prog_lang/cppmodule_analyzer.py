@@ -19,7 +19,7 @@
 #
 # Comments are '//' and '/* */'; strings use '"', '\'' and raw R"()".
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -38,41 +38,82 @@ class CppModuleAnalyzer(RegexCodeAnalyzer):
     # `export module a.b:part;`  |  `module a.b;`  (a bare `module;` has no name)
     _MODULE = re.compile(r"(?m)^\s*(?:export\s+)?module\s+([\w.:]+)\s*;")
     # `export import :part;` | `import a.b;` | `import <vector>;` | `import \"x\";`
-    _IMPORT = re.compile(r'(?m)^\s*(?:export\s+)?import\s+(?:<([^>]+)>|"([^"]+)"|([\w.:]+))\s*;')
+    _IMPORT = re.compile(
+        r'(?m)^\s*(?:export\s+)?import\s+(?:<([^>]+)>|"([^"]+)"|([\w.:]+))\s*;'
+    )
     _USING_NS = re.compile(r"(?m)^\s*using\s+namespace\s+([\w:]+)\s*;")
-    _USING_ALIAS = re.compile(r"(?m)^\s*(?:export\s+)?using\s+(" + _ID +
-                              r")\s*=\s*([^;]+);")
+    _USING_ALIAS = re.compile(
+        r"(?m)^\s*(?:export\s+)?using\s+(" + _ID + r")\s*=\s*([^;]+);"
+    )
     _DEFINE = re.compile(r"(?m)^\s*#\s*define\s+(" + _ID + r")\b")
 
     # ---- types ----------------------------------------------------------
-    _NAMESPACE = re.compile(r"(?m)^\s*(?:export\s+)?(?:inline\s+)?namespace\s+(" +
-                            _ID + r"(?:\s*::\s*" + _ID + r")*)\s*\{")
-    _RECORD = re.compile(r"(?m)^\s*(?:export\s+)?(?:template\s*<[^;{]*>\s*)?"
-                         r"(?:class|struct|union)\s+(?:\[\[[^\]]*\]\]\s*)?(" +
-                         _ID + r")\b(?!\s*[;,)])"
-                         r"(?:\s+final)?\s*(?::\s*([^{}]+?))?\s*\{")
-    _ENUM = re.compile(r"(?m)^\s*(?:export\s+)?enum\s+(?:class\s+|struct\s+)?(" +
-                       _ID + r")\b")
+    _NAMESPACE = re.compile(
+        r"(?m)^\s*(?:export\s+)?(?:inline\s+)?namespace\s+("
+        + _ID
+        + r"(?:\s*::\s*"
+        + _ID
+        + r")*)\s*\{"
+    )
+    _RECORD = re.compile(
+        r"(?m)^\s*(?:export\s+)?(?:template\s*<[^;{]*>\s*)?"
+        r"(?:class|struct|union)\s+(?:\[\[[^\]]*\]\]\s*)?(" + _ID + r")\b(?!\s*[;,)])"
+        r"(?:\s+final)?\s*(?::\s*([^{}]+?))?\s*\{"
+    )
+    _ENUM = re.compile(
+        r"(?m)^\s*(?:export\s+)?enum\s+(?:class\s+|struct\s+)?(" + _ID + r")\b"
+    )
 
     # ---- variables ------------------------------------------------------
-    _VAR = re.compile(r"(?m)^\s*(?:export\s+)?"
-                      r"(?:constexpr|constinit|consteval|inline|static|const|"
-                      r"extern|thread_local|register)\s+"
-                      r"[\w:<>,\*&\[\]\s]*?\b(" + _ID + r")\s*(?:=|\{)")
+    _VAR = re.compile(
+        r"(?m)^\s*(?:export\s+)?"
+        r"(?:constexpr|constinit|consteval|inline|static|const|"
+        r"extern|thread_local|register)\s+"
+        r"[\w:<>,\*&\[\]\s]*?\b(" + _ID + r")\s*(?:=|\{)"
+    )
 
     # ---- function scan --------------------------------------------------
     _CALL = re.compile(r"(" + _QNAME + r")\s*\(")
-    _NOT_FUNC = {"if", "for", "while", "switch", "catch", "return", "sizeof",
-                 "new", "delete", "throw", "and", "or", "not", "static_cast",
-                 "dynamic_cast", "reinterpret_cast", "const_cast", "decltype",
-                 "noexcept", "alignof", "alignas", "typeid", "co_await",
-                 "co_yield", "co_return", "requires", "assert", "static_assert",
-                 "defined", "__attribute__", "operator"}
-    _TRAILING = re.compile(r"\s*(?:const|noexcept(?:\([^)]*\))?|override|final|"
-                           r"mutable|volatile|&|&&|\[\[[^\]]*\]\]|"
-                           r"->\s*[\w:<>,\*&\[\] ]+|"
-                           r"requires\s+[^({]+|"
-                           r":\s*[^{;]+)*\s*")
+    _NOT_FUNC = {
+        "if",
+        "for",
+        "while",
+        "switch",
+        "catch",
+        "return",
+        "sizeof",
+        "new",
+        "delete",
+        "throw",
+        "and",
+        "or",
+        "not",
+        "static_cast",
+        "dynamic_cast",
+        "reinterpret_cast",
+        "const_cast",
+        "decltype",
+        "noexcept",
+        "alignof",
+        "alignas",
+        "typeid",
+        "co_await",
+        "co_yield",
+        "co_return",
+        "requires",
+        "assert",
+        "static_assert",
+        "defined",
+        "__attribute__",
+        "operator",
+    }
+    _TRAILING = re.compile(
+        r"\s*(?:const|noexcept(?:\([^)]*\))?|override|final|"
+        r"mutable|volatile|&|&&|\[\[[^\]]*\]\]|"
+        r"->\s*[\w:<>,\*&\[\] ]+|"
+        r"requires\s+[^({]+|"
+        r":\s*[^{;]+)*\s*"
+    )
 
     def _register_types(self, file_id, text, path):
         clean = self._strip_comments(text)
@@ -106,16 +147,19 @@ class CppModuleAnalyzer(RegexCodeAnalyzer):
         alias_names = set()
         for m in self._USING_ALIAS.finditer(clean):
             alias_names.add(m.group(1))
-            self._add_variable(file_id, m.group(1), value=m.group(2).strip(),
-                               scope="type-alias")
+            self._add_variable(
+                file_id, m.group(1), value=m.group(2).strip(), scope="type-alias"
+            )
 
         for m in self._NAMESPACE.finditer(clean):
-            self._add_class(file_id, m.group(1).split("::")[-1].strip(),
-                            description="c++ namespace")
+            self._add_class(
+                file_id, m.group(1).split("::")[-1].strip(), description="c++ namespace"
+            )
         for m in self._RECORD.finditer(clean):
             parents = self._parse_bases(m.group(2))
-            self._add_class(file_id, m.group(1), description="c++ type",
-                            parent_ids=parents or None)
+            self._add_class(
+                file_id, m.group(1), description="c++ type", parent_ids=parents or None
+            )
         for m in self._ENUM.finditer(clean):
             self._add_class(file_id, m.group(1), description="c++ enum")
 
@@ -137,7 +181,7 @@ class CppModuleAnalyzer(RegexCodeAnalyzer):
         for p in self._split_top_level(group.strip()):
             p = p.strip()
             p = re.sub(r"\b(?:public|private|protected|virtual)\b", " ", p)
-            p = p.split("<")[0].strip()          # drop template args
+            p = p.split("<")[0].strip()  # drop template args
             p = p.split("::")[-1].strip()
             if p:
                 pid = self._register_class(p)
@@ -161,7 +205,7 @@ class CppModuleAnalyzer(RegexCodeAnalyzer):
             tm = self._TRAILING.match(clean, close)
             after_pos = tm.end() if tm else close
             if after_pos >= len(clean) or clean[after_pos] != "{":
-                continue                          # declaration / call, not a def
+                continue  # declaration / call, not a def
             key = (m.start(), bare)
             if key in emitted:
                 continue
@@ -175,11 +219,12 @@ class CppModuleAnalyzer(RegexCodeAnalyzer):
                     cls_id = self._register_class(owner)
             args = self._paren_args(clean, open_paren, close)
             outs = self._return_output(clean, m.start(), bare, owner)
-            self._add_function(file_id, bare, args, outs, class_id=cls_id,
-                               description="c++ function")
+            self._add_function(
+                file_id, bare, args, outs, class_id=cls_id, description="c++ function"
+            )
 
     def _paren_args(self, clean, open_paren, close):
-        body = clean[open_paren + 1:close - 1].strip()
+        body = clean[open_paren + 1 : close - 1].strip()
         if not body or body == "void":
             return []
         arg_ids = []
@@ -187,7 +232,7 @@ class CppModuleAnalyzer(RegexCodeAnalyzer):
             part = part.strip()
             if not part or part == "...":
                 continue
-            part = part.split("=")[0].strip()      # drop default value
+            part = part.split("=")[0].strip()  # drop default value
             # last identifier token is the parameter name
             toks = re.findall(_ID, part)
             if not toks:
@@ -195,7 +240,7 @@ class CppModuleAnalyzer(RegexCodeAnalyzer):
             name = toks[-1]
             # a bare type (e.g. `int`, `std::string`) has the type as last tok;
             # keep it anyway -- best effort, mirrors other analyzers
-            atype = part[:part.rfind(name)].strip().rstrip("*&") or None
+            atype = part[: part.rfind(name)].strip().rstrip("*&") or None
             arg_ids.append(self._add_arg(name, atype))
         return arg_ids
 
@@ -203,9 +248,13 @@ class CppModuleAnalyzer(RegexCodeAnalyzer):
         line_start = clean.rfind("\n", 0, name_start) + 1
         pre = clean[line_start:name_start].strip()
         pre = re.sub(r"^\s*template\s*<[^>]*>\s*", "", pre)
-        pre = re.sub(r"\b(?:export|inline|static|virtual|explicit|constexpr|"
-                     r"consteval|constinit|friend|extern|[A-Z]+_API)\b", " ", pre)
+        pre = re.sub(
+            r"\b(?:export|inline|static|virtual|explicit|constexpr|"
+            r"consteval|constinit|friend|extern|[A-Z]+_API)\b",
+            " ",
+            pre,
+        )
         pre = pre.strip()
         if not pre or bare == owner or bare.startswith("~"):
-            return []                              # ctor / dtor -> no return type
+            return []  # ctor / dtor -> no return type
         return [self._add_output(pre)]

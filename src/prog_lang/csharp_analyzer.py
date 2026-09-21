@@ -1,17 +1,6 @@
 # Auto-extracted from code_analyzer.py (verbatim class body).
-import os
-import csv
-import json
-import re
-import ast
-import dis
-import inspect
-import traceback
-import subprocess
-import sqlite3
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
 from .tree_sitter_base import BaseTreeSitterAnalyzer
+
 
 class CSharpAnalyzer(BaseTreeSitterAnalyzer):
     """
@@ -21,15 +10,21 @@ class CSharpAnalyzer(BaseTreeSitterAnalyzer):
     methods and constructors, plus top-level function-like members.
     """
 
-    _TYPE_DECLS = ("class_declaration", "struct_declaration", "interface_declaration",
-                   "enum_declaration", "record_declaration", "record_struct_declaration")
+    _TYPE_DECLS = (
+        "class_declaration",
+        "struct_declaration",
+        "interface_declaration",
+        "enum_declaration",
+        "record_declaration",
+        "record_struct_declaration",
+    )
 
     def __init__(self, **kwargs):
         super().__init__(
             lang_key="c_sharp",
             extensions=[".cs"],
             introspection_source="System.Reflection.TypeInfo + System.Diagnostics.StackTrace",
-            **kwargs
+            **kwargs,
         )
 
     def _register_types(self, root_node, source: bytes):
@@ -44,7 +39,10 @@ class CSharpAnalyzer(BaseTreeSitterAnalyzer):
                 body = child.child_by_field_name("body")
                 if body is not None:
                     self._cs_register(body, source)
-            elif child.type in ("namespace_declaration", "file_scoped_namespace_declaration"):
+            elif child.type in (
+                "namespace_declaration",
+                "file_scoped_namespace_declaration",
+            ):
                 body = child.child_by_field_name("body")
                 self._cs_register(body if body is not None else child, source)
 
@@ -64,10 +62,19 @@ class CSharpAnalyzer(BaseTreeSitterAnalyzer):
 
     def _cs_using(self, file_id, node, source: bytes):
         n = node.child_by_field_name("name")
-        target = (self._node_text(n, source) if n else
-                  self._node_text(node, source).replace("using", "").strip().rstrip(";").strip())
+        target = (
+            self._node_text(n, source)
+            if n
+            else self._node_text(node, source)
+            .replace("using", "")
+            .strip()
+            .rstrip(";")
+            .strip()
+        )
         alias = None
-        aliased = node.child_by_field_name("alias") or node.child_by_field_name("aliased_type")
+        aliased = node.child_by_field_name("alias") or node.child_by_field_name(
+            "aliased_type"
+        )
         if aliased is not None and n is not None:
             alias = self._node_text(aliased, source)
         self._ts_add_import(file_id, target.split(".")[-1], target, alias)
@@ -90,9 +97,12 @@ class CSharpAnalyzer(BaseTreeSitterAnalyzer):
             if p.type == "parameter":
                 pn = p.child_by_field_name("name")
                 pt = p.child_by_field_name("type")
-                arg_ids.append(self._ts_add_arg(
-                    self._node_text(pn, source) if pn else "arg",
-                    self._node_text(pt, source) if pt else None))
+                arg_ids.append(
+                    self._ts_add_arg(
+                        self._node_text(pn, source) if pn else "arg",
+                        self._node_text(pt, source) if pt else None,
+                    )
+                )
         return arg_ids
 
     def _cs_method(self, file_id, node, source: bytes, class_id, ctor=False):
@@ -116,8 +126,11 @@ class CSharpAnalyzer(BaseTreeSitterAnalyzer):
         for c in vd.named_children:
             if c.type == "variable_declarator":
                 nn = c.child_by_field_name("name") or self._child_of(c, "identifier")
-                ids.append(self._ts_add_arg(
-                    self._node_text(nn, source) if nn else "field", type_text))
+                ids.append(
+                    self._ts_add_arg(
+                        self._node_text(nn, source) if nn else "field", type_text
+                    )
+                )
         return ids
 
     def _cs_type(self, file_id, node, source: bytes):
@@ -133,26 +146,42 @@ class CSharpAnalyzer(BaseTreeSitterAnalyzer):
             if body is not None:
                 for m in body.named_children:
                     if m.type == "enum_member_declaration":
-                        mn = m.child_by_field_name("name") or self._child_of(m, "identifier")
-                        attr_ids.append(self._ts_add_arg(
-                            self._node_text(mn, source) if mn else "member", "enum_member"))
+                        mn = m.child_by_field_name("name") or self._child_of(
+                            m, "identifier"
+                        )
+                        attr_ids.append(
+                            self._ts_add_arg(
+                                self._node_text(mn, source) if mn else "member",
+                                "enum_member",
+                            )
+                        )
         elif body is not None:
             for m in body.named_children:
                 mt = m.type
                 if mt == "method_declaration":
                     method_ids.append(self._cs_method(file_id, m, source, cls_id))
                 elif mt == "constructor_declaration":
-                    method_ids.append(self._cs_method(file_id, m, source, cls_id, ctor=True))
+                    method_ids.append(
+                        self._cs_method(file_id, m, source, cls_id, ctor=True)
+                    )
                 elif mt == "field_declaration":
                     attr_ids.extend(self._cs_fields(m, source))
                 elif mt == "property_declaration":
                     pn = m.child_by_field_name("name")
                     pt = m.child_by_field_name("type")
-                    attr_ids.append(self._ts_add_arg(
-                        self._node_text(pn, source) if pn else "prop",
-                        self._node_text(pt, source) if pt else None))
+                    attr_ids.append(
+                        self._ts_add_arg(
+                            self._node_text(pn, source) if pn else "prop",
+                            self._node_text(pt, source) if pt else None,
+                        )
+                    )
                 elif mt in self._TYPE_DECLS:
                     self._cs_type(file_id, m, source)
-        self._ts_add_class(file_id, name,
-                           description=f"c_sharp {node.type.replace('_declaration', '')}",
-                           parent_ids=parent_ids, method_ids=method_ids, attr_ids=attr_ids)
+        self._ts_add_class(
+            file_id,
+            name,
+            description=f"c_sharp {node.type.replace('_declaration', '')}",
+            parent_ids=parent_ids,
+            method_ids=method_ids,
+            attr_ids=attr_ids,
+        )

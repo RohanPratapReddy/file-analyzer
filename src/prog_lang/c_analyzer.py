@@ -1,17 +1,6 @@
 # Auto-extracted from code_analyzer.py (verbatim class body).
-import os
-import csv
-import json
-import re
-import ast
-import dis
-import inspect
-import traceback
-import subprocess
-import sqlite3
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
 from .tree_sitter_base import BaseTreeSitterAnalyzer
+
 
 class CAnalyzer(BaseTreeSitterAnalyzer):
     """
@@ -23,15 +12,24 @@ class CAnalyzer(BaseTreeSitterAnalyzer):
 
     # struct/union/enum for C; CppAnalyzer adds class_specifier.
     _RECORD_KINDS = ("struct_specifier", "union_specifier", "enum_specifier")
-    _NAME_LEAVES = ("identifier", "field_identifier", "type_identifier",
-                    "qualified_identifier", "operator_name", "destructor_name")
+    _NAME_LEAVES = (
+        "identifier",
+        "field_identifier",
+        "type_identifier",
+        "qualified_identifier",
+        "operator_name",
+        "destructor_name",
+    )
 
-    def __init__(self, lang_key="c", extensions=None, introspection_source=None, **kwargs):
+    def __init__(
+        self, lang_key="c", extensions=None, introspection_source=None, **kwargs
+    ):
         super().__init__(
             lang_key=lang_key,
             extensions=extensions or [".c", ".h"],
-            introspection_source=introspection_source or "libunwind + execinfo.h backtrace() + libdwarf",
-            **kwargs
+            introspection_source=introspection_source
+            or "libunwind + execinfo.h backtrace() + libdwarf",
+            **kwargs,
         )
 
     # -------- pass 1: register record/typedef type names --------
@@ -76,7 +74,9 @@ class CAnalyzer(BaseTreeSitterAnalyzer):
             elif t in ("preproc_def", "preproc_function_def"):
                 n = child.child_by_field_name("name")
                 if n:
-                    self._ts_add_variable(file_id, self._node_text(n, source), None, scope="macro")
+                    self._ts_add_variable(
+                        file_id, self._node_text(n, source), None, scope="macro"
+                    )
             elif t in self._RECORD_KINDS:
                 self._c_record(file_id, child, source)
             elif t == "type_definition":
@@ -108,7 +108,12 @@ class CAnalyzer(BaseTreeSitterAnalyzer):
                 target = self._node_text(c, source).strip('<>"')
                 break
         if target is None:
-            target = self._node_text(node, source).replace("#include", "").strip().strip('<>"')
+            target = (
+                self._node_text(node, source)
+                .replace("#include", "")
+                .strip()
+                .strip('<>"')
+            )
         self._ts_add_import(file_id, target.split("/")[-1], target)
 
     def _c_decl_name(self, node, source: bytes):
@@ -163,7 +168,11 @@ class CAnalyzer(BaseTreeSitterAnalyzer):
         for c in node.named_children:
             if c.type == "base_class_clause":
                 for t in c.named_children:
-                    if t.type in ("type_identifier", "qualified_identifier", "template_type"):
+                    if t.type in (
+                        "type_identifier",
+                        "qualified_identifier",
+                        "template_type",
+                    ):
                         nm = self._node_text(t, source).split("<")[0].strip()
                         if nm in self._class_registry:
                             parent_ids.append(self._class_registry[nm])
@@ -190,8 +199,11 @@ class CAnalyzer(BaseTreeSitterAnalyzer):
                 for e in body.named_children:
                     if e.type == "enumerator":
                         en = e.child_by_field_name("name")
-                        attr_ids.append(self._ts_add_arg(
-                            self._node_text(en, source) if en else "e", "enumerator"))
+                        attr_ids.append(
+                            self._ts_add_arg(
+                                self._node_text(en, source) if en else "e", "enumerator"
+                            )
+                        )
         elif body is not None:
             for member in body.named_children:
                 if member.type == "field_declaration":
@@ -199,26 +211,51 @@ class CAnalyzer(BaseTreeSitterAnalyzer):
                     ftype = member.child_by_field_name("type")
                     if decl is not None and self._c_has_func_declarator(decl):
                         mname, arg_ids = self._c_func_sig(decl, source)
-                        out = [self._ts_add_output(self._node_text(ftype, source))] if ftype else []
-                        method_ids.append(self._ts_add_function(file_id, mname, arg_ids, out, class_id=cls_id))
+                        out = (
+                            [self._ts_add_output(self._node_text(ftype, source))]
+                            if ftype
+                            else []
+                        )
+                        method_ids.append(
+                            self._ts_add_function(
+                                file_id, mname, arg_ids, out, class_id=cls_id
+                            )
+                        )
                     else:
                         fname = self._c_decl_name(decl, source) if decl else None
-                        attr_ids.append(self._ts_add_arg(
-                            fname or "field", self._node_text(ftype, source) if ftype else None))
+                        attr_ids.append(
+                            self._ts_add_arg(
+                                fname or "field",
+                                self._node_text(ftype, source) if ftype else None,
+                            )
+                        )
                 elif member.type == "function_definition":
                     method_ids.append(self._c_function(file_id, member, source, cls_id))
         kind = node.type.replace("_specifier", "")
-        self._ts_add_class(file_id, name, description=f"{self.lang_key} {kind}",
-                           parent_ids=parent_ids, method_ids=method_ids, attr_ids=attr_ids)
+        self._ts_add_class(
+            file_id,
+            name,
+            description=f"{self.lang_key} {kind}",
+            parent_ids=parent_ids,
+            method_ids=method_ids,
+            attr_ids=attr_ids,
+        )
         return cls_id
 
     def _c_typedef(self, file_id, node, source: bytes):
         d = node.child_by_field_name("declarator")
-        name = self._node_text(d, source) if d is not None and d.type == "type_identifier" else None
+        name = (
+            self._node_text(d, source)
+            if d is not None and d.type == "type_identifier"
+            else None
+        )
         ftype = node.child_by_field_name("type")
         attr_ids = []
-        if (ftype is not None and ftype.type in self._RECORD_KINDS
-                and ftype.type != "enum_specifier"):
+        if (
+            ftype is not None
+            and ftype.type in self._RECORD_KINDS
+            and ftype.type != "enum_specifier"
+        ):
             body = ftype.child_by_field_name("body")
             if body is not None:
                 for member in body.named_children:
@@ -226,24 +263,41 @@ class CAnalyzer(BaseTreeSitterAnalyzer):
                         decl = member.child_by_field_name("declarator")
                         t = member.child_by_field_name("type")
                         fname = self._c_decl_name(decl, source) if decl else None
-                        attr_ids.append(self._ts_add_arg(
-                            fname or "field", self._node_text(t, source) if t else None))
+                        attr_ids.append(
+                            self._ts_add_arg(
+                                fname or "field",
+                                self._node_text(t, source) if t else None,
+                            )
+                        )
         if name:
-            self._ts_add_class(file_id, name, description=f"{self.lang_key} typedef",
-                               attr_ids=attr_ids)
+            self._ts_add_class(
+                file_id, name, description=f"{self.lang_key} typedef", attr_ids=attr_ids
+            )
 
     def _c_declaration(self, file_id, node, source: bytes):
         ftype = node.child_by_field_name("type")
         # `struct X { ... };` / `enum E { ... };` wrapped in a declaration
-        if ftype is not None and ftype.type in self._RECORD_KINDS \
-                and ftype.child_by_field_name("body") is not None:
+        if (
+            ftype is not None
+            and ftype.type in self._RECORD_KINDS
+            and ftype.child_by_field_name("body") is not None
+        ):
             if ftype.child_by_field_name("name") is not None:
                 self._c_record(file_id, ftype, source)
         type_text = self._node_text(ftype, source) if ftype else None
-        decls = [c for c in node.named_children
-                 if c.type in ("init_declarator", "identifier", "pointer_declarator",
-                               "array_declarator", "function_declarator",
-                               "reference_declarator")]
+        decls = [
+            c
+            for c in node.named_children
+            if c.type
+            in (
+                "init_declarator",
+                "identifier",
+                "pointer_declarator",
+                "array_declarator",
+                "function_declarator",
+                "reference_declarator",
+            )
+        ]
         for decl in decls:
             if self._c_has_func_declarator(decl):
                 mname, arg_ids = self._c_func_sig(decl, source)
@@ -258,6 +312,7 @@ class CAnalyzer(BaseTreeSitterAnalyzer):
                 if name:
                     self._ts_add_variable(file_id, name, val, scope="module")
 
+
 class CppAnalyzer(CAnalyzer):
     """
     C++ on top of the C engine: adds `class` specifiers, base-class inheritance,
@@ -265,13 +320,17 @@ class CppAnalyzer(CAnalyzer):
     RTTI <typeinfo>, std::stacktrace and Boost.Describe.
     """
 
-    _RECORD_KINDS = ("class_specifier", "struct_specifier",
-                     "union_specifier", "enum_specifier")
+    _RECORD_KINDS = (
+        "class_specifier",
+        "struct_specifier",
+        "union_specifier",
+        "enum_specifier",
+    )
 
     def __init__(self, **kwargs):
         super().__init__(
             lang_key="cpp",
             extensions=[".cpp", ".hpp", ".cc", ".cxx"],
             introspection_source="<typeinfo> (RTTI) + std::stacktrace + Boost.Describe",
-            **kwargs
+            **kwargs,
         )

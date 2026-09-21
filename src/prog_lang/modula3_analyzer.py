@@ -15,7 +15,7 @@
 #
 # Comments are nested '(* ... *)'; strings use '"' and "'".  Case-sensitive.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z][A-Za-z0-9_]*"
@@ -28,19 +28,21 @@ class Modula3Analyzer(RegexCodeAnalyzer):
     BLOCK_COMMENTS = (("(*", "*)"),)
     STRING_DELIMS = ('"', "'")
 
-    _UNIT = re.compile(
-        r"\b(?:INTERFACE|MODULE)\s+(" + _ID + r")")
+    _UNIT = re.compile(r"\b(?:INTERFACE|MODULE)\s+(" + _ID + r")")
     _PROC = re.compile(r"\bPROCEDURE\s+(" + _ID + r")\s*(\([^)]*\))?")
     _FROM = re.compile(r"\bFROM\s+(" + _ID + r")\s+IMPORT\s+([^;]+);")
     _IMPORT = re.compile(r"^[ \t]*IMPORT\s+([^;]+);", re.MULTILINE)
     _OBJTYPE = re.compile(
-        r"\b(" + _ID + r")\s*=\s*(?:BRANDED\s+(?:\"[^\"]*\"\s+)?)?OBJECT\b")
+        r"\b(" + _ID + r")\s*=\s*(?:BRANDED\s+(?:\"[^\"]*\"\s+)?)?OBJECT\b"
+    )
     _RECTYPE = re.compile(r"\b(" + _ID + r")\s*=\s*RECORD\b")
     _CONST = re.compile(
-        r"^[ \t]*(?:CONST[ \t]+)?(" + _ID + r")\s*=\s*[^=;]", re.MULTILINE)
+        r"^[ \t]*(?:CONST[ \t]+)?(" + _ID + r")\s*=\s*[^=;]", re.MULTILINE
+    )
     _VARLINE = re.compile(
-        r"^[ \t]*(?:VAR[ \t]+)?(" + _ID + r"(?:\s*,\s*" + _ID +
-        r")*)\s*:\s*[^;]+", re.MULTILINE)
+        r"^[ \t]*(?:VAR[ \t]+)?(" + _ID + r"(?:\s*,\s*" + _ID + r")*)\s*:\s*[^;]+",
+        re.MULTILINE,
+    )
     _METHOD = re.compile(r"\b(" + _ID + r")\s*\([^)]*\)\s*(?::[^;]+)?:=")
 
     def _proc_args(self, paren):
@@ -82,22 +84,27 @@ class Modula3Analyzer(RegexCodeAnalyzer):
                 alias = parts[1].strip() if len(parts) > 1 else None
                 nm = re.match(_ID, mod)
                 if nm:
-                    self._add_import(file_id, (alias or nm.group(0)),
-                                     nm.group(0), alias)
+                    self._add_import(
+                        file_id, (alias or nm.group(0)), nm.group(0), alias
+                    )
 
         cls_id = None
         for m in self._UNIT.finditer(clean):
-            cls_id = self._add_class(file_id, m.group(1),
-                                     description="modula-3 unit")
+            cls_id = self._add_class(file_id, m.group(1), description="modula-3 unit")
         for m in self._OBJTYPE.finditer(clean):
             self._add_class(file_id, m.group(1), description="modula-3 object")
         for m in self._RECTYPE.finditer(clean):
             self._add_class(file_id, m.group(1), description="modula-3 record")
 
         for m in self._PROC.finditer(clean):
-            self._add_function(file_id, m.group(1),
-                               self._proc_args(m.group(2)), [],
-                               class_id=cls_id, description="modula-3 procedure")
+            self._add_function(
+                file_id,
+                m.group(1),
+                self._proc_args(m.group(2)),
+                [],
+                class_id=cls_id,
+                description="modula-3 procedure",
+            )
 
         for m in self._CONST.finditer(clean):
             self._add_variable(file_id, m.group(1), scope="module")

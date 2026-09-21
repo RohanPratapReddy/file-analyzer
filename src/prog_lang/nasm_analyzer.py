@@ -21,7 +21,7 @@
 # (variable); any other top-level label is a code entry point (function).
 # Local labels (leading '.') are ignored.  Comments are ';'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_.?][\w.$#@?~]*"
@@ -38,11 +38,12 @@ class NasmAnalyzer(RegexCodeAnalyzer):
     _INCLUDE = re.compile(r'^[ \t]*%include\s+["\']([^"\']+)["\']', re.MULTILINE)
     _EXTERN = re.compile(r"^[ \t]*extern\s+(.+)$", re.MULTILINE | re.IGNORECASE)
     _MACRO = re.compile(r"^[ \t]*%i?macro\s+(" + _ID + r")", re.MULTILINE)
-    _DEFINE = re.compile(r"^[ \t]*%[a-z]*(?:define|assign)\s+(" + _ID + r")",
-                         re.MULTILINE | re.IGNORECASE)
+    _DEFINE = re.compile(
+        r"^[ \t]*%[a-z]*(?:define|assign)\s+(" + _ID + r")",
+        re.MULTILINE | re.IGNORECASE,
+    )
     _STRUC = re.compile(r"^[ \t]*struc\s+(" + _ID + r")", re.MULTILINE)
-    _EQU = re.compile(r"^[ \t]*(" + _ID + r")\s+equ\b",
-                      re.MULTILINE | re.IGNORECASE)
+    _EQU = re.compile(r"^[ \t]*(" + _ID + r")\s+equ\b", re.MULTILINE | re.IGNORECASE)
     _LABEL = re.compile(r"^[ \t]*(" + _ID + r")\s*:(.*)$", re.MULTILINE)
 
     def _register_types(self, file_id, text, path):
@@ -71,8 +72,7 @@ class NasmAnalyzer(RegexCodeAnalyzer):
             self._add_variable(file_id, m.group(1), "equ")
 
         for m in self._MACRO.finditer(clean):
-            self._add_function(file_id, m.group(1), [], [],
-                               description="nasm macro")
+            self._add_function(file_id, m.group(1), [], [], description="nasm macro")
 
         for m in self._LABEL.finditer(clean):
             name = m.group(1)
@@ -82,5 +82,4 @@ class NasmAnalyzer(RegexCodeAnalyzer):
             if _DATA_DIR.match(rest):
                 self._add_variable(file_id, name, "data")
             else:
-                self._add_function(file_id, name, [], [],
-                                   description="nasm label")
+                self._add_function(file_id, name, [], [], description="nasm label")

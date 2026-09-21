@@ -22,7 +22,7 @@
 # name at cols 7-21, definition type at cols 24-25.  Comments are '//'
 # (free) or '*' in col 7 (fixed); keywords case-insensitive; strings use "'".
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z@#$][A-Za-z0-9@#$_]*"
@@ -38,7 +38,8 @@ class RPGAnalyzer(RegexCodeAnalyzer):
     # --- free-form ------------------------------------------------------
     _F_PROC = re.compile(r"(?im)^\s*dcl-proc\s+(" + _ID + r")")
     _F_PI = re.compile(
-        r"(?is)\bdcl-pi\s+(" + _ID + r"|\*n)\s*([A-Za-z0-9()#:.\s]*?);(.*?)\bend-pi\b")
+        r"(?is)\bdcl-pi\s+(" + _ID + r"|\*n)\s*([A-Za-z0-9()#:.\s]*?);(.*?)\bend-pi\b"
+    )
     _F_DS = re.compile(r"(?im)^\s*dcl-ds\s+(" + _ID + r")")
     _F_S = re.compile(r"(?im)^\s*dcl-s\s+(" + _ID + r")")
     _F_C = re.compile(r"(?im)^\s*dcl-c\s+(" + _ID + r")")
@@ -56,8 +57,9 @@ class RPGAnalyzer(RegexCodeAnalyzer):
                 continue
             m = re.match(r"(" + _ID + r")\s+(.*)$", line)
             if m and m.group(1).lower() not in ("const", "options", "value"):
-                ids.append(self._add_arg(m.group(1),
-                                         arg_type=m.group(2).strip() or None))
+                ids.append(
+                    self._add_arg(m.group(1), arg_type=m.group(2).strip() or None)
+                )
         return ids
 
     # ---- fixed-form D-spec column parsing -----------------------------
@@ -94,8 +96,7 @@ class RPGAnalyzer(RegexCodeAnalyzer):
 
         # ---- free-form data structures / procs / vars -----------------
         for m in self._F_DS.finditer(clean):
-            self._add_class(file_id, m.group(1),
-                            description="rpg data structure")
+            self._add_class(file_id, m.group(1), description="rpg data structure")
 
         pis = {}
         for m in self._F_PI.finditer(clean):
@@ -110,8 +111,7 @@ class RPGAnalyzer(RegexCodeAnalyzer):
         for m in self._F_PROC.finditer(clean):
             name = m.group(1)
             args, outs = pis.get(name.lower(), ([], []))
-            self._add_function(file_id, name, args, outs,
-                               description="rpg procedure")
+            self._add_function(file_id, name, args, outs, description="rpg procedure")
             seen_fn.add(name.lower())
 
         for m in self._F_S.finditer(clean):
@@ -122,23 +122,25 @@ class RPGAnalyzer(RegexCodeAnalyzer):
         # ---- fixed-form specs -----------------------------------------
         for name, dtype in self._fixed_d_specs(text):
             if dtype == "DS":
-                self._add_class(file_id, name,
-                                description="rpg data structure (fixed)")
+                self._add_class(file_id, name, description="rpg data structure (fixed)")
             elif dtype in ("PR", "PI"):
                 if name.lower() not in seen_fn:
-                    self._add_function(file_id, name, [], [],
-                                       description="rpg prototype (fixed)")
+                    self._add_function(
+                        file_id, name, [], [], description="rpg prototype (fixed)"
+                    )
                     seen_fn.add(name.lower())
             else:  # 'S', 'C', or blank subfield/standalone
                 self._add_variable(file_id, name, scope="module")
 
         for m in self._X_BEGSR.finditer(text):
             if m.group(1).lower() not in seen_fn:
-                self._add_function(file_id, m.group(1), [], [],
-                                   description="rpg subroutine")
+                self._add_function(
+                    file_id, m.group(1), [], [], description="rpg subroutine"
+                )
                 seen_fn.add(m.group(1).lower())
         for m in self._X_PBEGIN.finditer(text):
             if m.group(1).lower() not in seen_fn:
-                self._add_function(file_id, m.group(1), [], [],
-                                   description="rpg procedure (fixed)")
+                self._add_function(
+                    file_id, m.group(1), [], [], description="rpg procedure (fixed)"
+                )
                 seen_fn.add(m.group(1).lower())

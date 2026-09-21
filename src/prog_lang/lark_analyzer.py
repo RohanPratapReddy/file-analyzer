@@ -16,7 +16,7 @@
 # Rules (lowercase, optionally `?`/`!`-prefixed or `.priority`) become functions;
 # terminals (UPPERCASE) become variables; `%import` become imports.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -27,8 +27,9 @@ class LarkAnalyzer(RegexCodeAnalyzer):
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ('"',)
 
-    _RULE = re.compile(r"^[ \t]*[?!]?([a-z_]\w*)(?:\.\-?\d+)?"
-                       r"(?:\{[^}]*\})?\s*:", re.MULTILINE)
+    _RULE = re.compile(
+        r"^[ \t]*[?!]?([a-z_]\w*)(?:\.\-?\d+)?" r"(?:\{[^}]*\})?\s*:", re.MULTILINE
+    )
     _TERM = re.compile(r"^[ \t]*([A-Z_][A-Z0-9_]*)(?:\.\-?\d+)?\s*:", re.MULTILINE)
     _IMPORT = re.compile(r"^[ \t]*%import\s+([^\s(]+)", re.MULTILINE)
     _IGNORE = re.compile(r"^[ \t]*%(ignore|declare)\s+(.+)$", re.MULTILINE)

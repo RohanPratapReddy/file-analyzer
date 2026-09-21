@@ -21,12 +21,11 @@
 # Comments run from `%` to end of line; there are no block comments.  Metafont
 # identifiers are letter-runs that may embed `.` and a trailing `@#` sparker.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_.]*"
-_TYPES = ("numeric", "pair", "path", "pen", "picture", "transform", "string",
-          "boolean")
+_TYPES = ("numeric", "pair", "path", "pen", "picture", "transform", "string", "boolean")
 
 
 class MetafontAnalyzer(RegexCodeAnalyzer):
@@ -38,8 +37,14 @@ class MetafontAnalyzer(RegexCodeAnalyzer):
 
     _INPUT = re.compile(r"(?m)\binput\s+(" + _ID + r")")
     _DEF = re.compile(r"(?m)\b(?:def|vardef)\s+(" + _ID + r")(@#)?")
-    _OPDEF = re.compile(r"(?m)\b(?:primary|secondary|tertiary)def\s+" + _ID +
-                        r"\s+(" + _ID + r"|[-+*/<>=|&.]+)\s+" + _ID)
+    _OPDEF = re.compile(
+        r"(?m)\b(?:primary|secondary|tertiary)def\s+"
+        + _ID
+        + r"\s+("
+        + _ID
+        + r"|[-+*/<>=|&.]+)\s+"
+        + _ID
+    )
     _BEGINCHAR = re.compile(r'(?m)\bbeginchar\s*\(\s*("[^"]*"|[^,]+),')
     # declarations may share a line (`numeric u, py; pair z[];`) so this is not
     # line-anchored; a single decl runs from its type keyword to the next `;`.
@@ -64,8 +69,13 @@ class MetafontAnalyzer(RegexCodeAnalyzer):
             if op in seen_fn:
                 continue
             seen_fn.add(op)
-            self._add_function(file_id, op, [self._add_arg("a"), self._add_arg("b")],
-                               [], description="metafont operator macro")
+            self._add_function(
+                file_id,
+                op,
+                [self._add_arg("a"), self._add_arg("b")],
+                [],
+                description="metafont operator macro",
+            )
         for m in self._BEGINCHAR.finditer(clean):
             code = m.group(1).strip().strip('"')
             nm = "char_" + re.sub(r"[^A-Za-z0-9_]", "_", code)[:24]
@@ -75,11 +85,15 @@ class MetafontAnalyzer(RegexCodeAnalyzer):
             self._add_function(file_id, nm, [], [], description="metafont character")
 
         seen_v = set()
+
         def _emit_vars(names):
             for raw in self._split_top_level(names):
                 nm = re.split(r"[\[\(]", raw.strip())[0].strip()
-                if re.fullmatch(_ID, nm or "") and nm not in seen_v \
-                        and nm not in seen_fn:
+                if (
+                    re.fullmatch(_ID, nm or "")
+                    and nm not in seen_v
+                    and nm not in seen_fn
+                ):
                     seen_v.add(nm)
                     self._add_variable(file_id, nm, None, scope="module")
 

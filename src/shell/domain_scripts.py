@@ -13,6 +13,7 @@ class NukeAnalyzer(ShellScriptBase):
     ``NodeClass { ... }``   -> class (a node instance, keyed by its `name` knob)
     top-level ``push $name`` / ``set n [...]``  -> variable
     """
+
     LANG_KEY = "nuke"
     EXTENSIONS = (".nk", ".nknc")
     LINE_COMMENTS = ("#",)
@@ -32,10 +33,16 @@ class NukeAnalyzer(ShellScriptBase):
         classes = {}
         for m in self._NODE.finditer(clean):
             cls = m.group("cls")
-            if cls in ("set", "push", "add_layer", "version", "define_window_layout_xml"):
+            if cls in (
+                "set",
+                "push",
+                "add_layer",
+                "version",
+                "define_window_layout_xml",
+            ):
                 continue
             end = self._find_matching(clean, m.end() - 1, "{", "}")
-            body = clean[m.end():end]
+            body = clean[m.end() : end]
             nm = self._NAMEKNOB.search(body)
             label = nm.group(1) if nm else f"{cls}{node_count}"
             node_count += 1
@@ -47,12 +54,16 @@ class NukeAnalyzer(ShellScriptBase):
             name = m.group(1)
             if name not in seen_var:
                 seen_var.add(name)
-                self._add_variable(file_id, name, m.group(2).strip()[:120] or None,
-                                   scope="nuke")
+                self._add_variable(
+                    file_id, name, m.group(2).strip()[:120] or None, scope="nuke"
+                )
 
         self._record_module_meta(
-            file_id, kind="non-commercial" if path.suffix.lower() == ".nknc" else "nuke",
-            nodes=node_count, node_classes=classes or None)
+            file_id,
+            kind="non-commercial" if path.suffix.lower() == ".nknc" else "nuke",
+            nodes=node_count,
+            node_classes=classes or None,
+        )
 
 
 class PainlessAnalyzer(ShellScriptBase):
@@ -62,14 +73,19 @@ class PainlessAnalyzer(ShellScriptBase):
     ``def x = ...`` / ``Type x = ...``  -> variable
     Painless has no imports; access to `params`, `doc`, `ctx` is recorded.
     """
+
     LANG_KEY = "painless"
     EXTENSIONS = (".painless",)
     LINE_COMMENTS = ("//",)
     BLOCK_COMMENTS = (("/*", "*/"),)
     STRING_DELIMS = ('"', "'")
 
-    _FUNC = re.compile(r"(?m)^[ \t]*(?:[\w<>\[\].]+)[ \t]+([A-Za-z_]\w*)[ \t]*\(([^)]*)\)[ \t]*\{")
-    _VAR = re.compile(r"(?m)^[ \t]*(?:def|[\w<>\[\].]+)[ \t]+([A-Za-z_]\w*)[ \t]*=[ \t]*[^=]")
+    _FUNC = re.compile(
+        r"(?m)^[ \t]*(?:[\w<>\[\].]+)[ \t]+([A-Za-z_]\w*)[ \t]*\(([^)]*)\)[ \t]*\{"
+    )
+    _VAR = re.compile(
+        r"(?m)^[ \t]*(?:def|[\w<>\[\].]+)[ \t]+([A-Za-z_]\w*)[ \t]*=[ \t]*[^=]"
+    )
     _CONTEXT = re.compile(r"\b(params|doc|ctx|_score|_source|field)\b")
     _KW = {"if", "for", "while", "return", "else", "catch"}
 
@@ -82,10 +98,14 @@ class PainlessAnalyzer(ShellScriptBase):
             if name in self._KW or name in seen_fn:
                 continue
             seen_fn.add(name)
-            params = [p.strip().split()[-1]
-                      for p in self._split_top_level(m.group(2) or "") if p.strip()]
-            self._add_shell_function(file_id, name, params=params,
-                                     description="painless function")
+            params = [
+                p.strip().split()[-1]
+                for p in self._split_top_level(m.group(2) or "")
+                if p.strip()
+            ]
+            self._add_shell_function(
+                file_id, name, params=params, description="painless function"
+            )
 
         seen_var = set()
         for m in self._VAR.finditer(clean):
@@ -96,9 +116,12 @@ class PainlessAnalyzer(ShellScriptBase):
             self._add_variable(file_id, name, None, scope="painless")
 
         contexts = self._uniq(self._CONTEXT.findall(clean))
-        self._record_module_meta(file_id, functions=len(seen_fn),
-                                 variables=len(seen_var),
-                                 context_vars=contexts or None)
+        self._record_module_meta(
+            file_id,
+            functions=len(seen_fn),
+            variables=len(seen_var),
+            context_vars=contexts or None,
+        )
 
 
 class WeztermAnalyzer(ShellScriptBase):
@@ -108,14 +131,19 @@ class WeztermAnalyzer(ShellScriptBase):
     ``local x = ...`` / ``x = ...``                           -> variable
     ``require 'mod'``                                         -> import
     """
+
     LANG_KEY = "wezterm-lua"
     EXTENSIONS = (".wezterm",)
     LINE_COMMENTS = ("--",)
     BLOCK_COMMENTS = (("--[[", "]]"),)
     STRING_DELIMS = ('"', "'")
 
-    _FUNC = re.compile(r"(?m)^[ \t]*(?:local[ \t]+)?function[ \t]+([\w.:]+)[ \t]*\(([^)]*)\)")
-    _ASSIGNFN = re.compile(r"(?m)^[ \t]*(?:local[ \t]+)?([\w.]+)[ \t]*=[ \t]*function[ \t]*\(([^)]*)\)")
+    _FUNC = re.compile(
+        r"(?m)^[ \t]*(?:local[ \t]+)?function[ \t]+([\w.:]+)[ \t]*\(([^)]*)\)"
+    )
+    _ASSIGNFN = re.compile(
+        r"(?m)^[ \t]*(?:local[ \t]+)?([\w.]+)[ \t]*=[ \t]*function[ \t]*\(([^)]*)\)"
+    )
     _LOCAL = re.compile(r"(?m)^[ \t]*local[ \t]+([A-Za-z_]\w*)[ \t]*=[ \t]*(.*)")
     _REQUIRE = re.compile(r"(?m)require[ \t]*\(?[ \t]*['\"]([^'\"]+)['\"]")
 
@@ -130,8 +158,9 @@ class WeztermAnalyzer(ShellScriptBase):
                     continue
                 seen_fn.add(name)
                 params = self._split_top_level(m.group(2) or "")
-                self._add_shell_function(file_id, name, params=params,
-                                         description="lua function")
+                self._add_shell_function(
+                    file_id, name, params=params, description="lua function"
+                )
 
         seen_var = set()
         for m in self._LOCAL.finditer(clean):
@@ -148,8 +177,12 @@ class WeztermAnalyzer(ShellScriptBase):
                 seen_imp.add(mod)
                 self._add_import(file_id, mod.split(".")[-1], mod, alias="require")
 
-        self._record_module_meta(file_id, functions=len(seen_fn),
-                                 variables=len(seen_var), requires=len(seen_imp))
+        self._record_module_meta(
+            file_id,
+            functions=len(seen_fn),
+            variables=len(seen_var),
+            requires=len(seen_imp),
+        )
 
 
 class ProxyAutoConfigAnalyzer(ShellScriptBase):
@@ -160,6 +193,7 @@ class ProxyAutoConfigAnalyzer(ShellScriptBase):
     ``var x = ...``                                 -> variable
     PAC helper calls (isInNet, dnsResolve, ...) are recorded as command deps.
     """
+
     LANG_KEY = "proxy-pac"
     EXTENSIONS = (".pac", ".wpad")
     LINE_COMMENTS = ("//",)
@@ -168,10 +202,20 @@ class ProxyAutoConfigAnalyzer(ShellScriptBase):
 
     _FUNC = re.compile(r"(?m)\bfunction[ \t]+([A-Za-z_]\w*)[ \t]*\(([^)]*)\)")
     _VAR = re.compile(r"(?m)^[ \t]*var[ \t]+([A-Za-z_]\w*)[ \t]*=[ \t]*(.*)")
-    _HELPERS = ("isPlainHostName", "dnsDomainIs", "localHostOrDomainIs",
-                "isResolvable", "isInNet", "dnsResolve", "myIpAddress",
-                "dnsDomainLevels", "shExpMatch", "weekdayRange", "dateRange",
-                "timeRange")
+    _HELPERS = (
+        "isPlainHostName",
+        "dnsDomainIs",
+        "localHostOrDomainIs",
+        "isResolvable",
+        "isInNet",
+        "dnsResolve",
+        "myIpAddress",
+        "dnsDomainLevels",
+        "shExpMatch",
+        "weekdayRange",
+        "dateRange",
+        "timeRange",
+    )
 
     def _extract_entities(self, file_id, text, path):
         clean = self._strip_comments(text)
@@ -183,16 +227,18 @@ class ProxyAutoConfigAnalyzer(ShellScriptBase):
                 continue
             seen_fn.add(name)
             params = self._split_top_level(m.group(2) or "")
-            self._add_shell_function(file_id, name, params=params,
-                                     description="pac function")
+            self._add_shell_function(
+                file_id, name, params=params, description="pac function"
+            )
 
         seen_var = set()
         for m in self._VAR.finditer(clean):
             name = m.group(1)
             if name not in seen_var:
                 seen_var.add(name)
-                self._add_variable(file_id, name, m.group(2).strip()[:120] or None,
-                                   scope="pac")
+                self._add_variable(
+                    file_id, name, m.group(2).strip()[:120] or None, scope="pac"
+                )
 
         seen_imp = set()
         for helper in self._HELPERS:
@@ -201,6 +247,9 @@ class ProxyAutoConfigAnalyzer(ShellScriptBase):
                 self._add_command_dep(file_id, helper)
 
         self._record_module_meta(
-            file_id, kind="wpad" if path.suffix.lower() == ".wpad" else "pac",
+            file_id,
+            kind="wpad" if path.suffix.lower() == ".wpad" else "pac",
             has_entry_point=("FindProxyForURL" in seen_fn),
-            functions=len(seen_fn), pac_helpers=sorted(seen_imp) or None)
+            functions=len(seen_fn),
+            pac_helpers=sorted(seen_imp) or None,
+        )

@@ -12,7 +12,7 @@
 #
 # Comments are '//' and '/* */'; strings appear inline (no delimiter parsing needed).
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -28,7 +28,9 @@ class InkAnalyzer(RegexCodeAnalyzer):
     _INCLUDE = re.compile(r"(?m)^\s*INCLUDE\s+(\S+)")
     _EXTERNAL = re.compile(r"(?m)^\s*EXTERNAL\s+(" + _ID + r")\s*\(([^)]*)\)")
     # knot:  === name ===  or  === name  or  === function name(args)
-    _KNOT = re.compile(r"(?m)^\s*={2,}\s*(?:(function)\s+)?(" + _ID + r")\s*(\([^)]*\))?")
+    _KNOT = re.compile(
+        r"(?m)^\s*={2,}\s*(?:(function)\s+)?(" + _ID + r")\s*(\([^)]*\))?"
+    )
     # stitch:  = name  (single '=', not '==')
     _STITCH = re.compile(r"(?m)^\s*=(?!=)\s*(" + _ID + r")\s*(\([^)]*\))?")
     _VAR = re.compile(r"(?m)^\s*(?:VAR|CONST|LIST)\s+(" + _ID + r")")

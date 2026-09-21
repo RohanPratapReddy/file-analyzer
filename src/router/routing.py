@@ -32,7 +32,7 @@ whose *suffix alone* unambiguously identifies a schema-definition language.
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
 # Logical analyzer-class identifiers, and the flat-facade names the per-shard
 # worker imports (``from src import <name>``).
@@ -58,59 +58,206 @@ ANALYZER_CLASSES: Dict[str, str] = {
 # stay with DataAnalyzer. Routing is by true (last-component) suffix, so a
 # ``foo.tar.gz`` / ``bar.csv.gz`` both resolve via ``.gz`` -> archive; the archive
 # stage then decompresses and the *extracted* member is analyzed on its own merits.
-_ARCHIVE_EXTS = frozenset({
-    # zip-family containers (PKZIP / OPC / ODF / spec-guaranteed-ZIP packages)
-    ".zip", ".epub", ".usdz", ".3mf", ".kmz",
-    ".jar", ".war", ".ear", ".apk", ".whl", ".xpi", ".vsix", ".nupkg",
-    ".zipx", ".asice", ".bdoc", ".bcf", ".dwca", ".siard", ".wacz",
-    ".xdm", ".pk3", ".pdx", ".ufdr",
-    # tar (plain + transparently-compressed compounds resolve via last suffix)
-    ".tar", ".tgz", ".tbz2", ".tbz", ".txz", ".tzst", ".webdataset", ".mbz",
-    # single-stream compression
-    ".gz", ".bz2", ".xz", ".lzma", ".zst", ".zstd", ".7z",
-    ".br", ".lz", ".lz4", ".sz", ".z", ".tpz",
-    # recognized-but-not-extractable-without-external-tools archive formats
-    # (ArchiveAnalyzer catalogues them honestly and content-sniffs each one:
-    # any that is actually a ZIP/tar/gzip/... underneath is still extracted).
-    ".ace", ".arj", ".arc", ".cab", ".cpio", ".lha", ".lzh", ".zoo",
-    ".hqx", ".sit", ".sitx", ".rar", ".r00", ".r01",
-    ".000", ".001", ".002", ".z01",
-    ".aip", ".dip", ".sip", ".ddoc", ".sce", ".biar",
-    ".car", ".sapcar", ".sar", ".tpz", ".pds", ".pdse", ".xmit",
-    ".ba2", ".bsa", ".gcf", ".pak", ".pck", ".vpk", ".rgss3a", ".rpa", ".wad",
-    ".bundle", ".obb", ".odb", ".xcappdata", ".deskthemepack", ".themepack",
-    ".warc", ".wpress", ".xry",
-})
+_ARCHIVE_EXTS = frozenset(
+    {
+        # zip-family containers (PKZIP / OPC / ODF / spec-guaranteed-ZIP packages)
+        ".zip",
+        ".epub",
+        ".usdz",
+        ".3mf",
+        ".kmz",
+        ".jar",
+        ".war",
+        ".ear",
+        ".apk",
+        ".whl",
+        ".xpi",
+        ".vsix",
+        ".nupkg",
+        ".zipx",
+        ".asice",
+        ".bdoc",
+        ".bcf",
+        ".dwca",
+        ".siard",
+        ".wacz",
+        ".xdm",
+        ".pk3",
+        ".pdx",
+        ".ufdr",
+        # tar (plain + transparently-compressed compounds resolve via last suffix)
+        ".tar",
+        ".tgz",
+        ".tbz2",
+        ".tbz",
+        ".txz",
+        ".tzst",
+        ".webdataset",
+        ".mbz",
+        # single-stream compression
+        ".gz",
+        ".bz2",
+        ".xz",
+        ".lzma",
+        ".zst",
+        ".zstd",
+        ".7z",
+        ".br",
+        ".lz",
+        ".lz4",
+        ".sz",
+        ".z",
+        ".tpz",
+        # recognized-but-not-extractable-without-external-tools archive formats
+        # (ArchiveAnalyzer catalogues them honestly and content-sniffs each one:
+        # any that is actually a ZIP/tar/gzip/... underneath is still extracted).
+        ".ace",
+        ".arj",
+        ".arc",
+        ".cab",
+        ".cpio",
+        ".lha",
+        ".lzh",
+        ".zoo",
+        ".hqx",
+        ".sit",
+        ".sitx",
+        ".rar",
+        ".r00",
+        ".r01",
+        ".000",
+        ".001",
+        ".002",
+        ".z01",
+        ".aip",
+        ".dip",
+        ".sip",
+        ".ddoc",
+        ".sce",
+        ".biar",
+        ".car",
+        ".sapcar",
+        ".sar",
+        ".tpz",
+        ".pds",
+        ".pdse",
+        ".xmit",
+        ".ba2",
+        ".bsa",
+        ".gcf",
+        ".pak",
+        ".pck",
+        ".vpk",
+        ".rgss3a",
+        ".rpa",
+        ".wad",
+        ".bundle",
+        ".obb",
+        ".odb",
+        ".xcappdata",
+        ".deskthemepack",
+        ".themepack",
+        ".warc",
+        ".wpress",
+        ".xry",
+    }
+)
 
 # Suffixes that SchemaAnalyzer claims purely by extension (content-ambiguous
 # ``.json`` / ``.md`` are intentionally excluded — see module docstring).
-_SCHEMA_EXTS = frozenset({
-    ".sql", ".ddl", ".cql", ".psql", ".pgsql", ".mysql", ".hql",
-    ".proto", ".thrift",
-    ".graphql", ".gql", ".graphqls",
-    ".avsc", ".avpr", ".avdl",
-    ".fbs", ".capnp", ".xsd",
-    # Residual schema-definition families (real engines in schema_defs.py).
-    ".webidl", ".idl", ".smithy", ".cddl", ".dbml", ".yang", ".mib",
-    ".msg", ".srv", ".shacl", ".ebnf", ".jsonschema", ".openapi", ".swagger",
-    ".raml", ".crd", ".ksy", ".xcstrings",
-})
+_SCHEMA_EXTS = frozenset(
+    {
+        ".sql",
+        ".ddl",
+        ".cql",
+        ".psql",
+        ".pgsql",
+        ".mysql",
+        ".hql",
+        ".proto",
+        ".thrift",
+        ".graphql",
+        ".gql",
+        ".graphqls",
+        ".avsc",
+        ".avpr",
+        ".avdl",
+        ".fbs",
+        ".capnp",
+        ".xsd",
+        # Residual schema-definition families (real engines in schema_defs.py).
+        ".webidl",
+        ".idl",
+        ".smithy",
+        ".cddl",
+        ".dbml",
+        ".yang",
+        ".mib",
+        ".msg",
+        ".srv",
+        ".shacl",
+        ".ebnf",
+        ".jsonschema",
+        ".openapi",
+        ".swagger",
+        ".raml",
+        ".crd",
+        ".ksy",
+        ".xcstrings",
+    }
+)
 
 # Executable / object / bytecode / firmware suffixes claimed by MachineCodeAnalyzer.
 # These are machine-code containers parsed by a dedicated post-planes stage (deep
 # ELF/PE/Mach-O/.class/.pyc/WASM/DEX/ar/LLVM/UF2/OLE parsers), NOT plane shards and
 # NOT semantic data artifacts. Kept disjoint from the higher-priority classes so no
 # existing routing changes (see MachineCodeAnalyzer.ROUTED_EXTS for the rationale).
-_BINARY_EXTS = frozenset({
-    ".elf", ".o", ".ko", ".so", ".prx", ".axf", ".bin",
-    ".exe", ".dll", ".sys", ".efi", ".ocx", ".cpl", ".scr", ".drv", ".mui", ".winmd",
-    ".dylib", ".macho",
-    ".class", ".pyc", ".pyo", ".wasm",
-    ".dex", ".odex", ".oat", ".vdex", ".art",
-    ".bc", ".llbc", ".cma", ".cmo", ".cmx", ".cmxs",
-    ".uf2", ".hex", ".srec", ".s19", ".s28", ".s37",
-    ".msi", ".msm",
-})
+_BINARY_EXTS = frozenset(
+    {
+        ".elf",
+        ".o",
+        ".ko",
+        ".so",
+        ".prx",
+        ".axf",
+        ".bin",
+        ".exe",
+        ".dll",
+        ".sys",
+        ".efi",
+        ".ocx",
+        ".cpl",
+        ".scr",
+        ".drv",
+        ".mui",
+        ".winmd",
+        ".dylib",
+        ".macho",
+        ".class",
+        ".pyc",
+        ".pyo",
+        ".wasm",
+        ".dex",
+        ".odex",
+        ".oat",
+        ".vdex",
+        ".art",
+        ".bc",
+        ".llbc",
+        ".cma",
+        ".cmo",
+        ".cmx",
+        ".cmxs",
+        ".uf2",
+        ".hex",
+        ".srec",
+        ".s19",
+        ".s28",
+        ".s37",
+        ".msi",
+        ".msm",
+    }
+)
 
 # Lazily-populated caches for the code/data/database suffix universes.
 _CODE_EXTS: Optional[frozenset] = None
@@ -128,6 +275,7 @@ def _code_exts() -> frozenset:
     global _CODE_EXTS
     if _CODE_EXTS is None:
         from ..prog_lang.polyglot import PolyglotCodeAnalyzer
+
         _CODE_EXTS = frozenset(k.lower() for k in PolyglotCodeAnalyzer.EXT_MAP)
     return _CODE_EXTS
 
@@ -136,6 +284,7 @@ def _database_exts() -> frozenset:
     global _DATABASE_EXTS
     if _DATABASE_EXTS is None:
         from ..database.database_analyzer import DatabaseAnalyzer
+
         _DATABASE_EXTS = frozenset(DatabaseAnalyzer._known_exts())
     return _DATABASE_EXTS
 
@@ -144,6 +293,7 @@ def _data_exts() -> frozenset:
     global _DATA_EXTS
     if _DATA_EXTS is None:
         from ..data.data_analyzer import DataAnalyzer
+
         # _known_exts is an instance method but reads only class attributes.
         _DATA_EXTS = frozenset(DataAnalyzer.__new__(DataAnalyzer)._known_exts())
     return _DATA_EXTS
@@ -163,9 +313,16 @@ def _binary_format_exts() -> frozenset:
     global _BINARY_FMT_EXTS
     if _BINARY_FMT_EXTS is None:
         from ..binary.format_parsers import BinaryFormatParser
+
         cand = set(BinaryFormatParser.routing_suffixes())
-        owned = (set(_code_exts()) | set(_SCHEMA_EXTS) | set(_database_exts())
-                 | set(_ARCHIVE_EXTS) | set(_BINARY_EXTS) | set(_data_exts()))
+        owned = (
+            set(_code_exts())
+            | set(_SCHEMA_EXTS)
+            | set(_database_exts())
+            | set(_ARCHIVE_EXTS)
+            | set(_BINARY_EXTS)
+            | set(_data_exts())
+        )
         # Genuinely dual-meaning last-component suffixes that are more commonly a
         # TEXT artifact than the binary format that merely shares the tail: ``.md5``
         # is a checksum manifest (the binary hit is only the ``.tar.md5`` firmware
@@ -191,10 +348,17 @@ def _config_exts() -> frozenset:
     global _CONFIG_EXTS
     if _CONFIG_EXTS is None:
         from ..config.config_analyzer import ConfigAnalyzer
+
         cand = set(ConfigAnalyzer.routing_suffixes())
-        owned = (set(_code_exts()) | set(_SCHEMA_EXTS) | set(_database_exts())
-                 | set(_ARCHIVE_EXTS) | set(_BINARY_EXTS) | set(_data_exts())
-                 | set(_binary_format_exts()))
+        owned = (
+            set(_code_exts())
+            | set(_SCHEMA_EXTS)
+            | set(_database_exts())
+            | set(_ARCHIVE_EXTS)
+            | set(_BINARY_EXTS)
+            | set(_data_exts())
+            | set(_binary_format_exts())
+        )
         _CONFIG_EXTS = frozenset(cand - owned)
     return _CONFIG_EXTS
 
@@ -211,10 +375,18 @@ def _text_exts() -> frozenset:
     global _TEXT_EXTS
     if _TEXT_EXTS is None:
         from ..text.textual_analyzer import TextualAnalyzer
+
         cand = set(TextualAnalyzer.routing_suffixes())
-        owned = (set(_code_exts()) | set(_SCHEMA_EXTS) | set(_database_exts())
-                 | set(_ARCHIVE_EXTS) | set(_BINARY_EXTS) | set(_data_exts())
-                 | set(_binary_format_exts()) | set(_config_exts()))
+        owned = (
+            set(_code_exts())
+            | set(_SCHEMA_EXTS)
+            | set(_database_exts())
+            | set(_ARCHIVE_EXTS)
+            | set(_BINARY_EXTS)
+            | set(_data_exts())
+            | set(_binary_format_exts())
+            | set(_config_exts())
+        )
         _TEXT_EXTS = frozenset(cand - owned)
     return _TEXT_EXTS
 
@@ -232,11 +404,19 @@ def _markup_exts() -> frozenset:
     global _MARKUP_EXTS
     if _MARKUP_EXTS is None:
         from ..markup.markup_analyzer import MarkupAnalyzer
+
         cand = set(MarkupAnalyzer.routing_suffixes())
-        owned = (set(_code_exts()) | set(_SCHEMA_EXTS) | set(_database_exts())
-                 | set(_ARCHIVE_EXTS) | set(_BINARY_EXTS) | set(_data_exts())
-                 | set(_binary_format_exts()) | set(_config_exts())
-                 | set(_text_exts()))
+        owned = (
+            set(_code_exts())
+            | set(_SCHEMA_EXTS)
+            | set(_database_exts())
+            | set(_ARCHIVE_EXTS)
+            | set(_BINARY_EXTS)
+            | set(_data_exts())
+            | set(_binary_format_exts())
+            | set(_config_exts())
+            | set(_text_exts())
+        )
         _MARKUP_EXTS = frozenset(cand - owned)
     return _MARKUP_EXTS
 
@@ -256,11 +436,20 @@ def _document_exts() -> frozenset:
     global _DOCUMENT_EXTS
     if _DOCUMENT_EXTS is None:
         from ..document.document_analyzer import DocumentAnalyzer
+
         cand = set(DocumentAnalyzer.routing_suffixes())
-        owned = (set(_code_exts()) | set(_SCHEMA_EXTS) | set(_database_exts())
-                 | set(_ARCHIVE_EXTS) | set(_BINARY_EXTS) | set(_data_exts())
-                 | set(_binary_format_exts()) | set(_config_exts())
-                 | set(_text_exts()) | set(_markup_exts()))
+        owned = (
+            set(_code_exts())
+            | set(_SCHEMA_EXTS)
+            | set(_database_exts())
+            | set(_ARCHIVE_EXTS)
+            | set(_BINARY_EXTS)
+            | set(_data_exts())
+            | set(_binary_format_exts())
+            | set(_config_exts())
+            | set(_text_exts())
+            | set(_markup_exts())
+        )
         _DOCUMENT_EXTS = frozenset(cand - owned)
     return _DOCUMENT_EXTS
 
@@ -278,11 +467,21 @@ def _misc_exts() -> frozenset:
     global _MISC_EXTS
     if _MISC_EXTS is None:
         from ..misc.misc_analyzer import MiscAnalyzer
+
         cand = set(MiscAnalyzer.routing_suffixes())
-        owned = (set(_code_exts()) | set(_SCHEMA_EXTS) | set(_database_exts())
-                 | set(_ARCHIVE_EXTS) | set(_BINARY_EXTS) | set(_data_exts())
-                 | set(_binary_format_exts()) | set(_config_exts())
-                 | set(_text_exts()) | set(_markup_exts()) | set(_document_exts()))
+        owned = (
+            set(_code_exts())
+            | set(_SCHEMA_EXTS)
+            | set(_database_exts())
+            | set(_ARCHIVE_EXTS)
+            | set(_BINARY_EXTS)
+            | set(_data_exts())
+            | set(_binary_format_exts())
+            | set(_config_exts())
+            | set(_text_exts())
+            | set(_markup_exts())
+            | set(_document_exts())
+        )
         _MISC_EXTS = frozenset(cand - owned)
     return _MISC_EXTS
 
@@ -394,11 +593,15 @@ def build_mapping(
     for f in files:
         fid = f["file_id"]
         loc = paths.get(fid)
-        mapping.append({
-            "file_id": fid,
-            "file_location": str(loc) if loc is not None else None,
-            "analyzer_class": resolve_analyzer(loc.name if loc is not None else f["file_name"]),
-        })
+        mapping.append(
+            {
+                "file_id": fid,
+                "file_location": str(loc) if loc is not None else None,
+                "analyzer_class": resolve_analyzer(
+                    loc.name if loc is not None else f["file_name"]
+                ),
+            }
+        )
     return mapping
 
 
@@ -428,15 +631,26 @@ def group_into_shards(mapping: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         b["file_paths"].append(loc)
 
     shards: List[Dict[str, Any]] = []
-    for cls in ("code", "schema", "database", "data", "config", "text", "markup",
-                "document", "misc"):
+    for cls in (
+        "code",
+        "schema",
+        "database",
+        "data",
+        "config",
+        "text",
+        "markup",
+        "document",
+        "misc",
+    ):
         b = buckets.get(cls)
         if not b or not b["file_paths"]:
             continue
-        shards.append({
-            "shard_id": f"shard_{cls}",
-            "analyzer_class": cls,
-            "file_ids": b["file_ids"],
-            "file_paths": b["file_paths"],
-        })
+        shards.append(
+            {
+                "shard_id": f"shard_{cls}",
+                "analyzer_class": cls,
+                "file_ids": b["file_ids"],
+                "file_paths": b["file_paths"],
+            }
+        )
     return shards

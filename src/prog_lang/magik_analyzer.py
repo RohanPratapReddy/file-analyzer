@@ -13,7 +13,7 @@
 #
 # Comments are '#'; strings use '"'. Magik is case-insensitive on keywords.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_!][A-Za-z0-9_!?]*"
@@ -29,12 +29,18 @@ class MagikAnalyzer(RegexCodeAnalyzer):
     _PACKAGE = re.compile(r"(?im)^\s*_package\s+(" + _ID + r")")
     # alternate package declaration:  def_package(:name)
     _DEFPACKAGE = re.compile(r"def_package\s*\(\s*:(" + _ID + r")")
-    _EXEMPLAR = re.compile(r"def_(?:slotted|indexed|mixin)?_?exemplar\s*\(\s*:(" + _ID + r")")
-    _METHOD = re.compile(r"(?im)^\s*(?:_abstract\s+|_private\s+|_iter\s+|_pragma\s+)*"
-                         r"_method\s+(" + _ID + r")\s*\.\s*(" + _ID + r")")
+    _EXEMPLAR = re.compile(
+        r"def_(?:slotted|indexed|mixin)?_?exemplar\s*\(\s*:(" + _ID + r")"
+    )
+    _METHOD = re.compile(
+        r"(?im)^\s*(?:_abstract\s+|_private\s+|_iter\s+|_pragma\s+)*"
+        r"_method\s+(" + _ID + r")\s*\.\s*(" + _ID + r")"
+    )
     _PROC = re.compile(r"(?im)_proc\s*(?:@\s*(" + _ID + r"))?\s*\(")
-    _ASSIGN = re.compile(r"(?im)^\s*(?:_local\s+|_dynamic\s+|_global\s+|_constant\s+|"
-                         r"_import\s+)*(" + _ID + r")\s*<<")
+    _ASSIGN = re.compile(
+        r"(?im)^\s*(?:_local\s+|_dynamic\s+|_global\s+|_constant\s+|"
+        r"_import\s+)*(" + _ID + r")\s*<<"
+    )
 
     def _register_types(self, file_id, text, path):
         clean = self._strip_comments(text)
@@ -56,15 +62,20 @@ class MagikAnalyzer(RegexCodeAnalyzer):
             owner, name = m.group(1), m.group(2)
             cls_id = self._register_class(owner)
             args = self._method_args(clean, m.end())
-            self._add_function(file_id, name, args, [], class_id=cls_id,
-                               description="magik method on " + owner)
+            self._add_function(
+                file_id,
+                name,
+                args,
+                [],
+                class_id=cls_id,
+                description="magik method on " + owner,
+            )
 
         for m in self._PROC.finditer(clean):
             name = m.group(1) or "_anon_proc"
             open_paren = clean.index("(", m.end() - 1)
             args = self._paren_args(clean, open_paren)
-            self._add_function(file_id, name, args, [],
-                               description="magik proc")
+            self._add_function(file_id, name, args, [], description="magik proc")
 
         seen = set()
         for m in self._ASSIGN.finditer(clean):
@@ -83,7 +94,7 @@ class MagikAnalyzer(RegexCodeAnalyzer):
 
     def _paren_args(self, clean, open_paren):
         end = self._find_matching(clean, open_paren, "(", ")")
-        body = clean[open_paren + 1:end - 1]
+        body = clean[open_paren + 1 : end - 1]
         arg_ids = []
         for part in self._split_top_level(body):
             name = part.strip().lstrip("_optional").lstrip("_gather").strip()

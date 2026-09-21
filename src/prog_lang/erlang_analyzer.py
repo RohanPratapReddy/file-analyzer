@@ -9,7 +9,7 @@
 #   start() -> ... .                             -> function (by name/arity)
 #   loop(State) when ... -> ... ;                -> function clause (deduped)
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -20,15 +20,13 @@ class ErlangAnalyzer(RegexCodeAnalyzer):
     BLOCK_COMMENTS = ()
 
     _MODULE = re.compile(r"^\s*-module\s*\(\s*([\w]+)\s*\)", re.MULTILINE)
-    _IMPORT = re.compile(r"^\s*-import\s*\(\s*([\w]+)\s*,\s*\[([^\]]*)\]",
-                         re.MULTILINE)
+    _IMPORT = re.compile(r"^\s*-import\s*\(\s*([\w]+)\s*,\s*\[([^\]]*)\]", re.MULTILINE)
     _INCLUDE = re.compile(r'^\s*-include(?:_lib)?\s*\(\s*"([^"]+)"', re.MULTILINE)
     _RECORD = re.compile(
-        r"^\s*-record\s*\(\s*(\w+)\s*,\s*\{(.*?)\}\s*\)\s*\.",
-        re.MULTILINE | re.DOTALL)
+        r"^\s*-record\s*\(\s*(\w+)\s*,\s*\{(.*?)\}\s*\)\s*\.", re.MULTILINE | re.DOTALL
+    )
     _DEFINE = re.compile(r"^\s*-define\s*\(\s*(\w+)", re.MULTILINE)
-    _FUNC = re.compile(r"^([a-z]\w*)\s*\(([^)]*)\)\s*(?:when\b[^-]*?)?->",
-                       re.MULTILINE)
+    _FUNC = re.compile(r"^([a-z]\w*)\s*\(([^)]*)\)\s*(?:when\b[^-]*?)?->", re.MULTILINE)
 
     def _register_types(self, file_id, text, path):
         t = self._strip_comments(text)
@@ -59,11 +57,16 @@ class ErlangAnalyzer(RegexCodeAnalyzer):
             for field in self._split_top_level(body):
                 fm = re.match(r"(\w+)\s*(?:=\s*(.+))?$", field.strip(), re.DOTALL)
                 if fm:
-                    attr_ids.append(self._add_arg(
-                        fm.group(1), None,
-                        fm.group(2).strip() if fm.group(2) else None))
-            self._add_class(file_id, name, description="erlang record",
-                            attr_ids=attr_ids)
+                    attr_ids.append(
+                        self._add_arg(
+                            fm.group(1),
+                            None,
+                            fm.group(2).strip() if fm.group(2) else None,
+                        )
+                    )
+            self._add_class(
+                file_id, name, description="erlang record", attr_ids=attr_ids
+            )
 
         for m in self._DEFINE.finditer(t):
             self._add_variable(file_id, m.group(1), scope="macro")
@@ -77,7 +80,11 @@ class ErlangAnalyzer(RegexCodeAnalyzer):
             if key in seen:
                 continue
             seen.add(key)
-            arg_ids = [self._add_arg(a.strip())
-                       for a in self._split_top_level(params)] if params else []
-            self._add_function(file_id, f"{name}/{arity}", arg_ids,
-                               description="erlang function")
+            arg_ids = (
+                [self._add_arg(a.strip()) for a in self._split_top_level(params)]
+                if params
+                else []
+            )
+            self._add_function(
+                file_id, f"{name}/{arity}", arg_ids, description="erlang function"
+            )

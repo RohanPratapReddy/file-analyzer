@@ -12,7 +12,7 @@
 #   (defmacro unless [test #* body] ...)            -> function (macro)
 #   (defclass Point [object] (defn __init__ [self x] ...)) -> class (+ methods)
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _SYM = r"[A-Za-z_][A-Za-z0-9_.*/?!<>=+-]*"
@@ -71,15 +71,29 @@ class HyAnalyzer(RegexCodeAnalyzer):
                 mname = dm.group(2)
                 params = self._arg_vector(form, dm.end())
                 arg_ids = [self._add_arg(p) for p in params]
-                methods.append(self._add_function(
-                    file_id, mname, arg_ids, [], class_id=cid,
-                    description="hy method"))
-            self._add_class(file_id, name, description="hy class",
-                            parent_ids=parents, method_ids=methods)
+                methods.append(
+                    self._add_function(
+                        file_id,
+                        mname,
+                        arg_ids,
+                        [],
+                        class_id=cid,
+                        description="hy method",
+                    )
+                )
+            self._add_class(
+                file_id,
+                name,
+                description="hy class",
+                parent_ids=parents,
+                method_ids=methods,
+            )
 
         # free functions / macros (not inside a defclass form)
-        class_spans = [(mm.start(), self._form_at(text, mm.start()))
-                       for mm in self._CLASS.finditer(text)]
+        class_spans = [
+            (mm.start(), self._form_at(text, mm.start()))
+            for mm in self._CLASS.finditer(text)
+        ]
         class_ranges = []
         for start, form in class_spans:
             op = text.find("(", start)
@@ -100,8 +114,11 @@ class HyAnalyzer(RegexCodeAnalyzer):
     # ------------------------------------------------------------------
     def _parse_import(self, file_id, form):
         # (import a b) | (import a :as x) | (import [pkg [n1 n2]]) | (require m)
-        body = form[form.find("import") + 6:] if "import" in form else \
-            form[form.find("require") + 7:]
+        body = (
+            form[form.find("import") + 6 :]
+            if "import" in form
+            else form[form.find("require") + 7 :]
+        )
         body = body.rsplit(")", 1)[0]
         # bracketed selective imports first
         for bm in re.finditer(r"\[\s*(" + _SYM + r")\s*\[([^\]]*)\]\s*\]", body):
@@ -132,7 +149,7 @@ class HyAnalyzer(RegexCodeAnalyzer):
 
     def _arg_vector(self, text, pos):
         lb = text.find("[", pos)
-        for ch in text[pos:lb if lb != -1 else len(text)]:
+        for ch in text[pos : lb if lb != -1 else len(text)]:
             if ch in "([{":
                 return []
             if not ch.isspace():
@@ -141,7 +158,7 @@ class HyAnalyzer(RegexCodeAnalyzer):
             return []
         rb = self._find_matching(text, lb, "[", "]")
         params = []
-        for tok in re.findall(_SYM, text[lb + 1:rb - 1]):
+        for tok in re.findall(_SYM, text[lb + 1 : rb - 1]):
             if tok in ("#*", "#**", "/", "*"):
                 continue
             params.append(tok)

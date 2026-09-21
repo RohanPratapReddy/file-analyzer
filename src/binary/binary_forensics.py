@@ -36,11 +36,11 @@ from typing import Any, Dict, List, Optional, Tuple
 # Bounded read for entropy / histogram / string scans. SHA-256 and the on-disk
 # size always reflect the whole file; only the statistical scans are sampled so a
 # multi-gigabyte binary cannot blow up memory or time.
-_SCAN_CAP = 16 * 1024 * 1024          # 16 MiB sampled for stats
+_SCAN_CAP = 16 * 1024 * 1024  # 16 MiB sampled for stats
 _HASH_CHUNK = 1 << 20
-_MIN_STRING = 4                       # minimum run length for a "string"
-_MAX_STRING_SAMPLE = 40              # capped sample of extracted strings
-_MAX_STRING_LEN_KEEP = 200           # truncate any single sampled string
+_MIN_STRING = 4  # minimum run length for a "string"
+_MAX_STRING_SAMPLE = 40  # capped sample of extracted strings
+_MAX_STRING_LEN_KEEP = 200  # truncate any single sampled string
 
 
 class BinaryForensicsAnalyzer:
@@ -188,10 +188,10 @@ class BinaryForensicsAnalyzer:
     def sniff_format(self, head: bytes) -> Tuple[Optional[str], Optional[str]]:
         """Return ``(detected_format, format_family)`` from header magic, or (None, None)."""
         for off, magic, fmt, family in self._MAGIC:
-            if len(head) >= off + len(magic) and head[off:off + len(magic)] == magic:
+            if len(head) >= off + len(magic) and head[off : off + len(magic)] == magic:
                 return (fmt, family)
         for magic, fmt, family in self._MAGIC_OFFSET4:
-            if len(head) >= 4 + len(magic) and head[4:4 + len(magic)] == magic:
+            if len(head) >= 4 + len(magic) and head[4 : 4 + len(magic)] == magic:
                 return (fmt, family)
         return (None, None)
 
@@ -268,15 +268,21 @@ class BinaryForensicsAnalyzer:
         n = len(sample)
         entropy = self._entropy(counts, n)
         out["entropy"] = round(entropy, 4)
-        out["entropy_class"] = ("high" if entropy >= 7.5 else
-                                "medium" if entropy >= 5.0 else "low")
-        printable = sum(counts[c] for c in range(0x20, 0x7f)) + counts[0x09] + counts[0x0a] + counts[0x0d]
+        out["entropy_class"] = (
+            "high" if entropy >= 7.5 else "medium" if entropy >= 5.0 else "low"
+        )
+        printable = (
+            sum(counts[c] for c in range(0x20, 0x7F))
+            + counts[0x09]
+            + counts[0x0A]
+            + counts[0x0D]
+        )
         nul = counts[0]
-        ws = counts[0x20] + counts[0x09] + counts[0x0a] + counts[0x0d]
+        ws = counts[0x20] + counts[0x09] + counts[0x0A] + counts[0x0D]
         out["printable_ratio"] = round(printable / n, 4)
         out["null_ratio"] = round(nul / n, 4)
         out["whitespace_ratio"] = round(ws / n, 4)
-        buckets = [sum(counts[i * 16:(i + 1) * 16]) for i in range(16)]
+        buckets = [sum(counts[i * 16 : (i + 1) * 16]) for i in range(16)]
         out["histogram16"] = json.dumps(buckets)
 
         # String extraction.
@@ -286,16 +292,25 @@ class BinaryForensicsAnalyzer:
         out["ascii_string_count"] = len(ascii_strings)
         out["utf16_string_count"] = len(utf16_strings)
         out["max_string_len"] = max((len(s) for s in all_strings), default=0)
-        sample_strs = [s[:_MAX_STRING_LEN_KEEP] for s in all_strings[:_MAX_STRING_SAMPLE]]
+        sample_strs = [
+            s[:_MAX_STRING_LEN_KEEP] for s in all_strings[:_MAX_STRING_SAMPLE]
+        ]
         out["sample_strings"] = json.dumps(sample_strs, ensure_ascii=False)
 
-        out["is_probably_text"] = bool(out["printable_ratio"] >= 0.95 and out["null_ratio"] < 0.01)
+        out["is_probably_text"] = bool(
+            out["printable_ratio"] >= 0.95 and out["null_ratio"] < 0.01
+        )
         out["looks_compressed_or_encrypted"] = bool(
-            entropy >= 7.5 and out["printable_ratio"] < 0.30 and family in (None, "archive"))
+            entropy >= 7.5
+            and out["printable_ratio"] < 0.30
+            and family in (None, "archive")
+        )
         return out
 
     # ------------------------------------------------------------------
-    def analyze_files(self, rows: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+    def analyze_files(
+        self, rows: List[Dict[str, Any]]
+    ) -> Dict[str, List[Dict[str, Any]]]:
         """
         Standalone entry point: forensically profile every ``{file_id, file_location}``
         row and return ``{"binary_forensics": [...]}`` (one row per file).
@@ -308,11 +323,13 @@ class BinaryForensicsAnalyzer:
                 continue
             fid_counter += 1
             prof = self.profile(loc)
-            forensic_rows.append({
-                "forensic_id": fid_counter,
-                "file_id": row.get("file_id"),
-                **prof,
-            })
+            forensic_rows.append(
+                {
+                    "forensic_id": fid_counter,
+                    "file_id": row.get("file_id"),
+                    **prof,
+                }
+            )
         return {"binary_forensics": forensic_rows}
 
     # ------------------------------------------------------------------
@@ -345,7 +362,7 @@ class BinaryForensicsAnalyzer:
         out: List[str] = []
         cur = bytearray()
         for b in data:
-            if 0x20 <= b <= 0x7e:
+            if 0x20 <= b <= 0x7E:
                 cur.append(b)
             else:
                 if len(cur) >= _MIN_STRING:
@@ -365,7 +382,7 @@ class BinaryForensicsAnalyzer:
         n = len(data)
         while i + 1 < n:
             lo, hi = data[i], data[i + 1]
-            if hi == 0x00 and 0x20 <= lo <= 0x7e:
+            if hi == 0x00 and 0x20 <= lo <= 0x7E:
                 cur.append(lo)
                 i += 2
                 continue

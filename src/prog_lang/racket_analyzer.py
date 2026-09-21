@@ -12,7 +12,7 @@
 #   (define-struct posn (x y))                            -> struct (class + fields)
 #   (define-syntax-rule (swap a b) ...)                   -> function (macro)
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _SYM = r"[A-Za-z0-9+\-*/<>=!?._%&$:~^]+"
@@ -26,13 +26,18 @@ class RacketAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"',)
 
     _DEFUN = re.compile(r"\(\s*define\s*\(\s*(" + _SYM + r")", re.IGNORECASE)
-    _DEFVAL = re.compile(r"\(\s*define\s+(" + _SYM + r")\s+(.*?)$",
-                         re.IGNORECASE | re.MULTILINE)
+    _DEFVAL = re.compile(
+        r"\(\s*define\s+(" + _SYM + r")\s+(.*?)$", re.IGNORECASE | re.MULTILINE
+    )
     _STRUCT = re.compile(
-        r"\(\s*(?:struct|define-struct)\s+\(?\s*(" + _SYM + r")", re.IGNORECASE)
+        r"\(\s*(?:struct|define-struct)\s+\(?\s*(" + _SYM + r")", re.IGNORECASE
+    )
     _DEFSYNTAX = re.compile(
         r"\(\s*(define-syntax-rule|define-simple-macro|define-syntax)\s*\(?\s*("
-        + _SYM + r")", re.IGNORECASE)
+        + _SYM
+        + r")",
+        re.IGNORECASE,
+    )
     _REQUIRE = re.compile(r"\(\s*require\b", re.IGNORECASE)
     _LANG = re.compile(r"^#lang\s+(\S+)", re.MULTILINE)
 
@@ -51,8 +56,7 @@ class RacketAnalyzer(RegexCodeAnalyzer):
             form = self._form_at(text, m.start())
             struct_spans.append((m.start(), m.start() + len(form)))
             attrs = self._struct_fields(text, m.end())
-            self._add_class(file_id, name, description="racket struct",
-                            attr_ids=attrs)
+            self._add_class(file_id, name, description="racket struct", attr_ids=attrs)
 
         def in_struct(pos):
             return any(a <= pos < b for a, b in struct_spans)
@@ -60,7 +64,7 @@ class RacketAnalyzer(RegexCodeAnalyzer):
         # imports (require)
         for m in self._REQUIRE.finditer(text):
             form = self._form_at(text, m.start())
-            inner = form[form.find("require") + len("require"):-1]
+            inner = form[form.find("require") + len("require") : -1]
             # top-level tokens and (sub-form ...) module paths
             i = 0
             while i < len(inner):
@@ -72,9 +76,18 @@ class RacketAnalyzer(RegexCodeAnalyzer):
                     # For require sub-forms the module spec position depends on
                     # the leading keyword: prefix-in puts it second, all the
                     # others (only-in/except-in/rename-in/combine-in/for-*) first.
-                    if kw in ("only-in", "except-in", "rename-in", "combine-in",
-                              "relative-in", "multi-in", "for-syntax",
-                              "for-template", "for-label", "for-meta"):
+                    if kw in (
+                        "only-in",
+                        "except-in",
+                        "rename-in",
+                        "combine-in",
+                        "relative-in",
+                        "multi-in",
+                        "for-syntax",
+                        "for-template",
+                        "for-label",
+                        "for-meta",
+                    ):
                         mod = raw[1] if len(raw) > 1 else raw[0]
                     elif kw == "prefix-in":
                         mod = raw[2] if len(raw) > 2 else raw[-1]
@@ -140,7 +153,7 @@ class RacketAnalyzer(RegexCodeAnalyzer):
             return []
         if text[i] == "(":
             rp = self._find_matching(text, i, "(", ")")
-            inner = text[i + 1:rp - 1]
+            inner = text[i + 1 : rp - 1]
             out = []
             for t in re.findall(_SYM, inner):
                 if t == "." or t.startswith("#"):
@@ -155,7 +168,7 @@ class RacketAnalyzer(RegexCodeAnalyzer):
         if lp == -1:
             return []
         rp = self._find_matching(text, lp, "(", ")")
-        inner = text[lp + 1:rp - 1]
+        inner = text[lp + 1 : rp - 1]
         attrs = []
         for t in re.findall(_SYM, inner):
             if not t.startswith("#"):

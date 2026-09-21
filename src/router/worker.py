@@ -47,9 +47,17 @@ def run_shard(readers_root: str, temp_dir: str, shard_id: str) -> Path:
     if root not in sys.path:
         sys.path.insert(0, root)
 
-    from src import (PolyglotCodeAnalyzer, SchemaAnalyzer, DataAnalyzer,
-                     DatabaseAnalyzer, ConfigAnalyzer, TextualAnalyzer,
-                     MarkupAnalyzer, DocumentAnalyzer, MiscAnalyzer)
+    from src import (
+        ConfigAnalyzer,
+        DataAnalyzer,
+        DatabaseAnalyzer,
+        DocumentAnalyzer,
+        MarkupAnalyzer,
+        MiscAnalyzer,
+        PolyglotCodeAnalyzer,
+        SchemaAnalyzer,
+        TextualAnalyzer,
+    )
 
     engines = {
         "code": PolyglotCodeAnalyzer,
@@ -73,8 +81,16 @@ def run_shard(readers_root: str, temp_dir: str, shard_id: str) -> Path:
     tables = engine.analyze()
 
     file_index = None
-    if cls in ("schema", "database", "data", "config", "text", "markup",
-               "document", "misc"):
+    if cls in (
+        "schema",
+        "database",
+        "data",
+        "config",
+        "text",
+        "markup",
+        "document",
+        "misc",
+    ):
         # Rewrite local file_ids -> repository file_ids and build the file index.
         file_index = engine.link_repository((folders, extensions, files), file_paths)
         # Refresh so the linked (repo-scoped) ids are what we persist.
@@ -96,8 +112,11 @@ def run_shard(readers_root: str, temp_dir: str, shard_id: str) -> Path:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="tabgen router per-shard analysis worker")
-    ap.add_argument("--readers-root", required=True,
-                    help="path to the 'readers' directory (so 'from src import ...' resolves)")
+    ap.add_argument(
+        "--readers-root",
+        required=True,
+        help="path to the 'readers' directory (so 'from src import ...' resolves)",
+    )
     ap.add_argument("--temp", required=True, help="temp/ staging directory")
     ap.add_argument("--shard", required=True, help="shard_id to analyze")
     args = ap.parse_args(argv)

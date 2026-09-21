@@ -53,11 +53,15 @@ class RouterPlanes:
     def _go_binary(self) -> Optional[Path]:
         if shutil.which("go") is None:
             return None
-        exe = self.go_dir / ("analysis-plane.exe" if os.name == "nt" else "analysis-plane")
+        exe = self.go_dir / (
+            "analysis-plane.exe" if os.name == "nt" else "analysis-plane"
+        )
         try:
             proc = subprocess.run(
                 ["go", "build", "-o", exe.name, "."],
-                cwd=self.go_dir, capture_output=True, text=True,
+                cwd=self.go_dir,
+                capture_output=True,
+                text=True,
             )
             if proc.returncode != 0:
                 self.log.append(f"[planes] go build failed:\n{proc.stderr}")
@@ -75,7 +79,9 @@ class RouterPlanes:
         try:
             proc = subprocess.run(
                 ["javac", "-d", str(out_dir), "AnalyzerPlane.java"],
-                cwd=self.java_dir, capture_output=True, text=True,
+                cwd=self.java_dir,
+                capture_output=True,
+                text=True,
             )
             if proc.returncode != 0:
                 self.log.append(f"[planes] javac failed:\n{proc.stderr}")
@@ -91,22 +97,35 @@ class RouterPlanes:
     def _run_go_plane(self, exe: Path, shard_ids: List[str]) -> int:
         cmd = [
             str(exe),
-            "-python", self.python_exe,
-            "-readers-root", str(self.readers_root),
-            "-temp", str(self.temp_dir),
-            "-shards", ",".join(shard_ids),
-            "-workers", str(self.workers_per_plane),
+            "-python",
+            self.python_exe,
+            "-readers-root",
+            str(self.readers_root),
+            "-temp",
+            str(self.temp_dir),
+            "-shards",
+            ",".join(shard_ids),
+            "-workers",
+            str(self.workers_per_plane),
         ]
         return self._stream_subprocess(cmd, self.go_dir)
 
     def _run_java_plane(self, out_dir: Path, shard_ids: List[str]) -> int:
         cmd = [
-            "java", "-cp", str(out_dir), "AnalyzerPlane",
-            "--python", self.python_exe,
-            "--readers-root", str(self.readers_root),
-            "--temp", str(self.temp_dir),
-            "--shards", ",".join(shard_ids),
-            "--workers", str(self.workers_per_plane),
+            "java",
+            "-cp",
+            str(out_dir),
+            "AnalyzerPlane",
+            "--python",
+            self.python_exe,
+            "--readers-root",
+            str(self.readers_root),
+            "--temp",
+            str(self.temp_dir),
+            "--shards",
+            ",".join(shard_ids),
+            "--workers",
+            str(self.workers_per_plane),
         ]
         return self._stream_subprocess(cmd, self.java_dir)
 
@@ -119,15 +138,21 @@ class RouterPlanes:
 
         def _one(shard_id: str) -> int:
             cmd = [
-                self.python_exe, str(worker),
-                "--readers-root", str(self.readers_root),
-                "--temp", str(self.temp_dir),
-                "--shard", shard_id,
+                self.python_exe,
+                str(worker),
+                "--readers-root",
+                str(self.readers_root),
+                "--temp",
+                str(self.temp_dir),
+                "--shard",
+                shard_id,
             ]
             return self._stream_subprocess(cmd, self.router_dir)
 
         failures = 0
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.workers_per_plane) as ex:
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=self.workers_per_plane
+        ) as ex:
             for rc in ex.map(_one, shard_ids):
                 if rc != 0:
                     failures += 1
@@ -136,8 +161,12 @@ class RouterPlanes:
     def _stream_subprocess(self, cmd: List[str], cwd: Path) -> int:
         try:
             proc = subprocess.Popen(
-                cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, bufsize=1,
+                cmd,
+                cwd=cwd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
             )
         except OSError as err:
             self.log.append(f"[planes] failed to launch {cmd[0]}: {err}")

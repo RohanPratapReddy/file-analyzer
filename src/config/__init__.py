@@ -6,7 +6,7 @@ file into ``config_*`` tables.  See :mod:`.config_formats` for the parsers and
 :mod:`.config_analyzer` for the table-emitting analyzer.
 """
 
-from .config_analyzer import ConfigAnalyzer
 from . import config_formats
+from .config_analyzer import ConfigAnalyzer
 
 __all__ = ["ConfigAnalyzer", "config_formats"]

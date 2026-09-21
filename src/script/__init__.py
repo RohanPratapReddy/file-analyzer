@@ -13,26 +13,38 @@
 # parser (Groovy/Starlark/F#/Perl/POSIX-shell), the analyzer subclasses that
 # parser and only changes the owned extension -- never a placeholder.  Genuine
 # gaps (PowerShell, batch, CMake, fish) get their own real hand-written parsers.
-from .shells import PosixScriptShellAnalyzer, FishShellAnalyzer
-from .windows import PowerShellAnalyzer, BatchScriptAnalyzer
 from .build_tools import (
-    CMakeAnalyzer, GradleBuildAnalyzer, BazelExtensionAnalyzer,
+    BazelExtensionAnalyzer,
+    CMakeAnalyzer,
+    GradleBuildAnalyzer,
 )
 from .reused import FSharpScriptAnalyzer, PerlScriptAnalyzer
+from .shells import FishShellAnalyzer, PosixScriptShellAnalyzer
+from .windows import BatchScriptAnalyzer, PowerShellAnalyzer
 
 __all__ = [
-    "PosixScriptShellAnalyzer", "FishShellAnalyzer",
-    "PowerShellAnalyzer", "BatchScriptAnalyzer",
-    "CMakeAnalyzer", "GradleBuildAnalyzer", "BazelExtensionAnalyzer",
-    "FSharpScriptAnalyzer", "PerlScriptAnalyzer",
+    "PosixScriptShellAnalyzer",
+    "FishShellAnalyzer",
+    "PowerShellAnalyzer",
+    "BatchScriptAnalyzer",
+    "CMakeAnalyzer",
+    "GradleBuildAnalyzer",
+    "BazelExtensionAnalyzer",
+    "FSharpScriptAnalyzer",
+    "PerlScriptAnalyzer",
     "SCRIPT_EXT_MAP",
 ]
 
 _ANALYZERS = (
-    PosixScriptShellAnalyzer, FishShellAnalyzer,
-    PowerShellAnalyzer, BatchScriptAnalyzer,
-    CMakeAnalyzer, GradleBuildAnalyzer, BazelExtensionAnalyzer,
-    FSharpScriptAnalyzer, PerlScriptAnalyzer,
+    PosixScriptShellAnalyzer,
+    FishShellAnalyzer,
+    PowerShellAnalyzer,
+    BatchScriptAnalyzer,
+    CMakeAnalyzer,
+    GradleBuildAnalyzer,
+    BazelExtensionAnalyzer,
+    FSharpScriptAnalyzer,
+    PerlScriptAnalyzer,
 )
 
 # Extension -> analyzer class, built from each analyzer's own EXTENSIONS tuple so
@@ -44,5 +56,6 @@ for _cls in _ANALYZERS:
         if _key in SCRIPT_EXT_MAP and SCRIPT_EXT_MAP[_key] is not _cls:
             raise RuntimeError(
                 f"script extension collision on {_key}: "
-                f"{SCRIPT_EXT_MAP[_key].__name__} vs {_cls.__name__}")
+                f"{SCRIPT_EXT_MAP[_key].__name__} vs {_cls.__name__}"
+            )
         SCRIPT_EXT_MAP[_key] = _cls

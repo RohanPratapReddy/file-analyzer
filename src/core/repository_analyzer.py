@@ -1,16 +1,12 @@
 # Auto-extracted from code_analyzer.py (verbatim class body).
-import os
 import csv
-import json
-import re
-import ast
-import dis
 import hashlib
-import inspect
-import traceback
+import json
+import os
+import re
 import subprocess
-import sqlite3
-from datetime import datetime, timezone as _dt_timezone
+from datetime import datetime
+from datetime import timezone as _dt_timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -115,10 +111,20 @@ def _load_extension_catalog(path: Union[str, Path]) -> Optional[Dict[str, int]]:
 # two's-complement form via ``as_signed64`` and round-trips losslessly on both SQLite
 # and PostgreSQL.
 _TS64_LAYOUT: Tuple[Tuple[str, int], ...] = (
-    ("dst", 1), ("leap_second", 1), ("leap_year", 1), ("time_slew", 1),
-    ("am_pm", 1), ("local_tz", 1), ("tz_id", 9), ("year", 14),
-    ("month", 4), ("day", 5), ("hour12", 4), ("minute", 6),
-    ("second", 6), ("millisecond", 10),
+    ("dst", 1),
+    ("leap_second", 1),
+    ("leap_year", 1),
+    ("time_slew", 1),
+    ("am_pm", 1),
+    ("local_tz", 1),
+    ("tz_id", 9),
+    ("year", 14),
+    ("month", 4),
+    ("day", 5),
+    ("hour12", 4),
+    ("minute", 6),
+    ("second", 6),
+    ("millisecond", 10),
 )
 _TS64_TZ_BIAS = 256  # centers the signed quarter-hour offset in the 9-bit field
 _UINT64_MASK = 0xFFFFFFFFFFFFFFFF
@@ -139,7 +145,9 @@ def as_signed64(value: int) -> int:
     return value - 0x1_0000_0000_0000_0000 if value >> 63 else value
 
 
-def pack_timestamp64(epoch_seconds: Optional[float], local: bool = True) -> Optional[int]:
+def pack_timestamp64(
+    epoch_seconds: Optional[float], local: bool = True
+) -> Optional[int]:
     """Pack a POSIX timestamp into the 64-bit layout above (true unsigned uint64).
 
     Returns ``None`` when ``epoch_seconds`` is ``None`` or cannot be represented on
@@ -171,7 +179,7 @@ def pack_timestamp64(epoch_seconds: Optional[float], local: bool = True) -> Opti
         "leap_second": 1 if second >= 60 else 0,
         "leap_year": 1 if _is_leap_year(year) else 0,
         "time_slew": 0,  # reserved: not derivable from a filesystem timestamp
-        "am_pm": dt.hour // 12,          # 0 = AM (0-11), 1 = PM (12-23)
+        "am_pm": dt.hour // 12,  # 0 = AM (0-11), 1 = PM (12-23)
         "local_tz": 1 if local else 0,
         "tz_id": max(0, min(0x1FF, round(offset_seconds / 900) + _TS64_TZ_BIAS)),
         "year": year,
@@ -258,9 +266,9 @@ def _load_timezone_table(path: Union[str, Path]) -> Optional[Dict[int, Dict[str,
     return table
 
 
-def resolve_timezone64(tz_id: int, local_tz: int,
-                       tables_dir: Optional[Union[str, Path]] = None
-                       ) -> Optional[Dict[str, Any]]:
+def resolve_timezone64(
+    tz_id: int, local_tz: int, tables_dir: Optional[Union[str, Path]] = None
+) -> Optional[Dict[str, Any]]:
     """Resolve a packed timestamp's ``tz_id`` value + ``local_tz`` flag to an IANA row.
 
     ``local_tz`` selects the table (1 -> local, 0 -> global); ``tz_id`` is the value from
@@ -312,7 +320,14 @@ class RepositoryAnalyzer:
         self.exclude_folder_signatures = exclude_folder_signatures or []
         self.exclude_file_signatures = exclude_file_signatures or []
         self.ignore_files = ignore_files or []
-        self.ignore_dirs = ignore_dirs or ['__pycache__', '.git', '.venv', 'venv', 'env', '.pytest_cache']
+        self.ignore_dirs = ignore_dirs or [
+            "__pycache__",
+            ".git",
+            ".venv",
+            "venv",
+            "env",
+            ".pytest_cache",
+        ]
 
         # Canonical extension catalog: authoritative source of extension ids. An
         # explicit map (``extension_catalog``) wins; otherwise the catalog is
@@ -327,7 +342,11 @@ class RepositoryAnalyzer:
             )
         self._injected_ext_catalog = extension_catalog
 
-    def generate(self) -> Optional[Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]]:
+    def generate(
+        self,
+    ) -> Optional[
+        Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]
+    ]:
         """Orchestrates gathering, filtering, processing, and exporting of repository tables."""
         raw_file_paths = self._gather_files()
         if raw_file_paths is None:
@@ -351,8 +370,11 @@ class RepositoryAnalyzer:
         must have run first. Files no engine claims carry ``analyzer_class: None``.
         """
         if not all(hasattr(self, a) for a in ("folders", "extensions", "files")):
-            raise RuntimeError("build_analyzer_mapping() requires generate() to have run first")
+            raise RuntimeError(
+                "build_analyzer_mapping() requires generate() to have run first"
+            )
         from ..router.routing import build_mapping
+
         return build_mapping(self.dir_path, self.folders, self.extensions, self.files)
 
     def emit_analyzer_mapping(self, temp_dir: Union[str, Path]) -> Path:
@@ -363,6 +385,7 @@ class RepositoryAnalyzer:
         ``temp/repo_tables.json`` (folders/extensions/files). Returns the temp dir.
         """
         from ..router.routing import group_into_shards
+
         temp = Path(temp_dir)
         temp.mkdir(parents=True, exist_ok=True)
 
@@ -370,20 +393,25 @@ class RepositoryAnalyzer:
         shards = group_into_shards(mapping)
 
         (temp / "mapping.json").write_text(
-            json.dumps({
-                "repository_root": str(self.dir_path),
-                "file_count": len(mapping),
-                "mapping": mapping,
-                "shards": shards,
-            }, indent=2),
+            json.dumps(
+                {
+                    "repository_root": str(self.dir_path),
+                    "file_count": len(mapping),
+                    "mapping": mapping,
+                    "shards": shards,
+                },
+                indent=2,
+            ),
             encoding="utf-8",
         )
         (temp / "repo_tables.json").write_text(
-            json.dumps({
-                "folders": self.folders,
-                "extensions": self.extensions,
-                "files": self.files,
-            }),
+            json.dumps(
+                {
+                    "folders": self.folders,
+                    "extensions": self.extensions,
+                    "files": self.files,
+                }
+            ),
             encoding="utf-8",
         )
         return temp
@@ -393,19 +421,25 @@ class RepositoryAnalyzer:
         if self.git_tracked:
             try:
                 result = subprocess.run(
-                    ['git', 'ls-files'],
+                    ["git", "ls-files"],
                     cwd=self.dir_path,
-                    capture_output=True, text=True, check=True
+                    capture_output=True,
+                    text=True,
+                    check=True,
                 )
                 raw_file_paths = [Path(f) for f in result.stdout.splitlines()]
             except subprocess.CalledProcessError:
-                print("Error: Git command failed. Ensure this is a valid git repository.")
+                print(
+                    "Error: Git command failed. Ensure this is a valid git repository."
+                )
                 return None
         else:
             for root, dirs, files in os.walk(self.dir_path):
                 dirs[:] = [
-                    d for d in dirs
-                    if d not in self.ignore_dirs and not self._matches_signature(d, self.exclude_folder_signatures)
+                    d
+                    for d in dirs
+                    if d not in self.ignore_dirs
+                    and not self._matches_signature(d, self.exclude_folder_signatures)
                 ]
                 for file in files:
                     full_path = Path(root) / file
@@ -417,10 +451,16 @@ class RepositoryAnalyzer:
         for file_path in raw_file_paths:
             filename = file_path.name
 
-            if filename in self.ignore_files or self._matches_signature(filename, self.exclude_file_signatures):
+            if filename in self.ignore_files or self._matches_signature(
+                filename, self.exclude_file_signatures
+            ):
                 continue
 
-            if any(self._matches_signature(p.name, self.exclude_folder_signatures) for p in file_path.parents if p != Path('.')):
+            if any(
+                self._matches_signature(p.name, self.exclude_folder_signatures)
+                for p in file_path.parents
+                if p != Path(".")
+            ):
                 continue
 
             filtered_files.append(file_path)
@@ -460,22 +500,26 @@ class RepositoryAnalyzer:
 
         for file_path in filtered_files:
             parent = file_path.parent
-            while parent != Path('.'):
+            while parent != Path("."):
                 unique_dirs.add(parent)
                 parent = parent.parent
 
-            parts = file_path.name.split('.', 1)
+            parts = file_path.name.split(".", 1)
             if len(parts) > 1:
                 extensions_set.add(parts[1])
             else:
                 extensions_set.add("")
 
-        if self.list_order_type == 'dfs':
+        if self.list_order_type == "dfs":
             sorted_dirs = sorted(list(unique_dirs), key=lambda p: p.as_posix())
             sorted_files = sorted(list(filtered_files), key=lambda p: p.as_posix())
         else:  # BFS
-            sorted_dirs = sorted(list(unique_dirs), key=lambda p: (len(p.parts), p.as_posix()))
-            sorted_files = sorted(list(filtered_files), key=lambda p: (len(p.parts), p.as_posix()))
+            sorted_dirs = sorted(
+                list(unique_dirs), key=lambda p: (len(p.parts), p.as_posix())
+            )
+            sorted_files = sorted(
+                list(filtered_files), key=lambda p: (len(p.parts), p.as_posix())
+            )
 
         # Build Extension Table with GLOBALLY STABLE ids sourced from the canonical
         # extension catalog (src/tables/file_extensions.json). Ids come from a fixed
@@ -489,31 +533,31 @@ class RepositoryAnalyzer:
         extension_map = {}
         for ext in sorted(list(extensions_set)):
             if ext == "":
-                eid, ext_name = self._NONE_EXTENSION_ID, 'None'
+                eid, ext_name = self._NONE_EXTENSION_ID, "None"
             else:
                 eid, ext_name = self._stable_ext_id(ext, catalog), ext
             extension_map[ext] = eid
-            tables.append({
-                'extension_id': eid,
-                'extension_name': ext_name,
-            })
+            tables.append(
+                {
+                    "extension_id": eid,
+                    "extension_name": ext_name,
+                }
+            )
 
         # Build Folder Table
-        folder_table = [{
-            'folder_id': 1,
-            'folder_name': '.',
-            'parent_folder_id': None
-        }]
-        dir_to_id = {Path('.'): 1}
+        folder_table = [{"folder_id": 1, "folder_name": ".", "parent_folder_id": None}]
+        dir_to_id = {Path("."): 1}
         folder_id_counter = 2
 
         for d in sorted_dirs:
             parent_id = dir_to_id.get(d.parent, 1)
-            folder_table.append({
-                'folder_id': folder_id_counter,
-                'folder_name': d.as_posix(),
-                'parent_folder_id': parent_id
-            })
+            folder_table.append(
+                {
+                    "folder_id": folder_id_counter,
+                    "folder_name": d.as_posix(),
+                    "parent_folder_id": parent_id,
+                }
+            )
             dir_to_id[d] = folder_id_counter
             folder_id_counter += 1
 
@@ -521,7 +565,7 @@ class RepositoryAnalyzer:
         file_table = []
         file_id_counter = 1
         for file_path in sorted_files:
-            filename_parts = file_path.name.split('.', 1)
+            filename_parts = file_path.name.split(".", 1)
             file_name_only = filename_parts[0]
             file_ext = filename_parts[1] if len(filename_parts) > 1 else ""
             ext_id_val = extension_map.get(file_ext, self._NONE_EXTENSION_ID)
@@ -550,61 +594,76 @@ class RepositoryAnalyzer:
             # file is gone or the epoch is unrepresentable (never fabricated).
             created_packed = pack_timestamp64(created_epoch)
             modified_packed = pack_timestamp64(modified_epoch)
-            created_ts64 = as_signed64(created_packed) if created_packed is not None else None
-            modified_ts64 = as_signed64(modified_packed) if modified_packed is not None else None
+            created_ts64 = (
+                as_signed64(created_packed) if created_packed is not None else None
+            )
+            modified_ts64 = (
+                as_signed64(modified_packed) if modified_packed is not None else None
+            )
 
             location_path = []
             curr = file_path.parent
-            while curr != Path('.'):
+            while curr != Path("."):
                 location_path.append(curr)
                 curr = curr.parent
 
             location_path.reverse()
             location_ids = [1] + [dir_to_id[p] for p in location_path]
 
-            file_table.append({
-                'file_id': file_id_counter,
-                'file_name': file_name_only,
-                'file_extension_id': ext_id_val,
-                'size': size_value,
-                'units': size_unit,
-                'location': location_ids,
-                'created_at_ts64': created_ts64,
-                'modified_at_ts64': modified_ts64
-            })
+            file_table.append(
+                {
+                    "file_id": file_id_counter,
+                    "file_name": file_name_only,
+                    "file_extension_id": ext_id_val,
+                    "size": size_value,
+                    "units": size_unit,
+                    "location": location_ids,
+                    "created_at_ts64": created_ts64,
+                    "modified_at_ts64": modified_ts64,
+                }
+            )
             file_id_counter += 1
 
         return folder_table, tables, file_table
 
     def _export_data(self, folders: list, extensions: list, files: list):
         path_obj = Path(self.dump_file_path)
-        file_fields = ['file_id', 'file_name', 'file_extension_id', 'size', 'units', 'location',
-                       'created_at_ts64', 'modified_at_ts64']
+        file_fields = [
+            "file_id",
+            "file_name",
+            "file_extension_id",
+            "size",
+            "units",
+            "location",
+            "created_at_ts64",
+            "modified_at_ts64",
+        ]
 
-        if self.dump_file_type == 'json':
+        if self.dump_file_type == "json":
             data = {
                 "folder_details": folders,
                 "tables": extensions,
-                "file_details": files
+                "file_details": files,
             }
-            with open(path_obj, 'w', encoding='utf-8') as f:
+            with open(path_obj, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4)
             print(f"Exported repository metadata to JSON: {path_obj}")
 
-        elif self.dump_file_type in ['yml', 'yaml']:
+        elif self.dump_file_type in ["yml", "yaml"]:
             import yaml
+
             data = {
                 "folder_details": folders,
                 "tables": extensions,
-                "file_details": files
+                "file_details": files,
             }
-            with open(path_obj, 'w', encoding='utf-8') as f:
+            with open(path_obj, "w", encoding="utf-8") as f:
                 yaml.dump(data, f, sort_keys=False)
             print(f"Exported repository metadata to YAML: {path_obj}")
 
-        elif self.dump_file_type in ['csv', 'tsv']:
-            delimiter = '\t' if self.dump_file_type == 'tsv' else ','
-            ext_str = 'tsv' if self.dump_file_type == 'tsv' else 'csv'
+        elif self.dump_file_type in ["csv", "tsv"]:
+            delimiter = "\t" if self.dump_file_type == "tsv" else ","
+            ext_str = "tsv" if self.dump_file_type == "tsv" else "csv"
             base_name = path_obj.stem
             parent_dir = path_obj.parent
 
@@ -612,26 +671,42 @@ class RepositoryAnalyzer:
             e_file = parent_dir / f"{base_name}_extensions.{ext_str}"
             fi_file = parent_dir / f"{base_name}_files.{ext_str}"
 
-            self._write_flat_csv(f_file, folders, ['folder_id', 'folder_name', 'parent_folder_id'], delimiter)
-            self._write_flat_csv(e_file, extensions, ['extension_id', 'extension_name'], delimiter)
+            self._write_flat_csv(
+                f_file,
+                folders,
+                ["folder_id", "folder_name", "parent_folder_id"],
+                delimiter,
+            )
+            self._write_flat_csv(
+                e_file, extensions, ["extension_id", "extension_name"], delimiter
+            )
             self._write_flat_csv(fi_file, files, file_fields, delimiter)
-            print(f"Exported tables to {ext_str.upper()}: {f_file.name}, {e_file.name}, {fi_file.name}")
+            print(
+                f"Exported tables to {ext_str.upper()}: {f_file.name}, {e_file.name}, {fi_file.name}"
+            )
 
-        elif self.dump_file_type == 'xlsx':
+        elif self.dump_file_type == "xlsx":
             import pandas as pd
-            with pd.ExcelWriter(path_obj, engine='openpyxl') as writer:
-                pd.DataFrame(folders).to_excel(writer, sheet_name='folder_details', index=False)
-                pd.DataFrame(extensions).to_excel(writer, sheet_name='tables', index=False)
-                pd.DataFrame(files).to_excel(writer, sheet_name='file_details', index=False)
+
+            with pd.ExcelWriter(path_obj, engine="openpyxl") as writer:
+                pd.DataFrame(folders).to_excel(
+                    writer, sheet_name="folder_details", index=False
+                )
+                pd.DataFrame(extensions).to_excel(
+                    writer, sheet_name="tables", index=False
+                )
+                pd.DataFrame(files).to_excel(
+                    writer, sheet_name="file_details", index=False
+                )
             print(f"Exported repository metadata to Excel: {path_obj}")
-        elif self.dump_file_type == 'memory':
+        elif self.dump_file_type == "memory":
             pass
         else:
             print(f"Error: Unsupported dump file type '{self.dump_file_type}'.")
 
     @staticmethod
     def _format_file_size(size_in_bytes: int) -> Tuple[float, str]:
-        units = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
+        units = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
         unit_index = 0
         size = float(size_in_bytes)
         while size >= 1024 and unit_index < len(units) - 1:
@@ -653,7 +728,7 @@ class RepositoryAnalyzer:
 
     @staticmethod
     def _write_flat_csv(filepath: Path, data: list, fieldnames: list, delimiter: str):
-        with open(filepath, 'w', newline='', encoding='utf-8') as f:
+        with open(filepath, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=delimiter)
             writer.writeheader()
             writer.writerows(data)

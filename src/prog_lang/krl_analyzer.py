@@ -16,7 +16,7 @@
 #
 # Comments are ';'; strings use '"'. Case-insensitive keywords.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -32,15 +32,26 @@ class KRLAnalyzer(RegexCodeAnalyzer):
 
     # DEF / DEFFCT (optionally GLOBAL), function with optional return type
     _DEF = re.compile(r"(?im)^\s*(?:GLOBAL\s+)?DEF\s+(" + _ID + r")\s*\(([^)]*)\)")
-    _DEFFCT = re.compile(r"(?im)^\s*(?:GLOBAL\s+)?DEFFCT\s+(" + _TYPE +
-                         r")\s+(" + _ID + r")\s*\(([^)]*)\)")
+    _DEFFCT = re.compile(
+        r"(?im)^\s*(?:GLOBAL\s+)?DEFFCT\s+("
+        + _TYPE
+        + r")\s+("
+        + _ID
+        + r")\s*\(([^)]*)\)"
+    )
     _DEFDAT = re.compile(r"(?im)^\s*(?:GLOBAL\s+)?DEFDAT\s+(" + _ID + r")")
-    _EXT = re.compile(r"(?im)^\s*(?:GLOBAL\s+)?EXT(?:FCT)?\s+(?:" + _TYPE +
-                      r"\s+)?(" + _ID + r")\s*\(")
+    _EXT = re.compile(
+        r"(?im)^\s*(?:GLOBAL\s+)?EXT(?:FCT)?\s+(?:"
+        + _TYPE
+        + r"\s+)?("
+        + _ID
+        + r")\s*\("
+    )
     # DECL [GLOBAL] TYPE name  |  TYPE name  |  bare `DECL name`
-    _DECL = re.compile(r"(?im)^\s*(?:GLOBAL\s+)?(?:CONST\s+)?DECL\s+"
-                       r"(?:GLOBAL\s+)?(?:CONST\s+)?(?:" + _TYPE + r"\s+)?(" +
-                       _ID + r")")
+    _DECL = re.compile(
+        r"(?im)^\s*(?:GLOBAL\s+)?(?:CONST\s+)?DECL\s+"
+        r"(?:GLOBAL\s+)?(?:CONST\s+)?(?:" + _TYPE + r"\s+)?(" + _ID + r")"
+    )
     _SYSVAR = re.compile(r"(?m)^\s*(\$" + _ID + r")\s*=")
 
     def _register_types(self, file_id, text, path):
@@ -59,13 +70,13 @@ class KRLAnalyzer(RegexCodeAnalyzer):
 
         for m in self._DEF.finditer(clean):
             args = self._krl_args(m.group(2))
-            self._add_function(file_id, m.group(1), args, [],
-                               description="krl def")
+            self._add_function(file_id, m.group(1), args, [], description="krl def")
         for m in self._DEFFCT.finditer(clean):
             args = self._krl_args(m.group(3))
             outs = [self._add_output(m.group(1))]
-            self._add_function(file_id, m.group(2), args, outs,
-                               description="krl deffct")
+            self._add_function(
+                file_id, m.group(2), args, outs, description="krl deffct"
+            )
 
         seen = set()
         for m in self._DECL.finditer(clean):

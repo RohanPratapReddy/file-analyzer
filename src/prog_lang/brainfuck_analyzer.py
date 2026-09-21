@@ -15,8 +15,6 @@
 # program's structure — but emits nothing into the symbol tables because the
 # language names nothing.  A Brainfuck file legitimately showing up as "empty"
 # in the symbol index is the CORRECT result, not a missed extraction.
-import re
-from pathlib import Path
 from .regex_base import RegexCodeAnalyzer
 
 _COMMANDS = set("><+-.,[]")
@@ -25,7 +23,7 @@ _COMMANDS = set("><+-.,[]")
 class BrainfuckAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "brainfuck"
     EXTENSIONS = (".bf",)
-    LINE_COMMENTS = ()          # non-command bytes are the comments
+    LINE_COMMENTS = ()  # non-command bytes are the comments
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ()
 

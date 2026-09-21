@@ -22,13 +22,24 @@
 #
 # Uses C comments (`//`, `/* */`).  Resource ids are C identifiers or numbers.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
-_RESTYPES = ("DIALOGEX", "DIALOG", "MENUEX", "MENU", "TOOLBAR", "ACCELERATORS",
-             "VERSIONINFO", "RCDATA", "DLGINIT", "HTML", "MESSAGETABLE",
-             "DESIGNINFO")
+_RESTYPES = (
+    "DIALOGEX",
+    "DIALOG",
+    "MENUEX",
+    "MENU",
+    "TOOLBAR",
+    "ACCELERATORS",
+    "VERSIONINFO",
+    "RCDATA",
+    "DLGINIT",
+    "HTML",
+    "MESSAGETABLE",
+    "DESIGNINFO",
+)
 _FILETYPES = ("ICON", "BITMAP", "CURSOR", "FONT", "PNG", "WAVE", "AVI")
 
 
@@ -42,9 +53,14 @@ class RcAnalyzer(RegexCodeAnalyzer):
     _INCLUDE = re.compile(r'(?m)^\s*#\s*include\s+[<"]([^>"]+)[>"]')
     _DEFINE = re.compile(r"(?m)^\s*#\s*define\s+(" + _ID + r")(?:\s+(.+))?$")
     _RES = re.compile(r"(?m)^(" + _ID + r"|\d+)[ \t]+(" + "|".join(_RESTYPES) + r")\b")
-    _FILERES = re.compile(r'(?m)^(' + _ID + r'|\d+)[ \t]+(' + "|".join(_FILETYPES) +
-                          r')[ \t]+(?:(?:MOVEABLE|PURE|DISCARDABLE|LOADONCALL|'
-                          r'PRELOAD|FIXED)[ \t]+)*"([^"]+)"')
+    _FILERES = re.compile(
+        r"(?m)^("
+        + _ID
+        + r"|\d+)[ \t]+("
+        + "|".join(_FILETYPES)
+        + r")[ \t]+(?:(?:MOVEABLE|PURE|DISCARDABLE|LOADONCALL|"
+        r'PRELOAD|FIXED)[ \t]+)*"([^"]+)"'
+    )
     _STRTAB = re.compile(r"(?m)^\s*STRINGTABLE\b")
     _STRENT = re.compile(r"(?m)^\s*(" + _ID + r")\s*,?\s*\"")
 
@@ -66,8 +82,9 @@ class RcAnalyzer(RegexCodeAnalyzer):
             if nm in seen_v:
                 continue
             seen_v.add(nm)
-            self._add_variable(file_id, nm, (m.group(2) or "").strip()[:80],
-                               scope="macro")
+            self._add_variable(
+                file_id, nm, (m.group(2) or "").strip()[:80], scope="macro"
+            )
 
         seen_c = set()
         for m in self._RES.finditer(clean):
@@ -93,7 +110,7 @@ class RcAnalyzer(RegexCodeAnalyzer):
             end = clean.find("END", beg)
             if end == -1:
                 end = len(clean)
-            body = clean[beg + 5:end]
+            body = clean[beg + 5 : end]
             for m in self._STRENT.finditer(body):
                 nm = m.group(1)
                 if nm in seen_v:

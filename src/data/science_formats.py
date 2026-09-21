@@ -11,11 +11,12 @@ signature it does not recognise.  Privacy note: the DICOM reader deliberately re
 *only* technical acquisition tags and never touches the patient (0010) group or the
 PixelData (7FE0,0010) element.
 """
+
 from __future__ import annotations
 
 import gzip
 import struct
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 __all__ = [
     "read_tiff",
@@ -62,9 +63,21 @@ def _maybe_gunzip_head(path, n: int) -> bytes:
 # ======================================================================
 # TIFF field type -> (byte size, struct code)
 _TIFF_TYPE = {
-    1: (1, "B"), 2: (1, "c"), 3: (2, "H"), 4: (4, "I"), 5: (8, "II"),
-    6: (1, "b"), 7: (1, "B"), 8: (2, "h"), 9: (4, "i"), 10: (8, "ii"),
-    11: (4, "f"), 12: (8, "d"), 13: (4, "I"), 16: (8, "Q"), 17: (8, "q"),
+    1: (1, "B"),
+    2: (1, "c"),
+    3: (2, "H"),
+    4: (4, "I"),
+    5: (8, "II"),
+    6: (1, "b"),
+    7: (1, "B"),
+    8: (2, "h"),
+    9: (4, "i"),
+    10: (8, "ii"),
+    11: (4, "f"),
+    12: (8, "d"),
+    13: (4, "I"),
+    16: (8, "Q"),
+    17: (8, "q"),
     18: (8, "Q"),
 }
 # tag numbers we care about
@@ -99,14 +112,30 @@ _T_EXIFIFD = 34665
 _TIFF_MAGICS = {42, 43, 0x55, 0x4F52, 0x5352}
 
 _COMPRESSION_NAMES = {
-    1: "none", 2: "ccitt_rle", 3: "ccitt_g3", 4: "ccitt_g4", 5: "lzw",
-    6: "jpeg_old", 7: "jpeg", 8: "deflate", 32773: "packbits",
-    32946: "deflate", 34712: "jpeg2000", 34892: "dng_lossy",
+    1: "none",
+    2: "ccitt_rle",
+    3: "ccitt_g3",
+    4: "ccitt_g4",
+    5: "lzw",
+    6: "jpeg_old",
+    7: "jpeg",
+    8: "deflate",
+    32773: "packbits",
+    32946: "deflate",
+    34712: "jpeg2000",
+    34892: "dng_lossy",
     7794: "dng_lossless_prev",
 }
 _PHOTOMETRIC_NAMES = {
-    0: "white_is_zero", 1: "black_is_zero", 2: "rgb", 3: "palette",
-    5: "cmyk", 6: "ycbcr", 8: "cielab", 32803: "cfa", 34892: "linear_raw",
+    0: "white_is_zero",
+    1: "black_is_zero",
+    2: "rgb",
+    3: "palette",
+    5: "cmyk",
+    6: "ycbcr",
+    8: "cielab",
+    32803: "cfa",
+    34892: "linear_raw",
 }
 
 
@@ -151,12 +180,12 @@ class _TiffReader:
         entries: Dict[int, Tuple[int, int, bytes, int]] = {}
         blob = fh.read(entry_size * count)
         for k in range(count):
-            e = blob[k * entry_size:(k + 1) * entry_size]
+            e = blob[k * entry_size : (k + 1) * entry_size]
             if len(e) < entry_size:
                 break
             tag, typ = self._u("HH", e[0:4])
-            cnt = self._u(count_fmt, e[4:4 + (8 if self.bigtiff else 4)])[0]
-            valbytes = e[4 + (8 if self.bigtiff else 4):]
+            cnt = self._u(count_fmt, e[4 : 4 + (8 if self.bigtiff else 4)])[0]
+            valbytes = e[4 + (8 if self.bigtiff else 4) :]
             entries[tag] = (typ, cnt, valbytes, val_fld)
         return entries
 
@@ -169,7 +198,7 @@ class _TiffReader:
         if total <= val_fld:
             data = valbytes[:total]
         else:
-            off = self._u(self._off_fmt, valbytes[:self._off_size])[0]
+            off = self._u(self._off_fmt, valbytes[: self._off_size])[0]
             self.fh.seek(off)
             data = self.fh.read(total)
         if typ == 2:  # ASCII
@@ -178,12 +207,12 @@ class _TiffReader:
             out = []
             c2 = "II" if typ == 5 else "ii"
             for j in range(cnt):
-                num, den = self._u(c2, data[j * 8:j * 8 + 8])
+                num, den = self._u(c2, data[j * 8 : j * 8 + 8])
                 out.append(num / den if den else 0.0)
             return out
         out = []
         for j in range(cnt):
-            chunk = data[j * tsize:(j + 1) * tsize]
+            chunk = data[j * tsize : (j + 1) * tsize]
             if len(chunk) < tsize:
                 break
             out.append(self._u(code, chunk)[0])
@@ -205,6 +234,7 @@ def read_tiff(path) -> Dict[str, Any]:
     """Structural metadata from TIFF-IFD0 (dimensions, bit depth, compression)."""
     tr, ent = _read_tiff_ifd0(path)
     try:
+
         def one(tag):
             return tr.value(ent[tag])[0] if tag in ent else None
 
@@ -227,9 +257,13 @@ def read_tiff(path) -> Dict[str, Any]:
         photo = one(_T_PHOTOMETRIC)
         if photo is not None:
             out["photometric"] = _PHOTOMETRIC_NAMES.get(photo, str(photo))
-        for tag, key in ((_T_MAKE, "make"), (_T_MODEL, "model"),
-                         (_T_SOFTWARE, "software"), (_T_DATETIME, "datetime"),
-                         (_T_UNIQUECAMERAMODEL, "unique_camera_model")):
+        for tag, key in (
+            (_T_MAKE, "make"),
+            (_T_MODEL, "model"),
+            (_T_SOFTWARE, "software"),
+            (_T_DATETIME, "datetime"),
+            (_T_UNIQUECAMERAMODEL, "unique_camera_model"),
+        ):
             v = one(tag)
             if v:
                 out[key] = str(v).strip()[:128]
@@ -270,7 +304,7 @@ def read_geotiff_extras(path) -> Dict[str, Any]:
                 base = 4 + i * 4
                 if base + 3 >= len(keys):
                     break
-                key_id, loc, count, val = keys[base:base + 4]
+                key_id, loc, count, val = keys[base : base + 4]
                 if loc == 0:  # value stored inline in the directory
                     geokeys[key_id] = val
             mt = geokeys.get(_GK_MODELTYPE)
@@ -316,14 +350,20 @@ def read_camera_raw(path, ext: str) -> Dict[str, Any]:
     # Fujifilm RAF
     if head[:15] == b"FUJIFILMCCD-RAW":
         model = head[28:60].split(b"\x00", 1)[0].decode("latin-1", "replace").strip()
-        return {"container": "raf", "make": "FUJIFILM",
-                "model": model or None,
-                "raw_version": head[15:19].decode("latin-1", "replace").strip()}
+        return {
+            "container": "raf",
+            "make": "FUJIFILM",
+            "model": model or None,
+            "raw_version": head[15:19].decode("latin-1", "replace").strip(),
+        }
     # Sigma / Foveon X3F
     if head[:4] == b"FOVb":
         ver_minor, ver_major = struct.unpack("<HH", head[4:8])
-        return {"container": "x3f", "make": "SIGMA",
-                "x3f_version": "%d.%d" % (ver_major, ver_minor)}
+        return {
+            "container": "x3f",
+            "make": "SIGMA",
+            "x3f_version": "%d.%d" % (ver_major, ver_minor),
+        }
     # Canon CR3 / other ISO-BMFF: first box must be 'ftyp'
     if head[4:8] == b"ftyp":
         brand = head[8:12].decode("latin-1", "replace").strip()
@@ -352,8 +392,17 @@ def read_esri_ascii_grid(path) -> Dict[str, Any]:
                 break
             parts = line.split()
             if len(parts) == 2 and parts[0].lower() in (
-                    "ncols", "nrows", "xllcorner", "yllcorner", "xllcenter",
-                    "yllcenter", "cellsize", "nodata_value", "dx", "dy"):
+                "ncols",
+                "nrows",
+                "xllcorner",
+                "yllcorner",
+                "xllcenter",
+                "yllcenter",
+                "cellsize",
+                "nodata_value",
+                "dx",
+                "dy",
+            ):
                 hdr[parts[0].lower()] = parts[1]
             else:
                 f.seek(pos)
@@ -382,6 +431,7 @@ def read_vrt(path) -> Dict[str, Any]:
     """GDAL .vrt XML virtual raster: raster size, band count, SRS, geotransform."""
     import re
     import xml.etree.ElementTree as ET
+
     tree = ET.parse(path)
     root = tree.getroot()
     if root.tag != "VRTDataset":
@@ -421,8 +471,14 @@ def read_vrt(path) -> Dict[str, Any]:
     return out
 
 
-_NC_TYPE = {1: ("i1", 1), 2: ("char", 1), 3: ("i2", 2), 4: ("i4", 4),
-            5: ("f4", 4), 6: ("f8", 8)}
+_NC_TYPE = {
+    1: ("i1", 1),
+    2: ("char", 1),
+    3: ("i2", 2),
+    4: ("i4", 4),
+    5: ("f4", 4),
+    6: ("f8", 8),
+}
 
 
 def read_netcdf_classic(path) -> Dict[str, Any]:
@@ -487,12 +543,14 @@ def read_netcdf_classic(path) -> Dict[str, Any]:
                 _vsize = u32()
                 _begin = offv()
                 shape = [dims[d][1] for d in dimids if d < len(dims)]
-                variables.append({
-                    "name": vn,
-                    "dtype": _NC_TYPE.get(nc_type, ("?", 0))[0],
-                    "shape": shape,
-                    "dims": [dims[d][0] for d in dimids if d < len(dims)],
-                })
+                variables.append(
+                    {
+                        "name": vn,
+                        "dtype": _NC_TYPE.get(nc_type, ("?", 0))[0],
+                        "shape": shape,
+                        "dims": [dims[d][0] for d in dimids if d < len(dims)],
+                    }
+                )
     return {
         "driver": "netcdf_classic",
         "version": version,
@@ -508,8 +566,14 @@ def read_netcdf_classic(path) -> Dict[str, Any]:
 # ======================================================================
 # implicit-VR value representations for the technical tags we surface
 _DICOM_US_TAGS = {
-    (0x0028, 0x0002), (0x0028, 0x0010), (0x0028, 0x0011), (0x0028, 0x0100),
-    (0x0028, 0x0101), (0x0028, 0x0102), (0x0028, 0x0103), (0x0028, 0x0006),
+    (0x0028, 0x0002),
+    (0x0028, 0x0010),
+    (0x0028, 0x0011),
+    (0x0028, 0x0100),
+    (0x0028, 0x0101),
+    (0x0028, 0x0102),
+    (0x0028, 0x0103),
+    (0x0028, 0x0006),
 }
 _DICOM_STR_TAGS = {
     (0x0002, 0x0010): "transfer_syntax_uid",
@@ -539,8 +603,20 @@ _DICOM_US_NAMES = {
     (0x0028, 0x0006): "planar_configuration",
 }
 # VRs whose length is encoded as a 4-byte field (explicit VR)
-_DICOM_VR_LONG = {b"OB", b"OW", b"OF", b"SQ", b"UT", b"UN", b"UC", b"UR",
-                  b"OD", b"OL", b"OV", b"UI"}
+_DICOM_VR_LONG = {
+    b"OB",
+    b"OW",
+    b"OF",
+    b"SQ",
+    b"UT",
+    b"UN",
+    b"UC",
+    b"UR",
+    b"OD",
+    b"OL",
+    b"OV",
+    b"UI",
+}
 # NB: UI actually uses a 2-byte length; it is NOT in the long set below.
 _DICOM_VR_LONG.discard(b"UI")
 _PIXEL_DATA = (0x7FE0, 0x0010)
@@ -610,8 +686,9 @@ def read_dicom(path) -> Dict[str, Any]:
                 if want_us and len(val) >= 2:
                     out[_DICOM_US_NAMES[key]] = struct.unpack(bo + "H", val[:2])[0]
                 elif want_str:
-                    out[_DICOM_STR_TAGS[key]] = val.decode(
-                        "latin-1", "replace").strip(" \x00")
+                    out[_DICOM_STR_TAGS[key]] = val.decode("latin-1", "replace").strip(
+                        " \x00"
+                    )
             else:
                 f.seek(length, 1)
         # normalise a couple of numeric strings
@@ -628,10 +705,23 @@ def read_dicom(path) -> Dict[str, Any]:
 
 
 _NIFTI_DTYPE = {
-    0: "unknown", 1: "bool", 2: "uint8", 4: "int16", 8: "int32",
-    16: "float32", 32: "complex64", 64: "float64", 128: "rgb24",
-    256: "int8", 512: "uint16", 768: "uint32", 1024: "int64",
-    1280: "uint64", 1536: "float128", 1792: "complex128", 2048: "complex256",
+    0: "unknown",
+    1: "bool",
+    2: "uint8",
+    4: "int16",
+    8: "int32",
+    16: "float32",
+    32: "complex64",
+    64: "float64",
+    128: "rgb24",
+    256: "int8",
+    512: "uint16",
+    768: "uint32",
+    1024: "int64",
+    1280: "uint64",
+    1536: "float128",
+    1792: "complex128",
+    2048: "complex256",
     2304: "rgba32",
 }
 
@@ -657,8 +747,8 @@ def _nifti1(raw: bytes, bo: str) -> Dict[str, Any]:
     bitpix = struct.unpack(bo + "h", raw[72:74])[0]
     pixdim = struct.unpack(bo + "8f", raw[76:108])
     ndim = dim[0]
-    shape = list(dim[1:1 + ndim]) if 0 < ndim <= 7 else list(dim[1:])
-    voxel = [round(v, 6) for v in pixdim[1:1 + ndim]] if 0 < ndim <= 7 else []
+    shape = list(dim[1 : 1 + ndim]) if 0 < ndim <= 7 else list(dim[1:])
+    voxel = [round(v, 6) for v in pixdim[1 : 1 + ndim]] if 0 < ndim <= 7 else []
     magic = raw[344:348]
     return {
         "format": "nifti1",
@@ -679,8 +769,8 @@ def _nifti2(raw: bytes, bo: str) -> Dict[str, Any]:
     dim = struct.unpack(bo + "8q", raw[16:80])
     pixdim = struct.unpack(bo + "8d", raw[104:168])
     ndim = dim[0]
-    shape = list(dim[1:1 + ndim]) if 0 < ndim <= 7 else list(dim[1:])
-    voxel = [round(v, 6) for v in pixdim[1:1 + ndim]] if 0 < ndim <= 7 else []
+    shape = list(dim[1 : 1 + ndim]) if 0 < ndim <= 7 else list(dim[1:])
+    voxel = [round(v, 6) for v in pixdim[1 : 1 + ndim]] if 0 < ndim <= 7 else []
     return {
         "format": "nifti2",
         "byte_order": "little" if bo == "<" else "big",
@@ -744,7 +834,8 @@ def read_mgh(path) -> Dict[str, Any]:
     if len(raw) < 28:
         raise ValueError("file too small for MGH")
     version, width, height, depth, nframes, mtype, dof = struct.unpack(
-        ">iiiiiii", raw[0:28])
+        ">iiiiiii", raw[0:28]
+    )
     if version != 1:
         raise ValueError("unexpected MGH version %d" % version)
     out = {
@@ -780,15 +871,27 @@ def read_pcd(path) -> Dict[str, Any]:
             key = parts[0].upper()
             if key == "FIELDS":
                 fields = parts[1:]
-            elif key in ("VERSION", "SIZE", "TYPE", "COUNT", "WIDTH",
-                         "HEIGHT", "POINTS", "DATA", "VIEWPOINT"):
+            elif key in (
+                "VERSION",
+                "SIZE",
+                "TYPE",
+                "COUNT",
+                "WIDTH",
+                "HEIGHT",
+                "POINTS",
+                "DATA",
+                "VIEWPOINT",
+            ):
                 hdr[key] = " ".join(parts[1:])
             if key == "DATA":
                 break
     if not fields and "WIDTH" not in hdr:
         raise ValueError("not a PCD header")
-    out: Dict[str, Any] = {"format": "pcd", "fields": fields,
-                           "field_count": len(fields)}
+    out: Dict[str, Any] = {
+        "format": "pcd",
+        "fields": fields,
+        "field_count": len(fields),
+    }
     if "VERSION" in hdr:
         out["pcd_version"] = hdr["VERSION"]
     if "DATA" in hdr:
@@ -847,6 +950,7 @@ def read_las(path) -> Dict[str, Any]:
 def read_e57(path) -> Dict[str, Any]:
     """ASTM E57 point cloud: header + XML footer scan for scan/record counts."""
     import re
+
     with open(path, "rb") as f:
         head = f.read(48)
         if head[:8] != b"ASTM-E57":
@@ -859,11 +963,9 @@ def read_e57(path) -> Dict[str, Any]:
     lo = text.find("<?xml")
     if lo > 0:
         text = text[lo:]
-    counts = [int(m) for m in re.findall(
-        r'recordCount"[^>]*>\s*(\d+)', text)]
+    counts = [int(m) for m in re.findall(r'recordCount"[^>]*>\s*(\d+)', text)]
     if not counts:
-        counts = [int(m) for m in re.findall(
-            r'<recordCount>\s*(\d+)', text)]
+        counts = [int(m) for m in re.findall(r"<recordCount>\s*(\d+)", text)]
     scans = text.count("<vectorChild")
     out: Dict[str, Any] = {
         "format": "e57",
@@ -901,10 +1003,17 @@ def read_caf(path) -> Dict[str, Any]:
                 body = f.read(32)
                 sr = struct.unpack(">d", body[0:8])[0]
                 fmt_id = body[8:12].decode("latin-1", "replace").strip()
-                (_flags, _bytes_per_packet, _frames_per_packet,
-                 channels, bits) = struct.unpack(">IIIII", body[12:32])
-                out.update({"sample_rate_hz": int(sr), "channels": channels,
-                            "bit_depth": bits or None, "format_id": fmt_id})
+                _flags, _bytes_per_packet, _frames_per_packet, channels, bits = (
+                    struct.unpack(">IIIII", body[12:32])
+                )
+                out.update(
+                    {
+                        "sample_rate_hz": int(sr),
+                        "channels": channels,
+                        "bit_depth": bits or None,
+                        "format_id": fmt_id,
+                    }
+                )
                 remaining = csize - 32
                 if remaining > 0:
                     f.seek(remaining, 1)
@@ -915,7 +1024,8 @@ def read_caf(path) -> Dict[str, Any]:
                     out["frame_count"] = num_frames
                     if out.get("sample_rate_hz"):
                         out["duration_seconds"] = round(
-                            num_frames / out["sample_rate_hz"], 4)
+                            num_frames / out["sample_rate_hz"], 4
+                        )
                 if csize - len(body) > 0:
                     f.seek(csize - len(body), 1)
             else:
@@ -932,7 +1042,7 @@ def read_ogg(path) -> Dict[str, Any]:
     if page[:4] != b"OggS":
         raise ValueError("not an Ogg stream")
     nsegs = page[26]
-    seg_table = page[27:27 + nsegs]
+    seg_table = page[27 : 27 + nsegs]
     payload_start = 27 + nsegs
     payload = page[payload_start:]
     out: Dict[str, Any] = {"container": "ogg"}
@@ -943,15 +1053,23 @@ def read_ogg(path) -> Dict[str, Any]:
     elif payload[:8] == b"OpusHead":
         ch = payload[9]
         sr = struct.unpack("<I", payload[12:16])[0]
-        out.update({"codec": "opus", "channels": ch,
-                    "input_sample_rate_hz": sr, "sample_rate_hz": 48000})
+        out.update(
+            {
+                "codec": "opus",
+                "channels": ch,
+                "input_sample_rate_hz": sr,
+                "sample_rate_hz": 48000,
+            }
+        )
     elif payload[:5] == b"\x7fFLAC":
         out["codec"] = "flac_in_ogg"
         si = payload.find(b"fLaC")
         if si != -1:
-            info = payload[si + 8:si + 8 + 34]
+            info = payload[si + 8 : si + 8 + 34]
             if len(info) >= 18:
-                out["sample_rate_hz"] = (info[10] << 12) | (info[11] << 4) | (info[12] >> 4)
+                out["sample_rate_hz"] = (
+                    (info[10] << 12) | (info[11] << 4) | (info[12] >> 4)
+                )
                 out["channels"] = ((info[12] >> 1) & 0x07) + 1
     else:
         out["codec"] = "ogg_unknown"
@@ -959,8 +1077,23 @@ def read_ogg(path) -> Dict[str, Any]:
     return out
 
 
-_WAVPACK_SR = [6000, 8000, 9600, 11025, 12000, 16000, 22050, 24000, 32000,
-               44100, 48000, 64000, 88200, 96000, 192000]
+_WAVPACK_SR = [
+    6000,
+    8000,
+    9600,
+    11025,
+    12000,
+    16000,
+    22050,
+    24000,
+    32000,
+    44100,
+    48000,
+    64000,
+    88200,
+    96000,
+    192000,
+]
 
 
 def read_wavpack(path) -> Dict[str, Any]:
@@ -973,9 +1106,11 @@ def read_wavpack(path) -> Dict[str, Any]:
     flags = struct.unpack("<I", head[24:28])[0]
     sr_index = (flags >> 23) & 0x0F
     mono = bool(flags & 0x04)
-    out: Dict[str, Any] = {"codec": "wavpack",
-                           "channels": 1 if mono else 2,
-                           "bytes_per_sample": ((flags & 0x03) + 1)}
+    out: Dict[str, Any] = {
+        "codec": "wavpack",
+        "channels": 1 if mono else 2,
+        "bytes_per_sample": ((flags & 0x03) + 1),
+    }
     if sr_index < len(_WAVPACK_SR):
         sr = _WAVPACK_SR[sr_index]
         out["sample_rate_hz"] = sr
@@ -993,8 +1128,13 @@ def read_tta(path) -> Dict[str, Any]:
         raise ValueError("not a TTA1 file")
     audio_format, channels, bits = struct.unpack("<HHH", head[4:10])
     sr, data_len = struct.unpack("<II", head[10:18])
-    out = {"codec": "tta", "channels": channels, "bit_depth": bits,
-           "sample_rate_hz": sr, "frame_count": data_len}
+    out = {
+        "codec": "tta",
+        "channels": channels,
+        "bit_depth": bits,
+        "sample_rate_hz": sr,
+        "frame_count": data_len,
+    }
     if sr:
         out["duration_seconds"] = round(data_len / sr, 4)
     return out
@@ -1017,10 +1157,14 @@ def read_ape(path) -> Dict[str, Any]:
                 _blocks_per_frame, _final_blocks = struct.unpack("<II", hdr[8:16])
                 bits, channels, sr = struct.unpack("<HHI", hdr[16:24])
                 total_frames = struct.unpack("<I", hdr[4:8])[0]
-                out.update({"bit_depth": bits, "channels": channels,
-                            "sample_rate_hz": sr})
-                total_blocks = (_blocks_per_frame * (total_frames - 1)
-                                + _final_blocks) if total_frames else 0
+                out.update(
+                    {"bit_depth": bits, "channels": channels, "sample_rate_hz": sr}
+                )
+                total_blocks = (
+                    (_blocks_per_frame * (total_frames - 1) + _final_blocks)
+                    if total_frames
+                    else 0
+                )
                 if total_blocks and sr:
                     out["frame_count"] = total_blocks
                     out["duration_seconds"] = round(total_blocks / sr, 4)

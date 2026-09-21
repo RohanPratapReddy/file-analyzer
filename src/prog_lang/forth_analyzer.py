@@ -13,14 +13,14 @@
 # Forth has no classes; strings use S" ..." / ." ..." (delimited by a closing
 # '"'), which we do not treat as generic string literals.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
 class ForthAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "forth"
     EXTENSIONS = (".forth", ".fth")
-    LINE_COMMENTS = ()      # handled token-aware in _clean
+    LINE_COMMENTS = ()  # handled token-aware in _clean
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ()
 
@@ -28,12 +28,13 @@ class ForthAnalyzer(RegexCodeAnalyzer):
     _COLON = re.compile(r"(?:^|\s):\s+(\S+)", re.MULTILINE)
     _DEFVAR = re.compile(
         r"(?:^|\s)(VARIABLE|2VARIABLE|FVARIABLE|CVARIABLE|CREATE|DEFER)\s+(\S+)",
-        re.IGNORECASE)
+        re.IGNORECASE,
+    )
     # value/constant: the NAME follows the defining word (a preceding number is
     # the initialiser and is on the stack): `0 VALUE X`, `3 CONSTANT R`
     _DEFVAL = re.compile(
-        r"(?:^|\s)(VALUE|CONSTANT|2CONSTANT|FCONSTANT|2VALUE)\s+(\S+)",
-        re.IGNORECASE)
+        r"(?:^|\s)(VALUE|CONSTANT|2CONSTANT|FCONSTANT|2VALUE)\s+(\S+)", re.IGNORECASE
+    )
 
     def _clean(self, text):
         """Strip Forth '\\' line comments and '( ... )' comments token-aware,
@@ -81,8 +82,9 @@ class ForthAnalyzer(RegexCodeAnalyzer):
                 continue
             seen_word.add(name.upper())
             arg_ids, out_ids = self._effect_ids(effects.get(name.upper()))
-            self._add_function(file_id, name, arg_ids, out_ids,
-                               description="forth word")
+            self._add_function(
+                file_id, name, arg_ids, out_ids, description="forth word"
+            )
 
         seen_var = set()
         for rx in (self._DEFVAR, self._DEFVAL):

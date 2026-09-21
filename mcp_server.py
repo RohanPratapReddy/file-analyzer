@@ -52,6 +52,7 @@ Read-only & protocol safety
   query_only``) and rejects anything that is not a single SELECT/WITH statement.
   The engine never executes the code it analyzes and never stores raw payloads.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -266,9 +267,7 @@ def list_views(db_path: str) -> Dict[str, Any]:
     catalog = {v.object_name: list(v.tables) for v in view_catalog}
     return {
         "count": len(names),
-        "views": [
-            {"name": n, "base_tables": catalog.get(n, [])} for n in names
-        ],
+        "views": [{"name": n, "base_tables": catalog.get(n, [])} for n in names],
     }
 
 
@@ -398,7 +397,8 @@ def run_component(
         path: Directory to analyze.
         out_dir: Where to write the emitted JSON (default: ``<path>/.file-analyzer``).
     """
-    from src.main import build_parser, run_component as _run_component
+    from src.main import build_parser
+    from src.main import run_component as _run_component
 
     source = Path(path).expanduser().resolve()
     if not source.is_dir():
@@ -483,9 +483,7 @@ def warm_cache() -> None:
         with _hushed():
             import compileall
 
-            compileall.compile_dir(
-                str(_READERS_ROOT / "src"), quiet=1, optimize=0
-            )
+            compileall.compile_dir(str(_READERS_ROOT / "src"), quiet=1, optimize=0)
             # Execute the bodies so they land in sys.modules before any tool runs.
             import src  # noqa: F401  (runs src/__init__.py -> the whole fleet)
             import src.core.analysis_engine  # noqa: F401  (analyze_repository path)

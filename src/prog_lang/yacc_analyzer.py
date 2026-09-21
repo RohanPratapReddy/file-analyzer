@@ -17,13 +17,14 @@
 #     %%
 #     int main(void) { ... }        -> C functions
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _C_FUNC = re.compile(
     r"^[ \t]*(?:static\s+|inline\s+|extern\s+)*"
     r"(?:[A-Za-z_][\w\s\*]*?[\s\*])([A-Za-z_]\w*)\s*\(([^;{)]*)\)\s*\{",
-    re.MULTILINE)
+    re.MULTILINE,
+)
 
 
 class YaccAnalyzer(RegexCodeAnalyzer):
@@ -33,8 +34,9 @@ class YaccAnalyzer(RegexCodeAnalyzer):
     BLOCK_COMMENTS = (("/*", "*/"),)
     STRING_DELIMS = ("'", '"')
 
-    _TOKEN = re.compile(r"^[ \t]*%(?:token|term|nterm)\b(?:\s*<[^>]*>)?\s+(.+)$",
-                        re.MULTILINE)
+    _TOKEN = re.compile(
+        r"^[ \t]*%(?:token|term|nterm)\b(?:\s*<[^>]*>)?\s+(.+)$", re.MULTILINE
+    )
     _TYPE = re.compile(r"^[ \t]*%type\b(?:\s*<[^>]*>)?\s+(.+)$", re.MULTILINE)
     _START = re.compile(r"^[ \t]*%start\s+([A-Za-z_]\w*)", re.MULTILINE)
     _RULE = re.compile(r"^([a-zA-Z_]\w*)\s*:", re.MULTILINE)
@@ -85,22 +87,25 @@ class YaccAnalyzer(RegexCodeAnalyzer):
             lb = clean_defs.find("{", um.start())
             rb = self._find_matching(clean_defs, lb, "{", "}")
             attrs = []
-            for fld in re.split(r";", clean_defs[lb + 1:rb - 1]):
+            for fld in re.split(r";", clean_defs[lb + 1 : rb - 1]):
                 fm = re.search(r"([A-Za-z_]\w*)\s*$", fld.replace("*", " ").strip())
                 if fm:
                     attrs.append(self._add_arg(fm.group(1), fld.strip()))
-            self._add_class(file_id, "YYSTYPE", description="yacc semantic value",
-                            attr_ids=attrs)
+            self._add_class(
+                file_id, "YYSTYPE", description="yacc semantic value", attr_ids=attrs
+            )
 
         # grammar rules -> functions (nonterminals)
         clean_rules = self._strip_comments(rules)
         for m in self._RULE.finditer(clean_rules):
-            self._add_function(file_id, m.group(1), [], [],
-                               description="yacc nonterminal")
+            self._add_function(
+                file_id, m.group(1), [], [], description="yacc nonterminal"
+            )
 
         # C functions in prologue + epilogue
-        c_code = "\n".join(re.findall(r"%\{(.*?)%\}", defs, re.DOTALL)) \
-            + "\n" + epilogue
+        c_code = (
+            "\n".join(re.findall(r"%\{(.*?)%\}", defs, re.DOTALL)) + "\n" + epilogue
+        )
         c_code = self._strip_comments(c_code)
         for m in _C_FUNC.finditer(c_code):
             name = m.group(1)

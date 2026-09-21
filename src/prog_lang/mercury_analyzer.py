@@ -12,7 +12,7 @@
 #   append([], L, L).                                 -> clause (predicate)
 #   fact(N) = F :- ...                                 -> clause (function)
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _NAME = r"[a-z]\w*"
@@ -27,14 +27,15 @@ class MercuryAnalyzer(RegexCodeAnalyzer):
 
     _MODULE = re.compile(r":-\s*module\s+(" + _NAME + r")\s*\.", re.IGNORECASE)
     _IMPORT = re.compile(
-        r":-\s*(?:import_module|use_module)\s+(.+?)\.", re.IGNORECASE | re.DOTALL)
-    _TYPE = re.compile(
-        r":-\s*(?:type|solver\s+type)\s+(" + _NAME + r")", re.IGNORECASE)
+        r":-\s*(?:import_module|use_module)\s+(.+?)\.", re.IGNORECASE | re.DOTALL
+    )
+    _TYPE = re.compile(r":-\s*(?:type|solver\s+type)\s+(" + _NAME + r")", re.IGNORECASE)
     _TYPECLASS = re.compile(r":-\s*typeclass\s+(" + _NAME + r")", re.IGNORECASE)
     _PRED = re.compile(r":-\s*(?:pred|mode)\s+(" + _NAME + r")", re.IGNORECASE)
     _FUNC = re.compile(r":-\s*func\s+(" + _NAME + r")", re.IGNORECASE)
-    _CLAUSE = re.compile(r"^(" + _NAME + r")\s*(?:\((.*?)\))?\s*(?:=|:-|\.)",
-                         re.MULTILINE | re.DOTALL)
+    _CLAUSE = re.compile(
+        r"^(" + _NAME + r")\s*(?:\((.*?)\))?\s*(?:=|:-|\.)", re.MULTILINE | re.DOTALL
+    )
 
     def _register_types(self, file_id, text, path):
         text = self._strip_comments(text)
@@ -55,8 +56,13 @@ class MercuryAnalyzer(RegexCodeAnalyzer):
         # types -> classes with constructors (from `---> a ; b(...) ; ...`)
         for m in self._TYPE.finditer(text):
             name = m.group(1)
-            tail = text[m.end():text.find(".", m.end()) if text.find(".", m.end()) != -1
-                        else len(text)]
+            tail = text[
+                m.end() : (
+                    text.find(".", m.end())
+                    if text.find(".", m.end()) != -1
+                    else len(text)
+                )
+            ]
             attrs = []
             if "--->" in tail:
                 body = tail.split("--->", 1)[1]
@@ -74,18 +80,34 @@ class MercuryAnalyzer(RegexCodeAnalyzer):
         for m in self._PRED.finditer(text):
             if m.group(1) not in declared:
                 declared.add(m.group(1))
-                self._add_function(file_id, m.group(1), [], [],
-                                   description="mercury predicate")
+                self._add_function(
+                    file_id, m.group(1), [], [], description="mercury predicate"
+                )
         for m in self._FUNC.finditer(text):
             if m.group(1) not in declared:
                 declared.add(m.group(1))
-                self._add_function(file_id, m.group(1), [], [],
-                                   description="mercury function")
+                self._add_function(
+                    file_id, m.group(1), [], [], description="mercury function"
+                )
 
         # defined clause heads not already declared (dedup by name)
-        reserved = {"module", "interface", "implementation", "import_module",
-                    "use_module", "type", "pred", "func", "mode", "typeclass",
-                    "instance", "pragma", "inst", "end_module", "solver"}
+        reserved = {
+            "module",
+            "interface",
+            "implementation",
+            "import_module",
+            "use_module",
+            "type",
+            "pred",
+            "func",
+            "mode",
+            "typeclass",
+            "instance",
+            "pragma",
+            "inst",
+            "end_module",
+            "solver",
+        }
         for m in self._CLAUSE.finditer(text):
             name = m.group(1)
             if name in reserved or name in declared:

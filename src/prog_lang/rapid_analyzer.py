@@ -15,7 +15,7 @@
 #
 # Comments are '!'; strings use '"'. Case-insensitive keywords.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -30,15 +30,22 @@ class RAPIDAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"',)
 
     _MODULE = re.compile(r"(?im)^\s*MODULE\s+(" + _ID + r")")
-    _PROC = re.compile(r"(?im)^\s*(?:LOCAL\s+|GLOBAL\s+)?PROC\s+(" + _ID +
-                       r")\s*\(([^)]*)\)")
-    _FUNC = re.compile(r"(?im)^\s*(?:LOCAL\s+|GLOBAL\s+)?FUNC\s+(" + _TYPE +
-                       r")\s+(" + _ID + r")\s*\(([^)]*)\)")
+    _PROC = re.compile(
+        r"(?im)^\s*(?:LOCAL\s+|GLOBAL\s+)?PROC\s+(" + _ID + r")\s*\(([^)]*)\)"
+    )
+    _FUNC = re.compile(
+        r"(?im)^\s*(?:LOCAL\s+|GLOBAL\s+)?FUNC\s+("
+        + _TYPE
+        + r")\s+("
+        + _ID
+        + r")\s*\(([^)]*)\)"
+    )
     _TRAP = re.compile(r"(?im)^\s*(?:LOCAL\s+|GLOBAL\s+)?TRAP\s+(" + _ID + r")")
     # VAR / PERS / CONST  TYPE  name
-    _DATA = re.compile(r"(?im)^\s*(?:LOCAL\s+|TASK\s+|GLOBAL\s+)?"
-                       r"(?:VAR|PERS|CONST)\s+(?:" + _TYPE + r")\s+(" + _ID +
-                       r")\b")
+    _DATA = re.compile(
+        r"(?im)^\s*(?:LOCAL\s+|TASK\s+|GLOBAL\s+)?"
+        r"(?:VAR|PERS|CONST)\s+(?:" + _TYPE + r")\s+(" + _ID + r")\b"
+    )
 
     def _register_types(self, file_id, text, path):
         clean = self._strip_comments(text)
@@ -55,16 +62,24 @@ class RAPIDAnalyzer(RegexCodeAnalyzer):
 
         for m in self._PROC.finditer(clean):
             args = self._rapid_args(m.group(2))
-            self._add_function(file_id, m.group(1), args, [], class_id=cls_id,
-                               description="rapid proc")
+            self._add_function(
+                file_id, m.group(1), args, [], class_id=cls_id, description="rapid proc"
+            )
         for m in self._FUNC.finditer(clean):
             args = self._rapid_args(m.group(3))
             outs = [self._add_output(m.group(1))]
-            self._add_function(file_id, m.group(2), args, outs, class_id=cls_id,
-                               description="rapid func")
+            self._add_function(
+                file_id,
+                m.group(2),
+                args,
+                outs,
+                class_id=cls_id,
+                description="rapid func",
+            )
         for m in self._TRAP.finditer(clean):
-            self._add_function(file_id, m.group(1), [], [], class_id=cls_id,
-                               description="rapid trap")
+            self._add_function(
+                file_id, m.group(1), [], [], class_id=cls_id, description="rapid trap"
+            )
 
         seen = set()
         for m in self._DATA.finditer(clean):

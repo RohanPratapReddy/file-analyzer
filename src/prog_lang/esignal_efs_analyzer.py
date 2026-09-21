@@ -23,7 +23,7 @@
 #     `library("name")`                                   -> import
 # `//` and `/* ... */` are comments; `"` and `'` delimit strings.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_$][A-Za-z0-9_$]*"
@@ -37,11 +37,13 @@ class ESignalEFSAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"', "'")
 
     _FUNC = re.compile(r"(?m)\bfunction\s+(" + _ID + r")\s*\(([^)]*)\)")
-    _FUNC_EXPR = re.compile(r"(?m)^[ \t]*(?:var\s+|let\s+|const\s+)?(" + _ID +
-                            r")\s*=\s*function\s*\(")
+    _FUNC_EXPR = re.compile(
+        r"(?m)^[ \t]*(?:var\s+|let\s+|const\s+)?(" + _ID + r")\s*=\s*function\s*\("
+    )
     _VAR = re.compile(r"(?m)^[ \t]*(?:var|let|const)\s+(" + _ID + r")\b")
-    _IMPORT = re.compile(r'(?m)(?:^[ \t]*#\s*include\s+"([^"]+)"|'
-                         r'\blibrary\s*\(\s*"([^"]+)")')
+    _IMPORT = re.compile(
+        r'(?m)(?:^[ \t]*#\s*include\s+"([^"]+)"|' r'\blibrary\s*\(\s*"([^"]+)")'
+    )
 
     def _extract_entities(self, file_id, text, path):
         clean = self._strip_comments(text)
@@ -57,14 +59,12 @@ class ESignalEFSAnalyzer(RegexCodeAnalyzer):
                 a = a.strip()
                 if a:
                     arg_ids.append(self._add_arg(a))
-            self._add_function(file_id, name, arg_ids, [],
-                               description="EFS function")
+            self._add_function(file_id, name, arg_ids, [], description="EFS function")
         for m in self._FUNC_EXPR.finditer(clean):
             name = m.group(1)
             if name not in seen_fn:
                 seen_fn.add(name)
-                self._add_function(file_id, name, [], [],
-                                   description="EFS function")
+                self._add_function(file_id, name, [], [], description="EFS function")
 
         seen_v = set()
         for m in self._VAR.finditer(clean):

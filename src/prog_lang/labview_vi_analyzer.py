@@ -14,6 +14,7 @@
 # binary VI with no embedded readable names), exactly as the .urp / Piet
 # precedent: an empty result here is correct, not a miss.
 import re
+
 from .regex_base import RegexCodeAnalyzer
 
 # Readable ASCII runs of length >= 4 (LabVIEW pads names into the resource).

@@ -16,7 +16,7 @@
 # Comments: Harlowe/SugarCube macro comments vary; '/* */' inside passages.
 # Strings use '"'. The '::' header marks passages.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -30,7 +30,9 @@ class TweeAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"',)
 
     # passage header:  :: Name  [optional tags]  {optional metadata}
-    _PASSAGE = re.compile(r"(?m)^::\s*([^\[\{\n]+?)\s*(?:\[([^\]]*)\])?\s*(?:\{[^\}]*\})?\s*$")
+    _PASSAGE = re.compile(
+        r"(?m)^::\s*([^\[\{\n]+?)\s*(?:\[([^\]]*)\])?\s*(?:\{[^\}]*\})?\s*$"
+    )
     # passage link:  [[label->target]] / [[target<-label]] / [[target]]
     _LINK = re.compile(r"\[\[([^\]]+?)\]\]")
     # SugarCube/Harlowe variable set:  <<set $var ...>>  or  (set: $var ...)
@@ -51,8 +53,7 @@ class TweeAnalyzer(RegexCodeAnalyzer):
             if m.group(2):
                 for tag in m.group(2).split():
                     arg_ids.append(self._add_arg(tag, "tag"))
-            self._add_function(file_id, name, arg_ids, [],
-                               description="twee passage")
+            self._add_function(file_id, name, arg_ids, [], description="twee passage")
 
         # passage links become imports (references to other passages)
         seen_links = set()
@@ -73,8 +74,9 @@ class TweeAnalyzer(RegexCodeAnalyzer):
 
         # variables from set-macros
         seen_vars = set()
-        for block in re.findall(r"<<\s*set\b[^>]*>>", text) + \
-                     re.findall(r"\(\s*set:[^)]*\)", text):
+        for block in re.findall(r"<<\s*set\b[^>]*>>", text) + re.findall(
+            r"\(\s*set:[^)]*\)", text
+        ):
             for vm in self._SETVAR.finditer(block):
                 name = vm.group(1)
                 if name not in seen_vars:

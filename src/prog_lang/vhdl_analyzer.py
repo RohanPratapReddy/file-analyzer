@@ -9,7 +9,7 @@
 #   function inc (a : integer) return integer        -> function
 #   procedure reset (signal s : out std_logic)       -> function
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -23,16 +23,19 @@ class VhdlAnalyzer(RegexCodeAnalyzer):
     _USE = re.compile(r"^\s*use\s+([\w.]+)", re.I | re.MULTILINE)
     _ENTITY = re.compile(
         r"\bentity\s+(\w+)\s+is\b(.*?)\bend\b\s*(?:entity\b)?\s*\w*\s*;",
-        re.I | re.DOTALL)
-    _ARCH = re.compile(r"\barchitecture\s+(\w+)\s+of\s+(\w+)\s+is",
-                       re.I)
-    _SIGNAL = re.compile(r"^\s*signal\s+([\w,\s]+?)\s*:\s*([^;:=]+)",
-                         re.I | re.MULTILINE)
+        re.I | re.DOTALL,
+    )
+    _ARCH = re.compile(r"\barchitecture\s+(\w+)\s+of\s+(\w+)\s+is", re.I)
+    _SIGNAL = re.compile(
+        r"^\s*signal\s+([\w,\s]+?)\s*:\s*([^;:=]+)", re.I | re.MULTILINE
+    )
     _SUBPROG = re.compile(
-        r"\b(function|procedure)\s+(\w+)\s*(?:\(([^)]*)\))?"
-        r"(?:\s*return\s+(\w+))?", re.I)
-    _PORT = re.compile(r"(\w+)\s*:\s*(in|out|inout|buffer)\s+([\w()' downto0-9]+)",
-                       re.I)
+        r"\b(function|procedure)\s+(\w+)\s*(?:\(([^)]*)\))?" r"(?:\s*return\s+(\w+))?",
+        re.I,
+    )
+    _PORT = re.compile(
+        r"(\w+)\s*:\s*(in|out|inout|buffer)\s+([\w()' downto0-9]+)", re.I
+    )
 
     def _register_types(self, file_id, text, path):
         t = self._strip_comments(text)
@@ -63,25 +66,25 @@ class VhdlAnalyzer(RegexCodeAnalyzer):
             name, body = m.group(1), m.group(2)
             attr_ids = []
             for pm in self._PORT.finditer(body):
-                attr_ids.append(self._add_arg(pm.group(1),
-                                f"{pm.group(2)} {pm.group(3).strip()}"))
-            self._add_class(file_id, name, description="vhdl entity",
-                            attr_ids=attr_ids)
+                attr_ids.append(
+                    self._add_arg(pm.group(1), f"{pm.group(2)} {pm.group(3).strip()}")
+                )
+            self._add_class(file_id, name, description="vhdl entity", attr_ids=attr_ids)
 
         for m in self._ARCH.finditer(t):
             parents = []
             pid = self._class_registry.get(m.group(2))
             if pid is not None:
                 parents.append(pid)
-            self._add_class(file_id, m.group(1), description="vhdl architecture",
-                            parent_ids=parents)
+            self._add_class(
+                file_id, m.group(1), description="vhdl architecture", parent_ids=parents
+            )
 
         for m in self._SIGNAL.finditer(t):
             for nm in m.group(1).split(","):
                 nm = nm.strip()
                 if nm:
-                    self._add_variable(file_id, nm, m.group(2).strip(),
-                                       scope="signal")
+                    self._add_variable(file_id, nm, m.group(2).strip(), scope="signal")
 
         for m in self._SUBPROG.finditer(t):
             kind, name, params, ret = m.groups()
@@ -94,5 +97,6 @@ class VhdlAnalyzer(RegexCodeAnalyzer):
                         nm = part.split(":")[0].strip().split()[-1]
                         arg_ids.append(self._add_arg(nm))
             out_ids = [self._add_output(ret)] if ret else []
-            self._add_function(file_id, name, arg_ids, out_ids,
-                               description=f"vhdl {kind}")
+            self._add_function(
+                file_id, name, arg_ids, out_ids, description=f"vhdl {kind}"
+            )

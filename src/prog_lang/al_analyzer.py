@@ -9,13 +9,28 @@
 #   field(1; "No."; Code[20]) { ... }            -> attribute
 #   var  X: Integer;                             -> variable
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
-_OBJECTS = ("table", "tableextension", "page", "pageextension", "codeunit",
-            "report", "reportextension", "query", "xmlport", "enum",
-            "enumextension", "interface", "controladdin", "profile",
-            "permissionset", "entitlement", "dotnet")
+_OBJECTS = (
+    "table",
+    "tableextension",
+    "page",
+    "pageextension",
+    "codeunit",
+    "report",
+    "reportextension",
+    "query",
+    "xmlport",
+    "enum",
+    "enumextension",
+    "interface",
+    "controladdin",
+    "profile",
+    "permissionset",
+    "entitlement",
+    "dotnet",
+)
 
 
 class ALAnalyzer(RegexCodeAnalyzer):
@@ -25,27 +40,35 @@ class ALAnalyzer(RegexCodeAnalyzer):
     _USING = re.compile(r"^\s*using\s+([\w.]+)\s*;", re.MULTILINE)
     _OBJECT = re.compile(
         r"^\s*(" + "|".join(_OBJECTS) + r")\s+"
-        r"(?:(\d+)\s+)?"                                  # optional object id
-        r'(?:"([^"]+)"|([A-Za-z_]\w*))'                   # name (quoted or bare)
-        r'(?:\s+extends\s+(?:"([^"]+)"|([A-Za-z_]\w*)))?', re.IGNORECASE | re.MULTILINE)
+        r"(?:(\d+)\s+)?"  # optional object id
+        r'(?:"([^"]+)"|([A-Za-z_]\w*))'  # name (quoted or bare)
+        r'(?:\s+extends\s+(?:"([^"]+)"|([A-Za-z_]\w*)))?',
+        re.IGNORECASE | re.MULTILINE,
+    )
     _METHOD = re.compile(
         r"(?:(?:local|internal|protected)\s+)*"
         r"\b(procedure|trigger)\s+"
         r'(?:"([^"]+)"|([A-Za-z_]\w*))\s*'
         r"\(([^)]*)\)"
-        r"(?:\s*:\s*([\w\[\]. ]+?))?\s*", re.IGNORECASE)
+        r"(?:\s*:\s*([\w\[\]. ]+?))?\s*",
+        re.IGNORECASE,
+    )
     _FIELD = re.compile(
         r'\bfield\s*\(\s*\d+\s*;\s*(?:"([^"]+)"|([A-Za-z_]\w*))\s*;\s*'
-        r"([^)]+?)\s*\)", re.IGNORECASE)
+        r"([^)]+?)\s*\)",
+        re.IGNORECASE,
+    )
     _ENUMVAL = re.compile(
-        r'\bvalue\s*\(\s*\d+\s*;\s*(?:"([^"]+)"|([A-Za-z_]\w*))\s*\)',
-        re.IGNORECASE)
+        r'\bvalue\s*\(\s*\d+\s*;\s*(?:"([^"]+)"|([A-Za-z_]\w*))\s*\)', re.IGNORECASE
+    )
     _VAR = re.compile(
         r'^\s*(?:"([^"]+)"|([A-Za-z_]\w*))\s*:\s*'
         r"(Record|Codeunit|Page|Report|Integer|Decimal|Text|Code|Boolean|"
         r"Option|Date|Time|DateTime|Guid|BigInteger|Char|Byte|Duration|"
         r"List|Dictionary|JsonObject|JsonArray|JsonToken|Blob|RecordRef|"
-        r"FieldRef|Variant|Label|Enum)[^\n;]*;", re.IGNORECASE | re.MULTILINE)
+        r"FieldRef|Variant|Label|Enum)[^\n;]*;",
+        re.IGNORECASE | re.MULTILINE,
+    )
 
     def _register_types(self, file_id, text, path):
         for m in self._OBJECT.finditer(self._strip_comments(text)):
@@ -69,14 +92,24 @@ class ALAnalyzer(RegexCodeAnalyzer):
             pname = m.group(5) or m.group(6)
             if pname and pname in self._class_registry:
                 parents.append(self._class_registry[pname])
-            objects.append({"name": name, "kind": m.group(1).lower(),
-                            "bstart": bstart, "bend": bend, "parents": parents,
-                            "methods": [], "attrs": []})
+            objects.append(
+                {
+                    "name": name,
+                    "kind": m.group(1).lower(),
+                    "bstart": bstart,
+                    "bend": bend,
+                    "parents": parents,
+                    "methods": [],
+                    "attrs": [],
+                }
+            )
 
         def enclosing(pos):
             best = None
             for o in objects:
-                if o["bstart"] <= pos < o["bend"] and (best is None or o["bstart"] > best["bstart"]):
+                if o["bstart"] <= pos < o["bend"] and (
+                    best is None or o["bstart"] > best["bstart"]
+                ):
                     best = o
             return best
 
@@ -115,9 +148,14 @@ class ALAnalyzer(RegexCodeAnalyzer):
             self._add_variable(file_id, name, None)
 
         for o in objects:
-            self._add_class(file_id, o["name"], description=f"al {o['kind']}",
-                            parent_ids=o["parents"], method_ids=o["methods"],
-                            attr_ids=o["attrs"])
+            self._add_class(
+                file_id,
+                o["name"],
+                description=f"al {o['kind']}",
+                parent_ids=o["parents"],
+                method_ids=o["methods"],
+                attr_ids=o["attrs"],
+            )
 
     def _params(self, params):
         arg_ids = []

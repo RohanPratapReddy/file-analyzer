@@ -25,11 +25,11 @@
 #   * `import("m")` / `require("m")` / `evalfile("f")` / `#include`  -> import
 # `%` starts an S-Lang comment; `//` and `/* */` cover the C-like SL dialect.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
-_SL_TYPES = (r"float|point|vector|normal|color|string|matrix|void")
+_SL_TYPES = r"float|point|vector|normal|color|string|matrix|void"
 
 
 class SLangAnalyzer(RegexCodeAnalyzer):
@@ -40,27 +40,35 @@ class SLangAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"',)
 
     # S-Lang function definition
-    _DEFINE = re.compile(r"(?m)^[ \t]*(?:public\s+|private\s+|static\s+)?"
-                         r"define\s+(" + _ID + r")\s*\(")
+    _DEFINE = re.compile(
+        r"(?m)^[ \t]*(?:public\s+|private\s+|static\s+)?"
+        r"define\s+(" + _ID + r")\s*\("
+    )
     # RenderMan shader entry point
-    _SHADER = re.compile(r"(?m)^[ \t]*(?:surface|displacement|light|volume|"
-                         r"imager|transformation)\s+(" + _ID + r")\s*\(")
+    _SHADER = re.compile(
+        r"(?m)^[ \t]*(?:surface|displacement|light|volume|"
+        r"imager|transformation)\s+(" + _ID + r")\s*\("
+    )
     # RenderMan shader-local typed function:  float noise (point p) { ... }
-    _SLFUNC = re.compile(r"(?m)^[ \t]*(?:" + _SL_TYPES + r")\s+(" + _ID +
-                         r")\s*\(([^)]*)\)\s*\{")
+    _SLFUNC = re.compile(
+        r"(?m)^[ \t]*(?:" + _SL_TYPES + r")\s+(" + _ID + r")\s*\(([^)]*)\)\s*\{"
+    )
     _VARIABLE = re.compile(r"(?m)^[ \t]*variable\s+([^;]+);")
     _TYPEDEF = re.compile(r"(?m)\btypedef\s+struct\s*\{[^}]*\}\s*(" + _ID + r")")
-    _IMPORT = re.compile(r'(?m)\b(?:import|require|evalfile|autoload)\s*\(\s*'
-                         r'"([^"]+)"')
+    _IMPORT = re.compile(
+        r"(?m)\b(?:import|require|evalfile|autoload)\s*\(\s*" r'"([^"]+)"'
+    )
     _INCLUDE = re.compile(r'(?m)^[ \t]*#\s*include\s+[<"]([^>"]+)[>"]')
 
     def _extract_entities(self, file_id, text, path):
         clean = self._strip_comments(text)
 
         seen_fn = set()
-        for rx, desc in ((self._DEFINE, "S-Lang function"),
-                         (self._SHADER, "RenderMan shader"),
-                         (self._SLFUNC, "SL function")):
+        for rx, desc in (
+            (self._DEFINE, "S-Lang function"),
+            (self._SHADER, "RenderMan shader"),
+            (self._SLFUNC, "SL function"),
+        ):
             for m in rx.finditer(clean):
                 name = m.group(1)
                 if name in seen_fn:

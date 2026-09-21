@@ -10,9 +10,9 @@ rather than faked, and the raw payload is never persisted.
 """
 
 from .format_converter import (
+    RENDERABLE_TARGETS,
     ConversionError,
     FormatConverter,
-    RENDERABLE_TARGETS,
     encode_png,
 )
 from .text_analyzer import ANALYZABLE_TARGETS, AnalysisError, TextAnalyzer

@@ -12,7 +12,7 @@
 # Simula is case-insensitive.  Comments are 'comment ... ;' and '! ... ;'
 # (both terminated by a semicolon, NOT a newline); strings use '"'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z][A-Za-z0-9_]*"
@@ -29,14 +29,16 @@ class SimulaAnalyzer(RegexCodeAnalyzer):
 
     _CLASS = re.compile(r"\bclass\s+(" + _ID + r")", _ML)
     _PARENT = re.compile(r"(" + _ID + r")\s+class\s+(" + _ID + r")", _ML)
-    _PROC = re.compile(
-        r"(?:" + _TYPE + r"\s+)?\bprocedure\s+(" + _ID + r")", _ML)
+    _PROC = re.compile(r"(?:" + _TYPE + r"\s+)?\bprocedure\s+(" + _ID + r")", _ML)
     _VARDECL = re.compile(
-        r"(?:(?<=;)|^)[ \t]*(" + _TYPE +
-        r")\s+((?:array\s+)?[A-Za-z][\w, ()\[\]:.+*-]*?)\s*;",
-        _ML)
+        r"(?:(?<=;)|^)[ \t]*("
+        + _TYPE
+        + r")\s+((?:array\s+)?[A-Za-z][\w, ()\[\]:.+*-]*?)\s*;",
+        _ML,
+    )
     _EXTERNAL = re.compile(
-        r"^[ \t]*external\b[^;]*?\b(?:class|procedure)\s+(" + _ID + r")", _ML)
+        r"^[ \t]*external\b[^;]*?\b(?:class|procedure)\s+(" + _ID + r")", _ML
+    )
     _IDRX = re.compile(_ID)
 
     def _scrub(self, text):
@@ -46,21 +48,24 @@ class SimulaAnalyzer(RegexCodeAnalyzer):
         while i < n:
             c = text[i]
             if c == '"':
-                out.append(c); i += 1
+                out.append(c)
+                i += 1
                 while i < n:
                     out.append(text[i])
                     if text[i] == '"':
-                        i += 1; break
+                        i += 1
+                        break
                     i += 1
                 continue
             start_comment = False
             if c == "!":
                 start_comment = True
-            elif c in "cC" and text[i:i + 7].lower() == "comment":
+            elif c in "cC" and text[i : i + 7].lower() == "comment":
                 before = text[i - 1] if i else " "
                 after = text[i + 7] if i + 7 < n else " "
-                if not (before.isalnum() or before == "_") and \
-                   not (after.isalnum() or after == "_"):
+                if not (before.isalnum() or before == "_") and not (
+                    after.isalnum() or after == "_"
+                ):
                     start_comment = True
             if start_comment:
                 j = text.find(";", i)
@@ -68,7 +73,8 @@ class SimulaAnalyzer(RegexCodeAnalyzer):
                 out.append("".join(ch if ch == "\n" else " " for ch in text[i:j]))
                 i = j
                 continue
-            out.append(c); i += 1
+            out.append(c)
+            i += 1
         return "".join(out)
 
     def _names(self, blob):
@@ -91,18 +97,23 @@ class SimulaAnalyzer(RegexCodeAnalyzer):
         for m in self._EXTERNAL.finditer(clean):
             self._add_import(file_id, m.group(1), m.group(1))
 
-        parents = {}   # derived name -> base id
+        parents = {}  # derived name -> base id
         for m in self._PARENT.finditer(clean):
             parents[m.group(2)] = self._register_class(m.group(1))
         for m in self._CLASS.finditer(clean):
             name = m.group(1)
             pid = parents.get(name)
-            self._add_class(file_id, name, description="simula class",
-                            parent_ids=[pid] if pid else None)
+            self._add_class(
+                file_id,
+                name,
+                description="simula class",
+                parent_ids=[pid] if pid else None,
+            )
 
         for m in self._PROC.finditer(clean):
-            self._add_function(file_id, m.group(1), [], [],
-                               description="simula procedure")
+            self._add_function(
+                file_id, m.group(1), [], [], description="simula procedure"
+            )
 
         for m in self._VARDECL.finditer(clean):
             rest = m.group(2)

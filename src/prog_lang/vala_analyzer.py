@@ -12,12 +12,14 @@
 #   public int prop { get; set; }                 -> property (attribute)
 #   private int count = 0;                         -> field / module variable
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
-_MODIFIERS = (r"(?:public|private|protected|internal|static|abstract|virtual|"
-              r"override|sealed|extern|inline|async|weak|owned|unowned|const|"
-              r"new|partial)\s+")
+_MODIFIERS = (
+    r"(?:public|private|protected|internal|static|abstract|virtual|"
+    r"override|sealed|extern|inline|async|weak|owned|unowned|const|"
+    r"new|partial)\s+"
+)
 
 
 class ValaAnalyzer(RegexCodeAnalyzer):
@@ -29,22 +31,26 @@ class ValaAnalyzer(RegexCodeAnalyzer):
         r"(?:" + _MODIFIERS + r")*"
         r"\b(class|interface|struct|enum|errordomain|namespace)\s+"
         r"([\w.]+)"
-        r"(?:\s*<[^{;]*?>)?"                       # generic params
-        r"(?:\s*:\s*([^{]+?))?"                    # base list
-        r"\s*\{")
+        r"(?:\s*<[^{;]*?>)?"  # generic params
+        r"(?:\s*:\s*([^{]+?))?"  # base list
+        r"\s*\{"
+    )
     _METHOD = re.compile(
         r"(?:" + _MODIFIERS + r")*"
         r"(?:(?:async|signal)\s+)?"
-        r"([\w.]+(?:\s*\*)?(?:\s*\?)?(?:\s*\[\s*\])?)\s+"   # return type
-        r"([A-Za-z_]\w*)\s*"                                 # name
-        r"\(([^;{]*?)\)\s*"                                  # params
-        r"(?:throws\s+[\w.,\s]+?)?\s*\{")
+        r"([\w.]+(?:\s*\*)?(?:\s*\?)?(?:\s*\[\s*\])?)\s+"  # return type
+        r"([A-Za-z_]\w*)\s*"  # name
+        r"\(([^;{]*?)\)\s*"  # params
+        r"(?:throws\s+[\w.,\s]+?)?\s*\{"
+    )
     _PROP = re.compile(
         r"(?:" + _MODIFIERS + r")*"
-        r"([\w.]+(?:\?)?)\s+([A-Za-z_]\w*)\s*\{\s*(?:get|set|owned|default)")
+        r"([\w.]+(?:\?)?)\s+([A-Za-z_]\w*)\s*\{\s*(?:get|set|owned|default)"
+    )
     _FIELD = re.compile(
         r"(?:" + _MODIFIERS + r")*"
-        r"([\w.]+(?:\?)?(?:\s*\[\s*\])?)\s+([A-Za-z_]\w*)\s*(?:=\s*([^;]+?))?\s*;")
+        r"([\w.]+(?:\?)?(?:\s*\[\s*\])?)\s+([A-Za-z_]\w*)\s*(?:=\s*([^;]+?))?\s*;"
+    )
 
     def _register_types(self, file_id, text, path):
         text = self._strip_comments(text)
@@ -68,9 +74,17 @@ class ValaAnalyzer(RegexCodeAnalyzer):
                     base = base.split(".")[-1].split("<")[0].strip()
                     if base in self._class_registry:
                         parents.append(self._class_registry[base])
-            types.append({"name": raw_name, "kind": kind, "bstart": bstart,
-                          "bend": bend, "parents": parents,
-                          "methods": [], "attrs": []})
+            types.append(
+                {
+                    "name": raw_name,
+                    "kind": kind,
+                    "bstart": bstart,
+                    "bend": bend,
+                    "parents": parents,
+                    "methods": [],
+                    "attrs": [],
+                }
+            )
 
         def enclosing(pos):
             best = None
@@ -118,16 +132,24 @@ class ValaAnalyzer(RegexCodeAnalyzer):
             if vtype in ("return", "case", "else"):
                 continue
             if owner is None:
-                self._add_variable(file_id, name, val.strip() if val else None,
-                                   scope="module")
+                self._add_variable(
+                    file_id, name, val.strip() if val else None, scope="module"
+                )
             else:
-                owner["attrs"].append(self._add_arg(name, vtype, val.strip() if val else None))
+                owner["attrs"].append(
+                    self._add_arg(name, vtype, val.strip() if val else None)
+                )
 
         for t in types:
             desc = f"vala {t['kind']}"
-            self._add_class(file_id, t["name"], description=desc,
-                            parent_ids=t["parents"], method_ids=t["methods"],
-                            attr_ids=t["attrs"])
+            self._add_class(
+                file_id,
+                t["name"],
+                description=desc,
+                parent_ids=t["parents"],
+                method_ids=t["methods"],
+                attr_ids=t["attrs"],
+            )
 
     def _params(self, params):
         arg_ids = []

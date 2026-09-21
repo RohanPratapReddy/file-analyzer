@@ -11,7 +11,7 @@
 #   add a b = a + b                                         -> function
 #   config = { debug = True }                               -> variable
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -19,12 +19,13 @@ class ElmAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "elm"
     EXTENSIONS = (".elm",)
     LINE_COMMENTS = ("--",)
-    BLOCK_COMMENTS = ()          # nested {- -} handled below
+    BLOCK_COMMENTS = ()  # nested {- -} handled below
     STRING_DELIMS = ('"',)
 
     _IMPORT = re.compile(
         r"^import\s+([\w.]+)(?:\s+as\s+(\w+))?(?:\s+exposing\s*\(([^)]*)\))?",
-        re.MULTILINE)
+        re.MULTILINE,
+    )
     _TYPE_ALIAS = re.compile(r"^type\s+alias\s+([A-Z]\w*)\s*(?:[\w ]*)=", re.MULTILINE)
     _TYPE = re.compile(r"^type\s+([A-Z]\w*)\s*(?:[\w ]*)=", re.MULTILINE)
     _DEF = re.compile(r"^([a-z]\w*)\s+([^=\n]*?)=", re.MULTILINE)
@@ -50,12 +51,12 @@ class ElmAnalyzer(RegexCodeAnalyzer):
                     if c == '"':
                         break
                 continue
-            if text[i:i + 2] == "{-":
+            if text[i : i + 2] == "{-":
                 depth += 1
                 out.append("  ")
                 i += 2
                 continue
-            if text[i:i + 2] == "-}" and depth > 0:
+            if text[i : i + 2] == "-}" and depth > 0:
                 depth -= 1
                 out.append("  ")
                 i += 2
@@ -108,10 +109,8 @@ class ElmAnalyzer(RegexCodeAnalyzer):
                 for field in self._split_top_level(rec.group(1)):
                     fm = re.match(r"(\w+)\s*:\s*(.+)", field.strip(), re.DOTALL)
                     if fm:
-                        attrs.append(self._add_arg(fm.group(1),
-                                                   fm.group(2).strip()))
-            self._add_class(file_id, name, description="elm type alias",
-                            attr_ids=attrs)
+                        attrs.append(self._add_arg(fm.group(1), fm.group(2).strip()))
+            self._add_class(file_id, name, description="elm type alias", attr_ids=attrs)
 
         # union types -> constructors as attrs
         for m in self._TYPE.finditer(text):
@@ -124,23 +123,38 @@ class ElmAnalyzer(RegexCodeAnalyzer):
                 cm = re.match(r"\s*([A-Z]\w*)", con)
                 if cm:
                     cons.append(self._add_arg(cm.group(1), "constructor"))
-            self._add_class(file_id, name, description="elm union type",
-                            attr_ids=cons)
+            self._add_class(file_id, name, description="elm union type", attr_ids=cons)
 
         # top-level definitions (column-0 lowercase name)
         emitted = set()
         for m in self._DEF.finditer(text):
             name, params_raw = m.group(1), m.group(2).strip()
-            if name in emitted or name in ("module", "import", "type", "port",
-                                           "if", "then", "else", "let", "in", "case"):
+            if name in emitted or name in (
+                "module",
+                "import",
+                "type",
+                "port",
+                "if",
+                "then",
+                "else",
+                "let",
+                "in",
+                "case",
+            ):
                 continue
             emitted.add(name)
-            params = [p for p in re.split(r"\s+", params_raw) if p and re.match(
-                r"^[a-z_]\w*$", p)]
+            params = [
+                p
+                for p in re.split(r"\s+", params_raw)
+                if p and re.match(r"^[a-z_]\w*$", p)
+            ]
             if params:
                 arg_ids = [self._add_arg(p) for p in params]
-                out_ids = ([self._add_output(annotations[name].split("->")[-1].strip())]
-                           if name in annotations and "->" in annotations[name] else [])
+                out_ids = (
+                    [self._add_output(annotations[name].split("->")[-1].strip())]
+                    if name in annotations and "->" in annotations[name]
+                    else []
+                )
                 self._add_function(file_id, name, arg_ids, out_ids)
             else:
                 # nullary def: function if annotated with '->', else variable
@@ -154,7 +168,7 @@ class ElmAnalyzer(RegexCodeAnalyzer):
         nl = text.find("\n", start)
         if nl == -1:
             return text[start:]
-        rest = text[nl + 1:]
+        rest = text[nl + 1 :]
         end = nl + 1
         for line in rest.splitlines(keepends=True):
             if line[:1] not in (" ", "\t", "\n", "\r", ""):

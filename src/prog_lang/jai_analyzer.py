@@ -11,7 +11,7 @@
 #
 # Comments are '//' and (nestable) '/* */'; strings use '"'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -25,11 +25,15 @@ class JaiAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"',)
 
     _IMPORT = re.compile(r'(?m)^\s*#\s*(?:import|load)(?:,\s*\w+)?\s+"([^"]+)"')
-    _TYPE = re.compile(r"(?m)^\s*(" + _ID + r")\s*::\s*(?:struct|enum_flags|enum|union)\b")
+    _TYPE = re.compile(
+        r"(?m)^\s*(" + _ID + r")\s*::\s*(?:struct|enum_flags|enum|union)\b"
+    )
     _PROC = re.compile(r"(?m)^\s*(" + _ID + r")\s*::\s*(?:inline\s+|no_inline\s+)?\(")
     # named constant `X :: <not a proc/type>`
-    _CONST = re.compile(r"(?m)^\s*(" + _ID + r")\s*::\s*(?!struct\b|enum\b|enum_flags\b|"
-                        r"union\b|\(|inline\b|no_inline\b)")
+    _CONST = re.compile(
+        r"(?m)^\s*(" + _ID + r")\s*::\s*(?!struct\b|enum\b|enum_flags\b|"
+        r"union\b|\(|inline\b|no_inline\b)"
+    )
     _VAR = re.compile(r"(?m)^\s*(" + _ID + r")\s*:(?!:)=?")
 
     def _register_types(self, file_id, text, path):
@@ -52,9 +56,13 @@ class JaiAnalyzer(RegexCodeAnalyzer):
             open_paren = clean.index("(", m.end() - 1)
             args = self._proc_args(clean, open_paren)
             out = self._proc_output(clean, open_paren)
-            self._add_function(file_id, m.group(1), args,
-                               [out] if out is not None else [],
-                               description="jai procedure")
+            self._add_function(
+                file_id,
+                m.group(1),
+                args,
+                [out] if out is not None else [],
+                description="jai procedure",
+            )
 
         for m in self._CONST.finditer(clean):
             self._add_variable(file_id, m.group(1), scope="constant")
@@ -63,7 +71,7 @@ class JaiAnalyzer(RegexCodeAnalyzer):
 
     def _proc_args(self, clean, open_paren):
         end = self._find_matching(clean, open_paren, "(", ")")
-        body = clean[open_paren + 1:end - 1]
+        body = clean[open_paren + 1 : end - 1]
         arg_ids = []
         for part in self._split_top_level(body):
             name = part.split(":")[0].strip().lstrip("$").strip()

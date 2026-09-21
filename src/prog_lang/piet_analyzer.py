@@ -16,8 +16,6 @@
 # tokens, so a genuinely empty or non-grid file is distinguishable) but records
 # nothing.  An "empty" Piet file is the CORRECT result, not a missed
 # extraction.
-import re
-from pathlib import Path
 from .regex_base import RegexCodeAnalyzer
 
 

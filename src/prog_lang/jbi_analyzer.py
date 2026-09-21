@@ -28,14 +28,14 @@
 # comments start with a leading apostrophe (`'`).  Instruction mnemonics (MOVJ,
 # DOUT, NOP, ...) are statements and carry no named symbol.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
 class JbiAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "inform-jbi"
     EXTENSIONS = (".jbi",)
-    LINE_COMMENTS = ("'",)      # `//` are section headers, not comments
+    LINE_COMMENTS = ("'",)  # `//` are section headers, not comments
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ('"',)
 
@@ -49,8 +49,9 @@ class JbiAnalyzer(RegexCodeAnalyzer):
         clean = self._strip_comments(text)
 
         for m in self._NAME.finditer(clean):
-            self._add_function(file_id, m.group(1), [], [],
-                               description="INFORM job routine")
+            self._add_function(
+                file_id, m.group(1), [], [], description="INFORM job routine"
+            )
 
         for m in self._CALL.finditer(clean):
             nm = m.group(1)
@@ -62,8 +63,9 @@ class JbiAnalyzer(RegexCodeAnalyzer):
             if nm in seen_fn:
                 continue
             seen_fn.add(nm)
-            self._add_function(file_id, "*" + nm, [], [],
-                               description="INFORM jump label")
+            self._add_function(
+                file_id, "*" + nm, [], [], description="INFORM jump label"
+            )
 
         seen_v = set()
         for m in self._POSVAR.finditer(clean):

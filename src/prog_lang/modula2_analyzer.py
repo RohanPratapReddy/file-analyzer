@@ -15,7 +15,7 @@
 # Comments are nested '(* ... *)'; strings use '"' and "'".  Keywords are
 # upper-case and the language is case-sensitive.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z][A-Za-z0-9_]*"
@@ -28,17 +28,18 @@ class Modula2Analyzer(RegexCodeAnalyzer):
     BLOCK_COMMENTS = (("(*", "*)"),)
     STRING_DELIMS = ('"', "'")
 
-    _MODULE = re.compile(
-        r"\b(?:DEFINITION|IMPLEMENTATION)?\s*MODULE\s+(" + _ID + r")")
+    _MODULE = re.compile(r"\b(?:DEFINITION|IMPLEMENTATION)?\s*MODULE\s+(" + _ID + r")")
     _PROC = re.compile(r"\bPROCEDURE\s+(" + _ID + r")\s*(\([^)]*\))?")
     _FROM = re.compile(r"\bFROM\s+(" + _ID + r")\s+IMPORT\s+([^;]+);")
     _IMPORT = re.compile(r"^[ \t]*IMPORT\s+([^;]+);", re.MULTILINE)
     _RECORD = re.compile(r"\b(" + _ID + r")\s*=\s*RECORD\b")
     _CONST = re.compile(
-        r"^[ \t]*(?:CONST[ \t]+)?(" + _ID + r")\s*=\s*[^=;]", re.MULTILINE)
+        r"^[ \t]*(?:CONST[ \t]+)?(" + _ID + r")\s*=\s*[^=;]", re.MULTILINE
+    )
     _VARLINE = re.compile(
-        r"^[ \t]*(?:VAR[ \t]+)?(" + _ID + r"(?:\s*,\s*" + _ID +
-        r")*)\s*:\s*[^;]+;", re.MULTILINE)
+        r"^[ \t]*(?:VAR[ \t]+)?(" + _ID + r"(?:\s*,\s*" + _ID + r")*)\s*:\s*[^;]+;",
+        re.MULTILINE,
+    )
 
     def _proc_args(self, paren):
         if not paren:
@@ -83,15 +84,19 @@ class Modula2Analyzer(RegexCodeAnalyzer):
 
         cls_id = None
         for m in self._MODULE.finditer(clean):
-            cls_id = self._add_class(file_id, m.group(1),
-                                     description="modula-2 module")
+            cls_id = self._add_class(file_id, m.group(1), description="modula-2 module")
         for m in self._RECORD.finditer(clean):
             self._add_class(file_id, m.group(1), description="modula-2 record")
 
         for m in self._PROC.finditer(clean):
-            self._add_function(file_id, m.group(1),
-                               self._proc_args(m.group(2)), [],
-                               class_id=cls_id, description="modula-2 procedure")
+            self._add_function(
+                file_id,
+                m.group(1),
+                self._proc_args(m.group(2)),
+                [],
+                class_id=cls_id,
+                description="modula-2 procedure",
+            )
 
         for m in self._CONST.finditer(clean):
             self._add_variable(file_id, m.group(1), scope="module")

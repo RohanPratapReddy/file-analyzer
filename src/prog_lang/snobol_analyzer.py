@@ -9,7 +9,7 @@
 # Column-1 '*' -> comment line; column-1 '-' -> control line; '+'/'.' -> cont.
 # Strings use '"' and "'". No classes.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z][A-Za-z0-9_.]*"
@@ -18,23 +18,21 @@ _ID = r"[A-Za-z][A-Za-z0-9_.]*"
 class SnobolAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "snobol"
     EXTENSIONS = (".snobol", ".sno")
-    LINE_COMMENTS = ()          # column-sensitive; custom cleaner
+    LINE_COMMENTS = ()  # column-sensitive; custom cleaner
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ('"', "'")
 
-    _DEFINE = re.compile(r"(?i)\bDEFINE\s*\(\s*['\"]\s*(" + _ID +
-                         r")\s*(\([^)]*\))?")
+    _DEFINE = re.compile(r"(?i)\bDEFINE\s*\(\s*['\"]\s*(" + _ID + r")\s*(\([^)]*\))?")
     _INCLUDE = re.compile(r"(?im)^-\s*INCLUDE\s+['\"]([^'\"]+)['\"]")
     # assignment:  [LABEL] SUBJECT = OBJECT   -- capture the assigned identifier
-    _ASSIGN = re.compile(r"(?m)^\s*(?:(" + _ID + r")\s+)?(" + _ID +
-                         r")\s*=\s*(?!=)")
+    _ASSIGN = re.compile(r"(?m)^\s*(?:(" + _ID + r")\s+)?(" + _ID + r")\s*=\s*(?!=)")
 
     def _clean(self, text):
         out = []
         for line in text.splitlines():
-            if line[:1] == "*":                 # column-1 comment
+            if line[:1] == "*":  # column-1 comment
                 out.append("")
-            elif line[:1] == "-":               # control line (keep for include)
+            elif line[:1] == "-":  # control line (keep for include)
                 out.append(line)
             else:
                 out.append(line)
@@ -60,8 +58,7 @@ class SnobolAnalyzer(RegexCodeAnalyzer):
                     a = a.strip()
                     if a:
                         args.append(self._add_arg(a))
-            self._add_function(file_id, name, args, [],
-                               description="snobol function")
+            self._add_function(file_id, name, args, [], description="snobol function")
             defined.add(name.upper())
 
         seen = set()

@@ -14,6 +14,7 @@ class GapAnalyzer(ShellScriptBase):
     ``Read("file");`` / ``Reread(...)``   -> import
     ``LoadPackage("pkg");``               -> import
     """
+
     LANG_KEY = "gap"
     EXTENSIONS = (".g",)
     LINE_COMMENTS = ("#",)
@@ -35,8 +36,9 @@ class GapAnalyzer(ShellScriptBase):
                 continue
             seen_fn.add(name)
             params = self._split_top_level(m.group(2) or "")
-            self._add_shell_function(file_id, name, params=params,
-                                     description="gap function")
+            self._add_shell_function(
+                file_id, name, params=params, description="gap function"
+            )
 
         seen_var = set()
         for m in self._ASSIGN.finditer(clean):
@@ -58,8 +60,9 @@ class GapAnalyzer(ShellScriptBase):
                 seen_imp.add(pkg)
                 self._add_import(file_id, pkg, "package", alias="LoadPackage")
 
-        self._record_module_meta(file_id, functions=len(seen_fn),
-                                 variables=len(seen_var))
+        self._record_module_meta(
+            file_id, functions=len(seen_fn), variables=len(seen_var)
+        )
 
 
 class PariGpAnalyzer(ShellScriptBase):
@@ -70,9 +73,10 @@ class PariGpAnalyzer(ShellScriptBase):
     ``read("file")`` / ``\\r file``                    -> import
     ``install(sym, ...)``                             -> import
     """
+
     LANG_KEY = "pari-gp"
     EXTENSIONS = (".gp",)
-    LINE_COMMENTS = ("\\\\",)       # \\ starts a line comment in GP
+    LINE_COMMENTS = ("\\\\",)  # \\ starts a line comment in GP
     BLOCK_COMMENTS = (("/*", "*/"),)
     STRING_DELIMS = ('"',)
 
@@ -92,8 +96,9 @@ class PariGpAnalyzer(ShellScriptBase):
                 continue
             seen_fn.add(name)
             params = self._split_top_level(m.group(2) or "")
-            self._add_shell_function(file_id, name, params=params,
-                                     description="gp function")
+            self._add_shell_function(
+                file_id, name, params=params, description="gp function"
+            )
 
         seen_var = set()
         for m in self._ASSIGN.finditer(clean):
@@ -102,12 +107,13 @@ class PariGpAnalyzer(ShellScriptBase):
             if name in seen_fn or name in seen_var:
                 continue
             line_start = clean.rfind("\n", 0, m.start()) + 1
-            head = clean[line_start:m.start(2)]
+            head = clean[line_start : m.start(2)]
             if "(" in head.split("=")[0]:
                 continue
             seen_var.add(name)
-            self._add_variable(file_id, name, m.group(2).strip()[:120] or None,
-                               scope="gp")
+            self._add_variable(
+                file_id, name, m.group(2).strip()[:120] or None, scope="gp"
+            )
 
         seen_imp = set()
         for rx, kw in ((self._READ, "read"), (self._READCMD, "read")):
@@ -122,8 +128,9 @@ class PariGpAnalyzer(ShellScriptBase):
                 seen_imp.add(sym)
                 self._add_import(file_id, sym, "install", alias="install")
 
-        self._record_module_meta(file_id, functions=len(seen_fn),
-                                 variables=len(seen_var))
+        self._record_module_meta(
+            file_id, functions=len(seen_fn), variables=len(seen_var)
+        )
 
 
 class MapleAnalyzer(ShellScriptBase):
@@ -134,6 +141,7 @@ class MapleAnalyzer(ShellScriptBase):
     ``name := value;``                    -> variable
     ``with(pkg):`` / ``read "file";``     -> import
     """
+
     LANG_KEY = "maple"
     EXTENSIONS = (".mpl",)
     LINE_COMMENTS = ("#",)
@@ -168,8 +176,9 @@ class MapleAnalyzer(ShellScriptBase):
                 continue
             seen_fn.add(name)
             params = self._split_top_level(m.group(2) or "")
-            self._add_shell_function(file_id, name, params=params,
-                                     description="maple proc")
+            self._add_shell_function(
+                file_id, name, params=params, description="maple proc"
+            )
 
         seen_var = set()
         for m in self._ASSIGN.finditer(clean):
@@ -193,5 +202,6 @@ class MapleAnalyzer(ShellScriptBase):
                 seen_imp.add(tgt)
                 self._add_sourced(file_id, tgt, keyword="read")
 
-        self._record_module_meta(file_id, procs=len(seen_fn),
-                                 modules=len(seen_cls), variables=len(seen_var))
+        self._record_module_meta(
+            file_id, procs=len(seen_fn), modules=len(seen_cls), variables=len(seen_var)
+        )

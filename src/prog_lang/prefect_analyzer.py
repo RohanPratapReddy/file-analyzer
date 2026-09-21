@@ -22,6 +22,12 @@ from .python_embedded_base import PythonEmbeddedAnalyzer
 class PrefectAnalyzer(PythonEmbeddedAnalyzer):
     LANG_KEY = "prefect"
     EXTENSIONS = (".prefect",)
-    DSL_DECORATORS = ("flow", "task", "prefect.flow", "prefect.task",
-                      "materialize", "prefect.materialize")
+    DSL_DECORATORS = (
+        "flow",
+        "task",
+        "prefect.flow",
+        "prefect.task",
+        "materialize",
+        "prefect.materialize",
+    )
     DSL_BASECLASSES = ("Block", "prefect.Block", "prefect.blocks.core.Block")

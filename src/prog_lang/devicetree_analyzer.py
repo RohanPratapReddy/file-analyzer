@@ -16,7 +16,7 @@
 #
 # Comments are '//' and '/* */'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -35,7 +35,8 @@ class DeviceTreeAnalyzer(RegexCodeAnalyzer):
     _NODE = re.compile(
         r"^[ \t]*(?:([A-Za-z_]\w*)\s*:\s*)?"
         r"(/|&?[A-Za-z_][\w,.+-]*(?:@[\w,.+-]+)?)\s*\{",
-        re.MULTILINE)
+        re.MULTILINE,
+    )
     # a property is `name = ...;` or a boolean `name;` (name may start with '#')
     _PROP = re.compile(r"^[ \t]*([#A-Za-z_][\w,.+?#-]*)\s*(=|;)", re.MULTILINE)
 

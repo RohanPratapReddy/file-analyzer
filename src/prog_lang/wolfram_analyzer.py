@@ -11,7 +11,7 @@
 #
 # Comments are '(* *)' (nestable); strings use '"'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z$][A-Za-z0-9$]*"
@@ -57,8 +57,9 @@ class WolframAnalyzer(RegexCodeAnalyzer):
             name = m.group(1)
             func_names.add(name)
             args = self._pattern_args(m.group(2))
-            self._add_function(file_id, name, args, [],
-                               description="wolfram definition")
+            self._add_function(
+                file_id, name, args, [], description="wolfram definition"
+            )
 
         seen = set()
         for m in self._VAR.finditer(clean):

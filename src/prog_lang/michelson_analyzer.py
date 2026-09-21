@@ -11,7 +11,7 @@
 # declarations (variables); `code` and each named `view` are executable blocks
 # (functions).  Comments are '#', '/* */' and '(* *)'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -33,13 +33,12 @@ class MichelsonAnalyzer(RegexCodeAnalyzer):
         clean = self._strip_comments(text)
 
         for m in self._PARAM.finditer(clean):
-            self._add_variable(file_id, m.group(1),
-                               " ".join(m.group(2).split())[:80])
+            self._add_variable(file_id, m.group(1), " ".join(m.group(2).split())[:80])
 
         for m in self._VIEW.finditer(clean):
-            self._add_function(file_id, m.group(1), [], [],
-                               description="michelson view")
+            self._add_function(
+                file_id, m.group(1), [], [], description="michelson view"
+            )
 
         if self._CODE.search(clean):
-            self._add_function(file_id, "code", [], [],
-                               description="michelson code")
+            self._add_function(file_id, "code", [], [], description="michelson code")

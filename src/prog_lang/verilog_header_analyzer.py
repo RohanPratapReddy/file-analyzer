@@ -16,7 +16,7 @@
 #
 # Comments are '//' and '/* */'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -31,18 +31,21 @@ class VerilogHeaderAnalyzer(RegexCodeAnalyzer):
     _DEFINE = re.compile(r"^[ \t]*`define\s+([A-Za-z_]\w*)", re.MULTILINE)
     _PARAM = re.compile(
         r"^[ \t]*(?:parameter|localparam)\b(?:\s+\w+)?(?:\s*\[[^\]]*\])?\s+"
-        r"([A-Za-z_]\w*)\s*=", re.MULTILINE)
+        r"([A-Za-z_]\w*)\s*=",
+        re.MULTILINE,
+    )
     _MODULE = re.compile(r"^[ \t]*module\s+([A-Za-z_]\w*)", re.MULTILINE)
     _INTERFACE = re.compile(r"^[ \t]*interface\s+([A-Za-z_]\w*)", re.MULTILINE)
     _PACKAGE = re.compile(r"^[ \t]*package\s+([A-Za-z_]\w*)", re.MULTILINE)
-    _CLASS = re.compile(r"^[ \t]*(?:virtual\s+)?class\s+([A-Za-z_]\w*)",
-                        re.MULTILINE)
+    _CLASS = re.compile(r"^[ \t]*(?:virtual\s+)?class\s+([A-Za-z_]\w*)", re.MULTILINE)
     _TYPEDEF = re.compile(r"^[ \t]*typedef\b", re.MULTILINE)
     _FUNCTION = re.compile(
         r"^[ \t]*function\b(?:\s+automatic)?[^;(]*?\b([A-Za-z_]\w*)\s*[;(]",
-        re.MULTILINE)
+        re.MULTILINE,
+    )
     _TASK = re.compile(
-        r"^[ \t]*task\b(?:\s+automatic)?\s+([A-Za-z_]\w*)\s*[;(]", re.MULTILINE)
+        r"^[ \t]*task\b(?:\s+automatic)?\s+([A-Za-z_]\w*)\s*[;(]", re.MULTILINE
+    )
 
     def _typedef_name(self, clean, start):
         """Return the declared name of a typedef beginning at `start` (just
@@ -96,10 +99,12 @@ class VerilogHeaderAnalyzer(RegexCodeAnalyzer):
         for m in self._PARAM.finditer(clean):
             self._add_variable(file_id, m.group(1), "parameter")
 
-        for rx, desc in ((self._MODULE, "verilog module"),
-                         (self._INTERFACE, "verilog interface"),
-                         (self._PACKAGE, "verilog package"),
-                         (self._CLASS, "verilog class")):
+        for rx, desc in (
+            (self._MODULE, "verilog module"),
+            (self._INTERFACE, "verilog interface"),
+            (self._PACKAGE, "verilog package"),
+            (self._CLASS, "verilog class"),
+        ):
             for m in rx.finditer(clean):
                 self._add_class(file_id, m.group(1), description=desc)
         for m in self._TYPEDEF.finditer(clean):
@@ -111,17 +116,19 @@ class VerilogHeaderAnalyzer(RegexCodeAnalyzer):
             if clean[m.end() - 1] == "(":
                 lp = m.end() - 1
                 rp = self._find_matching(clean, lp, "(", ")")
-                arg_ids = self._args(clean[lp + 1:rp - 1])
+                arg_ids = self._args(clean[lp + 1 : rp - 1])
             else:
                 arg_ids = []
-            self._add_function(file_id, m.group(1), arg_ids, [],
-                               description="verilog function")
+            self._add_function(
+                file_id, m.group(1), arg_ids, [], description="verilog function"
+            )
         for m in self._TASK.finditer(clean):
             if clean[m.end() - 1] == "(":
                 lp = m.end() - 1
                 rp = self._find_matching(clean, lp, "(", ")")
-                arg_ids = self._args(clean[lp + 1:rp - 1])
+                arg_ids = self._args(clean[lp + 1 : rp - 1])
             else:
                 arg_ids = []
-            self._add_function(file_id, m.group(1), arg_ids, [],
-                               description="verilog task")
+            self._add_function(
+                file_id, m.group(1), arg_ids, [], description="verilog task"
+            )

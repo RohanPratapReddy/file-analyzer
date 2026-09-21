@@ -11,18 +11,26 @@
 #   def area (r : Float) : Float := ...                    -> function
 #   theorem foo : P := ...   lemma / abbrev / instance     -> function
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
-_DEFKW = ("def", "theorem", "lemma", "abbrev", "instance", "example",
-          "noncomputable def", "partial def")
+_DEFKW = (
+    "def",
+    "theorem",
+    "lemma",
+    "abbrev",
+    "instance",
+    "example",
+    "noncomputable def",
+    "partial def",
+)
 
 
 class LeanAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "lean"
     EXTENSIONS = (".lean",)
     LINE_COMMENTS = ("--",)
-    BLOCK_COMMENTS = ()             # nested /- -/ handled below
+    BLOCK_COMMENTS = ()  # nested /- -/ handled below
     STRING_DELIMS = ('"',)
 
     _IMPORT = re.compile(r"^import\s+([\w.]+)", re.MULTILINE)
@@ -30,38 +38,56 @@ class LeanAnalyzer(RegexCodeAnalyzer):
     _NAMESPACE = re.compile(r"^namespace\s+([\w.]+)", re.MULTILINE)
     _STRUCT = re.compile(
         r"^(?:@\[[^\]]*\]\s*)?(?:private\s+|protected\s+)?structure\s+([\w.]+)",
-        re.MULTILINE)
+        re.MULTILINE,
+    )
     _INDUCT = re.compile(
         r"^(?:@\[[^\]]*\]\s*)?(?:private\s+|protected\s+)?inductive\s+([\w.]+)",
-        re.MULTILINE)
+        re.MULTILINE,
+    )
     _CLASS = re.compile(
         r"^(?:@\[[^\]]*\]\s*)?(?:private\s+|protected\s+)?class\s+([\w.]+)",
-        re.MULTILINE)
+        re.MULTILINE,
+    )
     _DEF = re.compile(
         r"^(?:@\[[^\]]*\]\s*)?(?:private\s+|protected\s+|noncomputable\s+|"
         r"partial\s+|unsafe\s+|scoped\s+)*"
-        r"(def|theorem|lemma|abbrev|instance)\s+([\w.']+)?\s*", re.MULTILINE)
+        r"(def|theorem|lemma|abbrev|instance)\s+([\w.']+)?\s*",
+        re.MULTILINE,
+    )
 
     def _strip_block(self, text):
         out, i, n, depth = [], 0, len(text), 0
         while i < n:
             if depth == 0 and text[i] == '"':
-                out.append('"'); i += 1
+                out.append('"')
+                i += 1
                 while i < n:
-                    c = text[i]; out.append(c)
+                    c = text[i]
+                    out.append(c)
                     if c == "\\" and i + 1 < n:
-                        out.append(text[i + 1]); i += 2; continue
+                        out.append(text[i + 1])
+                        i += 2
+                        continue
                     i += 1
                     if c == '"':
                         break
                 continue
-            if text[i:i + 2] == "/-":
-                depth += 1; out.append("  "); i += 2; continue
-            if text[i:i + 2] == "-/" and depth > 0:
-                depth -= 1; out.append("  "); i += 2; continue
+            if text[i : i + 2] == "/-":
+                depth += 1
+                out.append("  ")
+                i += 2
+                continue
+            if text[i : i + 2] == "-/" and depth > 0:
+                depth -= 1
+                out.append("  ")
+                i += 2
+                continue
             if depth > 0:
-                out.append("\n" if text[i] == "\n" else " "); i += 1; continue
-            out.append(text[i]); i += 1
+                out.append("\n" if text[i] == "\n" else " ")
+                i += 1
+                continue
+            out.append(text[i])
+            i += 1
         return "".join(out)
 
     def _clean(self, text):
@@ -75,7 +101,7 @@ class LeanAnalyzer(RegexCodeAnalyzer):
         if nl == -1:
             return ""
         out, end = [], nl + 1
-        for line in text[nl + 1:].splitlines(keepends=True):
+        for line in text[nl + 1 :].splitlines(keepends=True):
             if line.strip() and self._indent_of(line) == 0:
                 break
             out.append(line)
@@ -108,13 +134,18 @@ class LeanAnalyzer(RegexCodeAnalyzer):
             # inline `extends Parent`
             parents = []
             head_end = text.find("\n", m.end())
-            head = text[m.end():head_end if head_end != -1 else len(text)]
+            head = text[m.end() : head_end if head_end != -1 else len(text)]
             for pm in re.finditer(r"extends\s+([\w.]+)", head):
                 pn = self._leaf(pm.group(1))
                 if pn in self._class_registry:
                     parents.append(self._class_registry[pn])
-            self._add_class(file_id, name, description="lean structure",
-                            parent_ids=parents, attr_ids=attrs)
+            self._add_class(
+                file_id,
+                name,
+                description="lean structure",
+                parent_ids=parents,
+                attr_ids=attrs,
+            )
 
         # inductive -> constructors as attrs
         for m in self._INDUCT.finditer(text):
@@ -131,9 +162,16 @@ class LeanAnalyzer(RegexCodeAnalyzer):
             body = self._indent_body(text, m.start())
             methods = []
             for mm in re.finditer(r"^\s+([\w']+)\s*:\s+", body, re.MULTILINE):
-                methods.append(self._add_function(file_id, mm.group(1), [], [],
-                               class_id=self._class_registry.get(name),
-                               description="lean class member"))
+                methods.append(
+                    self._add_function(
+                        file_id,
+                        mm.group(1),
+                        [],
+                        [],
+                        class_id=self._class_registry.get(name),
+                        description="lean class member",
+                    )
+                )
             self._add_class(file_id, name, description="lean class", method_ids=methods)
 
         # def / theorem / lemma / abbrev / instance
@@ -143,8 +181,13 @@ class LeanAnalyzer(RegexCodeAnalyzer):
                 continue
             name = self._leaf(name)
             # parse binders up to ':' or ':=' for args
-            tail = text[m.end():text.find("\n", m.end()) if text.find("\n", m.end()) != -1
-                        else len(text)]
+            tail = text[
+                m.end() : (
+                    text.find("\n", m.end())
+                    if text.find("\n", m.end()) != -1
+                    else len(text)
+                )
+            ]
             arg_ids = []
             for bm in re.finditer(r"[\(\{\[]\s*([\w'\s]+?)\s*:", tail):
                 for v in bm.group(1).split():

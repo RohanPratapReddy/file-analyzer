@@ -16,14 +16,14 @@
 # (index 6) is a full-line comment; '-' is a continuation. Free format uses
 # '*>' inline comments. Both are handled below.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
 class CobolAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "cobol"
     EXTENSIONS = (".cbl", ".cob", ".cpy")
-    LINE_COMMENTS = ("*>",)          # free-format inline; fixed-format col-7 done manually
+    LINE_COMMENTS = ("*>",)  # free-format inline; fixed-format col-7 done manually
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ('"', "'")
 
@@ -31,25 +31,62 @@ class CobolAnalyzer(RegexCodeAnalyzer):
     _FUNCTION = re.compile(r"\bFUNCTION-ID\s*\.\s*([A-Za-z0-9][\w-]*)", re.IGNORECASE)
     _CLASSID = re.compile(r"\bCLASS-ID\s*\.\s*([A-Za-z0-9][\w-]*)", re.IGNORECASE)
     _COPY = re.compile(r"\bCOPY\s+([A-Za-z0-9][\w-]*)", re.IGNORECASE)
-    _CALL = re.compile(r'\bCALL\s+(?:"([^"]+)"|\'([^\']+)\'|([A-Za-z0-9][\w-]*))',
-                       re.IGNORECASE)
+    _CALL = re.compile(
+        r'\bCALL\s+(?:"([^"]+)"|\'([^\']+)\'|([A-Za-z0-9][\w-]*))', re.IGNORECASE
+    )
     # data item:  level-number  name  [PIC ...] [VALUE ...] .
     _DATA = re.compile(
         r"^\s*(\d{1,2})\s+([A-Za-z0-9][\w-]*)"
         r"(?:\s+(?:PIC(?:TURE)?\s+(?:IS\s+)?(\S+)))?"
-        r"(?:.*?\bVALUE\s+(?:IS\s+)?([^.]+?))?\s*\.?\s*$", re.IGNORECASE)
+        r"(?:.*?\bVALUE\s+(?:IS\s+)?([^.]+?))?\s*\.?\s*$",
+        re.IGNORECASE,
+    )
     # paragraph or section header:  NAME.  or  NAME SECTION.
     _PARA = re.compile(r"^\s*([A-Za-z0-9][\w-]*)\s*(SECTION)?\s*\.\s*$", re.IGNORECASE)
     _DIV = re.compile(r"^\s*[A-Z0-9-]+\s+DIVISION\b", re.IGNORECASE)
     _PROC_DIV = re.compile(r"^\s*PROCEDURE\s+DIVISION\b(.*)$", re.IGNORECASE)
 
     _STMT_KW = {
-        "accept", "add", "call", "cancel", "close", "compute", "continue",
-        "delete", "display", "divide", "evaluate", "exit", "goback", "go",
-        "if", "initialize", "inspect", "move", "multiply", "open", "perform",
-        "read", "release", "return", "rewrite", "search", "set", "sort",
-        "start", "stop", "string", "subtract", "unstring", "write", "when",
-        "else", "end-if", "end-perform", "end-evaluate", "end-read",
+        "accept",
+        "add",
+        "call",
+        "cancel",
+        "close",
+        "compute",
+        "continue",
+        "delete",
+        "display",
+        "divide",
+        "evaluate",
+        "exit",
+        "goback",
+        "go",
+        "if",
+        "initialize",
+        "inspect",
+        "move",
+        "multiply",
+        "open",
+        "perform",
+        "read",
+        "release",
+        "return",
+        "rewrite",
+        "search",
+        "set",
+        "sort",
+        "start",
+        "stop",
+        "string",
+        "subtract",
+        "unstring",
+        "write",
+        "when",
+        "else",
+        "end-if",
+        "end-perform",
+        "end-evaluate",
+        "end-read",
     }
 
     # ------------------------------------------------------------------
@@ -103,12 +140,22 @@ class CobolAnalyzer(RegexCodeAnalyzer):
         # program units (class rows) with paragraph methods.
         programs = []
         for i, line in enumerate(lines):
-            for rx, kind in ((self._PROGRAM, "program"), (self._FUNCTION, "function"),
-                             (self._CLASSID, "class")):
+            for rx, kind in (
+                (self._PROGRAM, "program"),
+                (self._FUNCTION, "function"),
+                (self._CLASSID, "class"),
+            ):
                 m = rx.search(line)
                 if m:
-                    programs.append({"name": m.group(1).upper(), "kind": kind,
-                                     "line": i, "methods": [], "attrs": []})
+                    programs.append(
+                        {
+                            "name": m.group(1).upper(),
+                            "kind": kind,
+                            "line": i,
+                            "methods": [],
+                            "attrs": [],
+                        }
+                    )
 
         def owner_for(lineno):
             best = None
@@ -133,8 +180,13 @@ class CobolAnalyzer(RegexCodeAnalyzer):
                 if um:
                     for tok in re.split(r"[,\s]+", um.group(1).strip()):
                         tok = tok.strip(".")
-                        if tok and tok.upper() not in ("BY", "REFERENCE", "VALUE",
-                                                       "CONTENT", "USING"):
+                        if tok and tok.upper() not in (
+                            "BY",
+                            "REFERENCE",
+                            "VALUE",
+                            "CONTENT",
+                            "USING",
+                        ):
                             arg_ids.append(self._add_arg(tok, "cobol-param"))
                 if owner is not None and arg_ids:
                     # attach params to a synthetic entry paragraph later; keep as attrs
@@ -156,16 +208,23 @@ class CobolAnalyzer(RegexCodeAnalyzer):
                         continue
                     owner = owner_for(i)
                     cid = self._class_registry.get(owner["name"]) if owner else None
-                    fid = self._add_function(file_id, name, [], [], class_id=cid,
-                                             description="cobol section" if is_section
-                                             else "cobol paragraph")
+                    fid = self._add_function(
+                        file_id,
+                        name,
+                        [],
+                        [],
+                        class_id=cid,
+                        description=(
+                            "cobol section" if is_section else "cobol paragraph"
+                        ),
+                    )
                     if owner is not None:
                         owner["methods"].append(fid)
 
         # data items -> variables (01/77 levels) or group attributes.
         # a 01/77 group with subordinate items becomes a variable; subordinate
         # numbered items become args attached to their nearest 01 group owner.
-        group_stack = []   # (level, var_or_group_dict)
+        group_stack = []  # (level, var_or_group_dict)
         for i, line in enumerate(lines):
             dm = self._DATA.match(line)
             if not dm:
@@ -177,12 +236,15 @@ class CobolAnalyzer(RegexCodeAnalyzer):
             pic = dm.group(3)
             val = dm.group(4)
             if level in (1, 77):
-                self._add_variable(file_id, name,
-                                   val.strip() if val else (pic or None))
+                self._add_variable(file_id, name, val.strip() if val else (pic or None))
             # subordinate items recorded as args of enclosing program (data model)
             # kept lightweight: only top-level 01/77 become variables.
 
         for p in programs:
-            self._add_class(file_id, p["name"], description=f"cobol {p['kind']}",
-                            method_ids=p["methods"],
-                            attr_ids=p.get("params", []))
+            self._add_class(
+                file_id,
+                p["name"],
+                description=f"cobol {p['kind']}",
+                method_ids=p["methods"],
+                attr_ids=p.get("params", []),
+            )

@@ -6,7 +6,7 @@
 # component's props and are recorded as (exported) variables.  Markup and <style>
 # are ignored -- they hold no callable/type definitions.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -18,16 +18,18 @@ class SvelteAnalyzer(RegexCodeAnalyzer):
 
     _SCRIPT = re.compile(r"<script\b[^>]*>(.*?)</script>", re.DOTALL | re.I)
     _IMPORT = re.compile(
-        r"""^\s*import\s+(?:(.+?)\s+from\s+)?['"]([^'"]+)['"]""", re.MULTILINE)
+        r"""^\s*import\s+(?:(.+?)\s+from\s+)?['"]([^'"]+)['"]""", re.MULTILINE
+    )
     _FUNC = re.compile(
-        r"^\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)",
-        re.MULTILINE)
+        r"^\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)", re.MULTILINE
+    )
     _ARROW = re.compile(
         r"^\s*(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?"
-        r"\(([^)]*)\)\s*=>", re.MULTILINE)
+        r"\(([^)]*)\)\s*=>",
+        re.MULTILINE,
+    )
     _PROP = re.compile(r"^\s*export\s+(?:let|const)\s+(\w+)", re.MULTILINE)
-    _VAR = re.compile(
-        r"^\s*(?:const|let|var)\s+(\w+)\s*=(?!=)", re.MULTILINE)
+    _VAR = re.compile(r"^\s*(?:const|let|var)\s+(\w+)\s*=(?!=)", re.MULTILINE)
 
     def _script(self, text):
         return "\n".join(m.group(1) for m in self._SCRIPT.finditer(text))
@@ -40,8 +42,12 @@ class SvelteAnalyzer(RegexCodeAnalyzer):
 
         for m in self._IMPORT.finditer(s):
             src = m.group(2)
-            self._add_import(file_id, src.split("/")[-1], src,
-                             alias=(m.group(1) or "").strip() or None)
+            self._add_import(
+                file_id,
+                src.split("/")[-1],
+                src,
+                alias=(m.group(1) or "").strip() or None,
+            )
 
         self._add_class(file_id, path.stem, description="svelte component")
 
@@ -65,6 +71,8 @@ class SvelteAnalyzer(RegexCodeAnalyzer):
                 self._add_variable(file_id, m.group(1))
 
     def _args(self, params):
-        return [self._add_arg(p.split(":")[0].split("=")[0].strip())
-                for p in self._split_top_level(params)
-                if p.split(":")[0].split("=")[0].strip()]
+        return [
+            self._add_arg(p.split(":")[0].split("=")[0].strip())
+            for p in self._split_top_level(params)
+            if p.split(":")[0].split("=")[0].strip()
+        ]

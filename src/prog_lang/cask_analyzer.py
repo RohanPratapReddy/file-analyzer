@@ -26,36 +26,70 @@
 #
 # Ruby `#` line comments; single- and double-quoted strings.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
-_STANZAS = ("version", "sha256", "url", "name", "desc", "homepage", "app", "pkg",
-            "binary", "manpage", "colorpicker", "dictionary", "font",
-            "input_method", "internet_plugin", "prefpane", "qlplugin",
-            "screen_saver", "service", "suite", "artifact", "installer",
-            "container", "appcast", "auto_updates", "arch", "os",
-            "livecheck", "language")
-_BLOCKS = ("preflight", "postflight", "uninstall_preflight",
-           "uninstall_postflight", "uninstall", "zap", "caveats")
+_STANZAS = (
+    "version",
+    "sha256",
+    "url",
+    "name",
+    "desc",
+    "homepage",
+    "app",
+    "pkg",
+    "binary",
+    "manpage",
+    "colorpicker",
+    "dictionary",
+    "font",
+    "input_method",
+    "internet_plugin",
+    "prefpane",
+    "qlplugin",
+    "screen_saver",
+    "service",
+    "suite",
+    "artifact",
+    "installer",
+    "container",
+    "appcast",
+    "auto_updates",
+    "arch",
+    "os",
+    "livecheck",
+    "language",
+)
+_BLOCKS = (
+    "preflight",
+    "postflight",
+    "uninstall_preflight",
+    "uninstall_postflight",
+    "uninstall",
+    "zap",
+    "caveats",
+)
 
 
 class CaskAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "cask"
-    EXTENSIONS = (".cask",)     # Homebrew casks ship as `.rb`; appended at test time
+    EXTENSIONS = (".cask",)  # Homebrew casks ship as `.rb`; appended at test time
     LINE_COMMENTS = ("#",)
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ('"', "'")
 
     _CASK = re.compile(r'(?m)^\s*cask\s+["\']([^"\']+)["\']\s+do')
-    _STANZA = re.compile(r"(?m)^\s*(" + "|".join(_STANZAS) +
-                         r')\s+["\']([^"\']*)["\']')
+    _STANZA = re.compile(r"(?m)^\s*(" + "|".join(_STANZAS) + r')\s+["\']([^"\']*)["\']')
     _VERSION_BARE = re.compile(r"(?m)^\s*version\s+(:\w+)")
-    _DEPENDS = re.compile(r'(?m)^\s*depends_on\s+(cask|formula|macos|arch):'
-                          r'\s*["\']?([^"\'\n,]+)')
+    _DEPENDS = re.compile(
+        r"(?m)^\s*depends_on\s+(cask|formula|macos|arch):" r'\s*["\']?([^"\'\n,]+)'
+    )
     _BLOCK = re.compile(r"(?m)^\s*(" + "|".join(_BLOCKS) + r")\s+do\b")
     # zap/uninstall also take a directive-hash form: `zap trash: "..."`
-    _CLEANUP = re.compile(r"(?m)^\s*(zap|uninstall|uninstall_preflight|"
-                          r"uninstall_postflight)\s+[a-z_]+:")
+    _CLEANUP = re.compile(
+        r"(?m)^\s*(zap|uninstall|uninstall_preflight|"
+        r"uninstall_postflight)\s+[a-z_]+:"
+    )
 
     def _register_types(self, file_id, text, path):
         clean = self._strip_comments(text)
@@ -97,4 +131,6 @@ class CaskAnalyzer(RegexCodeAnalyzer):
             if nm in seen_fn:
                 continue
             seen_fn.add(nm)
-            self._add_function(file_id, nm, [], [], description="cask cleanup directive")
+            self._add_function(
+                file_id, nm, [], [], description="cask cleanup directive"
+            )

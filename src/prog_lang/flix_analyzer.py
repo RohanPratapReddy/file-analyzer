@@ -17,7 +17,7 @@
 #
 # Comments are '//', '///' and '/* */'; strings use '"'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -38,7 +38,9 @@ class FlixAnalyzer(RegexCodeAnalyzer):
     # `def` may sit inline inside a trait/instance body (`{ pub def eq(...) }`),
     # so anchor on a keyword boundary rather than line start.
     _DEF = re.compile(r"(?<![\w.])def\s+(" + _ID + r")")
-    _ENUM = re.compile(r"(?m)^\s*(?:pub\s+)?(?:sealed\s+|restrictable\s+)?enum\s+(" + _ID + r")")
+    _ENUM = re.compile(
+        r"(?m)^\s*(?:pub\s+)?(?:sealed\s+|restrictable\s+)?enum\s+(" + _ID + r")"
+    )
     _STRUCT = re.compile(r"(?m)^\s*(?:pub\s+)?struct\s+(" + _ID + r")")
     _TRAIT = re.compile(r"(?m)^\s*(?:pub\s+)?(?:trait|class)\s+(" + _ID + r")")
     _EFF = re.compile(r"(?m)^\s*(?:pub\s+)?eff\s+(" + _ID + r")")
@@ -64,8 +66,9 @@ class FlixAnalyzer(RegexCodeAnalyzer):
                             self._add_import(file_id, nm, base + "." + nm)
 
         for m in self._MOD.finditer(clean):
-            self._add_class(file_id, m.group(1).split(".")[-1],
-                            description="flix module")
+            self._add_class(
+                file_id, m.group(1).split(".")[-1], description="flix module"
+            )
         for m in self._ENUM.finditer(clean):
             self._add_class(file_id, m.group(1), description="flix enum")
         for m in self._STRUCT.finditer(clean):
@@ -78,5 +81,4 @@ class FlixAnalyzer(RegexCodeAnalyzer):
             self._add_variable(file_id, m.group(1), scope="type")
 
         for m in self._DEF.finditer(clean):
-            self._add_function(file_id, m.group(1), [], [],
-                               description="flix function")
+            self._add_function(file_id, m.group(1), [], [], description="flix function")

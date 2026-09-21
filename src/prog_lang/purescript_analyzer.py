@@ -12,7 +12,7 @@
 #   area :: Number -> Number                                -> (type annotation)
 #   area r = pi * r * r                                     -> function
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -20,12 +20,14 @@ class PureScriptAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "purescript"
     EXTENSIONS = (".purs",)
     LINE_COMMENTS = ("--",)
-    BLOCK_COMMENTS = ()             # nested {- -} handled below
+    BLOCK_COMMENTS = ()  # nested {- -} handled below
     STRING_DELIMS = ('"',)
 
     _IMPORT = re.compile(
         r"^import\s+([\w.]+)(?:\s*\(([^)]*)\))?(?:\s+as\s+(\w+))?"
-        r"(?:\s+hiding\s*\([^)]*\))?", re.MULTILINE)
+        r"(?:\s+hiding\s*\([^)]*\))?",
+        re.MULTILINE,
+    )
     _DATA = re.compile(r"^(?:data|newtype)\s+([A-Z]\w*)", re.MULTILINE)
     _TYPE = re.compile(r"^type\s+([A-Z]\w*)", re.MULTILINE)
     _CLASS = re.compile(r"^class\s+(?:.*?=>\s*)?([A-Z]\w*)", re.MULTILINE)
@@ -37,22 +39,35 @@ class PureScriptAnalyzer(RegexCodeAnalyzer):
         out, i, n, depth = [], 0, len(text), 0
         while i < n:
             if depth == 0 and text[i] == '"':
-                out.append('"'); i += 1
+                out.append('"')
+                i += 1
                 while i < n:
-                    c = text[i]; out.append(c)
+                    c = text[i]
+                    out.append(c)
                     if c == "\\" and i + 1 < n:
-                        out.append(text[i + 1]); i += 2; continue
+                        out.append(text[i + 1])
+                        i += 2
+                        continue
                     i += 1
                     if c == '"':
                         break
                 continue
-            if text[i:i + 2] == "{-":
-                depth += 1; out.append("  "); i += 2; continue
-            if text[i:i + 2] == "-}" and depth > 0:
-                depth -= 1; out.append("  "); i += 2; continue
+            if text[i : i + 2] == "{-":
+                depth += 1
+                out.append("  ")
+                i += 2
+                continue
+            if text[i : i + 2] == "-}" and depth > 0:
+                depth -= 1
+                out.append("  ")
+                i += 2
+                continue
             if depth > 0:
-                out.append("\n" if text[i] == "\n" else " "); i += 1; continue
-            out.append(text[i]); i += 1
+                out.append("\n" if text[i] == "\n" else " ")
+                i += 1
+                continue
+            out.append(text[i])
+            i += 1
         return "".join(out)
 
     def _clean(self, text):
@@ -63,7 +78,7 @@ class PureScriptAnalyzer(RegexCodeAnalyzer):
         if nl == -1:
             return text[start:]
         end = nl + 1
-        for line in text[nl + 1:].splitlines(keepends=True):
+        for line in text[nl + 1 :].splitlines(keepends=True):
             if line[:1] not in (" ", "\t", "\n", "\r", ""):
                 break
             end += len(line)
@@ -111,7 +126,9 @@ class PureScriptAnalyzer(RegexCodeAnalyzer):
                     fm = re.match(r"(\w+)\s*::\s*(.+)", field.strip(), re.DOTALL)
                     if fm:
                         attrs.append(self._add_arg(fm.group(1), fm.group(2).strip()))
-            self._add_class(file_id, name, description="purescript type", attr_ids=attrs)
+            self._add_class(
+                file_id, name, description="purescript type", attr_ids=attrs
+            )
 
         # type classes -> class row with member method names
         for m in self._CLASS.finditer(text):
@@ -119,11 +136,19 @@ class PureScriptAnalyzer(RegexCodeAnalyzer):
             body = self._decl_body(text, m.end())
             methods = []
             for mm in re.finditer(r"^\s+([a-z_]\w*'?)\s*::", body, re.MULTILINE):
-                methods.append(self._add_function(file_id, mm.group(1), [], [],
-                               class_id=self._class_registry.get(name),
-                               description="purescript class member"))
-            self._add_class(file_id, name, description="purescript class",
-                            method_ids=methods)
+                methods.append(
+                    self._add_function(
+                        file_id,
+                        mm.group(1),
+                        [],
+                        [],
+                        class_id=self._class_registry.get(name),
+                        description="purescript class member",
+                    )
+                )
+            self._add_class(
+                file_id, name, description="purescript class", method_ids=methods
+            )
 
         # top-level annotations (for return types)
         annotations = {}
@@ -134,17 +159,37 @@ class PureScriptAnalyzer(RegexCodeAnalyzer):
         emitted = set()
         for m in self._DEF.finditer(text):
             name, params = m.group(1), m.group(2).strip()
-            if name in emitted or name in ("module", "import", "data", "type",
-                                           "newtype", "class", "instance", "derive",
-                                           "foreign", "where", "let", "in", "if",
-                                           "then", "else", "case", "of"):
+            if name in emitted or name in (
+                "module",
+                "import",
+                "data",
+                "type",
+                "newtype",
+                "class",
+                "instance",
+                "derive",
+                "foreign",
+                "where",
+                "let",
+                "in",
+                "if",
+                "then",
+                "else",
+                "case",
+                "of",
+            ):
                 continue
             emitted.add(name)
-            pnames = [p for p in re.split(r"\s+", params) if re.match(r"^[a-z_]\w*'?$", p)]
+            pnames = [
+                p for p in re.split(r"\s+", params) if re.match(r"^[a-z_]\w*'?$", p)
+            ]
             if pnames:
                 arg_ids = [self._add_arg(p) for p in pnames]
-                out_ids = ([self._add_output(annotations[name].split("->")[-1].strip())]
-                           if name in annotations and "->" in annotations[name] else [])
+                out_ids = (
+                    [self._add_output(annotations[name].split("->")[-1].strip())]
+                    if name in annotations and "->" in annotations[name]
+                    else []
+                )
                 self._add_function(file_id, name, arg_ids, out_ids)
             else:
                 if name in annotations and "->" in annotations[name]:

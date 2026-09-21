@@ -1,16 +1,9 @@
 # Auto-extracted from code_analyzer.py (verbatim class body).
-import os
 import csv
 import json
-import re
-import ast
-import dis
-import inspect
-import traceback
-import subprocess
-import sqlite3
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
+
 
 class ImportLinkageAnalyzer:
     """
@@ -54,7 +47,9 @@ class ImportLinkageAnalyzer:
 
     def __init__(
         self,
-        repository_tables: Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]],
+        repository_tables: Tuple[
+            List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]
+        ],
         code_analyzer_tables: Dict[str, List[Dict[str, Any]]],
         analyzed_file_paths: Optional[List[Union[str, Path]]] = None,
         code_file_map: Optional[Dict[int, Optional[int]]] = None,
@@ -103,7 +98,9 @@ class ImportLinkageAnalyzer:
 
     def _file_relpath(self, file_row: Dict[str, Any]) -> str:
         """Reconstruct a file's posix relative path from repository metadata."""
-        ext = self._clean_ext(self._ext_name_by_id.get(file_row.get("file_extension_id")))
+        ext = self._clean_ext(
+            self._ext_name_by_id.get(file_row.get("file_extension_id"))
+        )
         location = file_row.get("location") or []
         deepest_folder = location[-1] if location else 1
         folder_path = self._folder_name_by_id.get(deepest_folder, ".")
@@ -116,7 +113,9 @@ class ImportLinkageAnalyzer:
         for f in self.files:
             relpath = self._file_relpath(f)
             self._repo_by_relpath.setdefault(relpath, f["file_id"])
-            self._repo_by_basename.setdefault(Path(relpath).name, []).append(f["file_id"])
+            self._repo_by_basename.setdefault(Path(relpath).name, []).append(
+                f["file_id"]
+            )
 
             # Build dotted-module candidates for imported_to resolution.
             location = f.get("location") or []
@@ -184,7 +183,9 @@ class ImportLinkageAnalyzer:
                 result.setdefault(sym.get("target_entity_id"), sym.get("file_id"))
         return result
 
-    def _repo_file_meta(self, repo_file_id: Optional[int]) -> Tuple[Optional[str], Optional[str], List[int]]:
+    def _repo_file_meta(
+        self, repo_file_id: Optional[int]
+    ) -> Tuple[Optional[str], Optional[str], List[int]]:
         """Return (file_name, file_type/extension, location[list]) for a repo file id."""
         if repo_file_id is None:
             return None, None, []
@@ -211,18 +212,23 @@ class ImportLinkageAnalyzer:
                 return self._module_index[dotted]
         return None
 
-    def _value_ids_for_import(self, import_id: int) -> Tuple[List[int], List[int], List[int]]:
+    def _value_ids_for_import(
+        self, import_id: int
+    ) -> Tuple[List[int], List[int], List[int]]:
         """Collect (variable_ids, function_ids, class_ids) projected from an import."""
         var_ids = [
-            v["variable_id"] for v in self.code_tables.get("variables_table", [])
+            v["variable_id"]
+            for v in self.code_tables.get("variables_table", [])
             if v.get("source_import_id") == import_id
         ]
         fn_ids = [
-            fn["function_id"] for fn in self.code_tables.get("functions_table", [])
+            fn["function_id"]
+            for fn in self.code_tables.get("functions_table", [])
             if fn.get("source_import_id") == import_id
         ]
         cls_ids = [
-            c["class_id"] for c in self.code_tables.get("classes_table", [])
+            c["class_id"]
+            for c in self.code_tables.get("classes_table", [])
             if c.get("source_import_id") == import_id
         ]
         return var_ids, fn_ids, cls_ids
@@ -240,7 +246,11 @@ class ImportLinkageAnalyzer:
 
             # imported_by: file that contains the import statement.
             code_file_id = import_to_code_file.get(import_id)
-            imported_by_repo_id = self.code_file_map.get(code_file_id) if code_file_id is not None else None
+            imported_by_repo_id = (
+                self.code_file_map.get(code_file_id)
+                if code_file_id is not None
+                else None
+            )
             by_name, by_type, by_location = self._repo_file_meta(imported_by_repo_id)
 
             # imported_to: repository file the import resolves to (if local).
@@ -249,26 +259,28 @@ class ImportLinkageAnalyzer:
 
             var_ids, fn_ids, cls_ids = self._value_ids_for_import(import_id)
 
-            self.linkage_table.append({
-                "linkage_id": linkage_id,
-                "import_id": import_id,
-                "import_name": imp.get("import_name"),
-                "import_source": imp.get("import_source"),
-                "alias": imp.get("alias"),
-                "imported_by_file_id": imported_by_repo_id,
-                "imported_by_file_name": by_name,
-                "imported_by_file_type": by_type,
-                "imported_by_file_location": by_location,
-                "imported_to_file_id": imported_to_repo_id,
-                "imported_to_file_name": to_name,
-                "imported_to_file_type": to_type,
-                "imported_to_file_location": to_location,
-                "is_external": imported_to_repo_id is None,
-                "import_value_ids": var_ids + fn_ids + cls_ids,
-                "import_value_variable_ids": var_ids,
-                "import_value_function_ids": fn_ids,
-                "import_value_class_ids": cls_ids,
-            })
+            self.linkage_table.append(
+                {
+                    "linkage_id": linkage_id,
+                    "import_id": import_id,
+                    "import_name": imp.get("import_name"),
+                    "import_source": imp.get("import_source"),
+                    "alias": imp.get("alias"),
+                    "imported_by_file_id": imported_by_repo_id,
+                    "imported_by_file_name": by_name,
+                    "imported_by_file_type": by_type,
+                    "imported_by_file_location": by_location,
+                    "imported_to_file_id": imported_to_repo_id,
+                    "imported_to_file_name": to_name,
+                    "imported_to_file_type": to_type,
+                    "imported_to_file_location": to_location,
+                    "is_external": imported_to_repo_id is None,
+                    "import_value_ids": var_ids + fn_ids + cls_ids,
+                    "import_value_variable_ids": var_ids,
+                    "import_value_function_ids": fn_ids,
+                    "import_value_class_ids": cls_ids,
+                }
+            )
             linkage_id += 1
 
         if self.dump_file_type != "memory":
@@ -286,13 +298,22 @@ class ImportLinkageAnalyzer:
             print(f"Exported import linkage to JSON: {out_path}")
         elif self.dump_file_type in ["yml", "yaml"]:
             import yaml
+
             with open(out_path, "w", encoding="utf-8") as f:
-                yaml.dump({"import_linkage_table": self.linkage_table}, f, sort_keys=False)
+                yaml.dump(
+                    {"import_linkage_table": self.linkage_table}, f, sort_keys=False
+                )
             print(f"Exported import linkage to YAML: {out_path}")
         elif self.dump_file_type in ["csv", "tsv"] and self.linkage_table:
             delimiter = "\t" if self.dump_file_type == "tsv" else ","
             with open(out_path, "w", newline="", encoding="utf-8") as f:
-                writer = csv.DictWriter(f, fieldnames=list(self.linkage_table[0].keys()), delimiter=delimiter)
+                writer = csv.DictWriter(
+                    f,
+                    fieldnames=list(self.linkage_table[0].keys()),
+                    delimiter=delimiter,
+                )
                 writer.writeheader()
                 writer.writerows(self.linkage_table)
-            print(f"Exported import linkage to {self.dump_file_type.upper()}: {out_path}")
+            print(
+                f"Exported import linkage to {self.dump_file_type.upper()}: {out_path}"
+            )

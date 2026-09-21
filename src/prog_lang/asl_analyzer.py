@@ -23,7 +23,7 @@
 # ASL uses C comments (`//`, `/* */`); the default strip handles them.  ACPI
 # names are 4-char roots that may be scoped/rooted (`\_SB.PCI0`, `^DEV`, `_HID`).
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _NM = r"[\\^A-Za-z_][A-Za-z0-9_.\\^]*"
@@ -31,14 +31,15 @@ _NM = r"[\\^A-Za-z_][A-Za-z0-9_.\\^]*"
 
 class AslAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "asl"
-    EXTENSIONS = (".asl",)      # iasl `.dsl` output is a sibling, appended at test time
+    EXTENSIONS = (".asl",)  # iasl `.dsl` output is a sibling, appended at test time
     LINE_COMMENTS = ("//",)
     BLOCK_COMMENTS = (("/*", "*/"),)
     STRING_DELIMS = ('"',)
 
     _CONTAINER = re.compile(
         r"(?m)\b(DefinitionBlock|Scope|Device|Processor|PowerResource|"
-        r"ThermalZone|Field|IndexField|BankField|OperationRegion|Package)\s*\(")
+        r"ThermalZone|Field|IndexField|BankField|OperationRegion|Package)\s*\("
+    )
     _METHOD = re.compile(r"(?m)\bMethod\s*\(\s*(" + _NM + r")\s*(?:,\s*(\d+))?")
     _NAME = re.compile(r"(?m)\bName\s*\(\s*(" + _NM + r")\s*,")
     _EXTERNAL = re.compile(r"(?m)\bExternal\s*\(\s*(" + _NM + r")")
@@ -49,7 +50,7 @@ class AslAnalyzer(RegexCodeAnalyzer):
 
     def _first_arg(self, text: str, open_paren: int) -> str:
         end = self._find_matching(text, open_paren, "(", ")")
-        inner = text[open_paren + 1:end - 1]
+        inner = text[open_paren + 1 : end - 1]
         parts = self._split_top_level(inner)
         return parts[0].strip() if parts else ""
 
@@ -82,10 +83,13 @@ class AslAnalyzer(RegexCodeAnalyzer):
             if kind == "DefinitionBlock":
                 # first operand is the output-file string; use the table sig 2nd arg
                 end = self._find_matching(clean, m.end() - 1, "(", ")")
-                parts = self._split_top_level(clean[m.end():end - 1])
-                nm = (parts[1].strip().strip('"') if len(parts) > 1 else "DSDT")
-                self._add_class(file_id, nm or "DefinitionBlock",
-                                description="ACPI definition block")
+                parts = self._split_top_level(clean[m.end() : end - 1])
+                nm = parts[1].strip().strip('"') if len(parts) > 1 else "DSDT"
+                self._add_class(
+                    file_id,
+                    nm or "DefinitionBlock",
+                    description="ACPI definition block",
+                )
                 continue
             if not arg or not re.match(_NM, arg):
                 continue

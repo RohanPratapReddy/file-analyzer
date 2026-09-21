@@ -21,6 +21,7 @@
 # DoFn/PTransform/CombineFn subclasses, ptransform-decorated fns, and pipeline
 # construction sites.
 import ast
+
 from .python_embedded_base import PythonEmbeddedAnalyzer
 
 
@@ -28,13 +29,20 @@ class ApacheBeamAnalyzer(PythonEmbeddedAnalyzer):
     LANG_KEY = "apache-beam"
     EXTENSIONS = (".beam",)
     DSL_DECORATORS = (
-        "ptransform_fn", "beam.ptransform_fn",
+        "ptransform_fn",
+        "beam.ptransform_fn",
         "apache_beam.ptransform_fn",
     )
     DSL_BASECLASSES = (
-        "DoFn", "PTransform", "CombineFn", "PartitionFn",
-        "beam.DoFn", "beam.PTransform", "beam.CombineFn",
-        "apache_beam.DoFn", "apache_beam.PTransform",
+        "DoFn",
+        "PTransform",
+        "CombineFn",
+        "PartitionFn",
+        "beam.DoFn",
+        "beam.PTransform",
+        "beam.CombineFn",
+        "apache_beam.DoFn",
+        "apache_beam.PTransform",
     )
 
     def _dsl_enrich(self, file_id, tree, code_text):

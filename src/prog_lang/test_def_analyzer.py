@@ -18,6 +18,7 @@
 #
 # `//`, `#` and `--` start line comments; `"` / `'` / `` ` `` delimit strings.
 import re
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_]\w*"
@@ -33,24 +34,31 @@ class TestDefAnalyzer(RegexCodeAnalyzer):
     # test "name" {   /   test 'name'
     _TEST_BLOCK = re.compile(r"(?m)^[ \t]*test\s+[\"']([^\"']+)[\"']")
     # describe/context/it/specify/suite/scenario("name"  or  scenario "name"
-    _BDD_CALL = re.compile(r"(?m)\b(?:describe|context|it|specify|suite|"
-                           r"scenario|test)\s*\(\s*[\"'`]([^\"'`]+)[\"'`]")
+    _BDD_CALL = re.compile(
+        r"(?m)\b(?:describe|context|it|specify|suite|"
+        r"scenario|test)\s*\(\s*[\"'`]([^\"'`]+)[\"'`]"
+    )
     _BDD_BARE = re.compile(r"(?m)^[ \t]*(?:scenario|specify)\s+[\"']([^\"']+)[\"']")
     # Gherkin
     _FEATURE = re.compile(r"(?m)^[ \t]*Feature\s*:\s*(.+?)\s*$")
     _SCENARIO = re.compile(r"(?m)^[ \t]*Scenario(?:\s+Outline)?\s*:\s*(.+?)\s*$")
     # pytest / unittest / Go / fixtures
     _PYTEST = re.compile(r"(?m)^[ \t]*def\s+(test" + r"\w*)\s*\(")
-    _GOTEST = re.compile(r"(?m)^[ \t]*func\s+(Test\w+|Benchmark\w+|Example\w+)"
-                         r"\s*\(")
-    _FIXTURE = re.compile(r"(?m)^[ \t]*(setup|teardown|before(?:Each|All)?|"
-                          r"after(?:Each|All)?|beforeEach|afterEach)\b")
+    _GOTEST = re.compile(
+        r"(?m)^[ \t]*func\s+(Test\w+|Benchmark\w+|Example\w+)" r"\s*\("
+    )
+    _FIXTURE = re.compile(
+        r"(?m)^[ \t]*(setup|teardown|before(?:Each|All)?|"
+        r"after(?:Each|All)?|beforeEach|afterEach)\b"
+    )
     # JUnit: @Test on its own / preceding line, then `... name(`
-    _JUNIT_ANNOT = re.compile(r"(?m)^[ \t]*@(?:Test|ParameterizedTest|"
-                              r"RepeatedTest)\b")
-    _JAVA_METHOD = re.compile(r"[ \t]*(?:public|private|protected|static|\s)*"
-                              r"(?:void|[A-Za-z_][\w<>\[\]]*)\s+(" + _ID +
-                              r")\s*\(")
+    _JUNIT_ANNOT = re.compile(
+        r"(?m)^[ \t]*@(?:Test|ParameterizedTest|" r"RepeatedTest)\b"
+    )
+    _JAVA_METHOD = re.compile(
+        r"[ \t]*(?:public|private|protected|static|\s)*"
+        r"(?:void|[A-Za-z_][\w<>\[\]]*)\s+(" + _ID + r")\s*\("
+    )
 
     def _extract_entities(self, file_id, text, path):
         clean = self._strip_comments(text)
@@ -73,11 +81,13 @@ class TestDefAnalyzer(RegexCodeAnalyzer):
             add_cls(m.group(1))
         for m in self._SCENARIO.finditer(clean):
             add_fn(m.group(1), "gherkin scenario")
-        for rx, desc in ((self._TEST_BLOCK, "test case"),
-                         (self._BDD_CALL, "test case"),
-                         (self._BDD_BARE, "test case"),
-                         (self._PYTEST, "test function"),
-                         (self._GOTEST, "test function")):
+        for rx, desc in (
+            (self._TEST_BLOCK, "test case"),
+            (self._BDD_CALL, "test case"),
+            (self._BDD_BARE, "test case"),
+            (self._PYTEST, "test function"),
+            (self._GOTEST, "test function"),
+        ):
             for m in rx.finditer(clean):
                 add_fn(m.group(1), desc)
 
@@ -85,7 +95,7 @@ class TestDefAnalyzer(RegexCodeAnalyzer):
         lines = clean.splitlines()
         for i, ln in enumerate(lines):
             if self._JUNIT_ANNOT.match(ln):
-                for nxt in lines[i + 1:]:
+                for nxt in lines[i + 1 :]:
                     if not nxt.strip():
                         continue
                     mm = self._JAVA_METHOD.match(nxt)

@@ -22,7 +22,7 @@
 # Numbered geometric primitives (`Point(1)`, `Line(2)`, ...) are indexed, not
 # named, so they carry no recoverable symbol and are intentionally skipped.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -36,32 +36,55 @@ class GmshGeoAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"',)
 
     _FUNC = re.compile(r"(?m)^[ \t]*(?:Function|Macro)\s+(" + _ID + r")\s*$")
-    _PHYS = re.compile(r"(?m)^[ \t]*Physical\s+"
-                       r"(?:Point|Line|Curve|Surface|Volume)\s*"
-                       r'(?:\(\s*)?"([^"]+)"')
+    _PHYS = re.compile(
+        r"(?m)^[ \t]*Physical\s+"
+        r"(?:Point|Line|Curve|Surface|Volume)\s*"
+        r'(?:\(\s*)?"([^"]+)"'
+    )
     # a top-level scalar / array assignment: ident [ = | += | -= | *= | /= ] ...
-    _ASSIGN = re.compile(r"(?m)^[ \t]*(" + _ID + r")\s*(?:\[[^\]]*\])?"
-                         r"\s*(?:\+|-|\*|/)?=\s*([^;]+);")
+    _ASSIGN = re.compile(
+        r"(?m)^[ \t]*(" + _ID + r")\s*(?:\[[^\]]*\])?" r"\s*(?:\+|-|\*|/)?=\s*([^;]+);"
+    )
     _INCLUDE = re.compile(r'(?mi)^[ \t]*(?:Include|Merge)\s+"([^"]+)"')
     _SHAPEFILE = re.compile(r'(?i)ShapeFromFile\s*\(\s*"([^"]+)"')
     # DefineConstant[ name = value|... ]  -> a configurable variable
     _DEFCONST = re.compile(r"(?i)DefineConstant\s*\[\s*(" + _ID + r")\s*=")
 
     # reserved words that can appear on the LHS of `=` but are not variables
-    _RESERVED = {"If", "ElseIf", "For", "While", "Return", "Physical",
-                 "Point", "Line", "Curve", "Surface", "Volume", "Circle",
-                 "Ellipse", "Spline", "BSpline", "Bezier", "Plane",
-                 "Transfinite", "Recombine", "Extrude", "Rotate", "Translate"}
+    _RESERVED = {
+        "If",
+        "ElseIf",
+        "For",
+        "While",
+        "Return",
+        "Physical",
+        "Point",
+        "Line",
+        "Curve",
+        "Surface",
+        "Volume",
+        "Circle",
+        "Ellipse",
+        "Spline",
+        "BSpline",
+        "Bezier",
+        "Plane",
+        "Transfinite",
+        "Recombine",
+        "Extrude",
+        "Rotate",
+        "Translate",
+    }
 
     def _extract_entities(self, file_id, text, path):
         clean = self._strip_comments(text)
 
         for m in self._FUNC.finditer(clean):
-            self._add_function(file_id, m.group(1), [], [],
-                               description="Gmsh function/macro")
+            self._add_function(
+                file_id, m.group(1), [], [], description="Gmsh function/macro"
+            )
         for m in self._PHYS.finditer(clean):
-            self._add_class(file_id, m.group(1),
-                            description="Gmsh physical group")
+            self._add_class(file_id, m.group(1), description="Gmsh physical group")
 
         seen_v = set()
         for m in self._ASSIGN.finditer(clean):

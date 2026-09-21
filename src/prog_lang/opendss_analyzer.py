@@ -20,7 +20,7 @@
 #   * `Set option=value`                     -> variable
 # Commands are case-insensitive; `!` and `//` start comments.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _NM = r"[A-Za-z0-9_.\-]+"
@@ -34,8 +34,9 @@ class OpenDSSAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"',)
 
     # `New object=Line.650632 ...` or `New Line.650632 ...`
-    _NEW = re.compile(r"(?mi)^[ \t]*New\s+(?:object\s*=\s*)?"
-                      r"(" + _NM + r")\.(" + _NM + r")")
+    _NEW = re.compile(
+        r"(?mi)^[ \t]*New\s+(?:object\s*=\s*)?" r"(" + _NM + r")\.(" + _NM + r")"
+    )
     _REDIR = re.compile(r"(?mi)^[ \t]*(?:Redirect|Compile)\s+([^\s!/]+)")
     _SET = re.compile(r"(?mi)^[ \t]*Set\s+(" + _NM + r")\s*=\s*(\S+)")
 

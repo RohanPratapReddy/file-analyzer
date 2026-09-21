@@ -12,12 +12,14 @@
 #   auto name(args) { }                    -> function
 #   int x = 5;  immutable y = 2;           -> field / variable
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
-_ATTR = (r"(?:public|private|protected|package|export|static|final|abstract|"
-         r"override|const|immutable|shared|__gshared|nothrow|pure|ref|auto|"
-         r"scope|extern|align|deprecated|synchronized|@\w+|@\"[^\"]*\")\s+")
+_ATTR = (
+    r"(?:public|private|protected|package|export|static|final|abstract|"
+    r"override|const|immutable|shared|__gshared|nothrow|pure|ref|auto|"
+    r"scope|extern|align|deprecated|synchronized|@\w+|@\"[^\"]*\")\s+"
+)
 
 
 class DAnalyzer(RegexCodeAnalyzer):
@@ -25,28 +27,30 @@ class DAnalyzer(RegexCodeAnalyzer):
     EXTENSIONS = (".d", ".di")
     BLOCK_COMMENTS = (("/*", "*/"), ("/+", "+/"))
 
-    _IMPORT = re.compile(
-        r"^\s*(?:public\s+|static\s+)*import\s+([^;]+);", re.MULTILINE)
+    _IMPORT = re.compile(r"^\s*(?:public\s+|static\s+)*import\s+([^;]+);", re.MULTILINE)
     _TYPE = re.compile(
         r"(?:" + _ATTR + r")*"
         r"\b(class|struct|interface|union|enum|template)\s+"
         r"([A-Za-z_]\w*)"
-        r"(?:\s*\([^)]*\))?"                       # template params
-        r"(?:\s*:\s*([^{]+?))?"                    # base list / enum base
-        r"\s*\{")
+        r"(?:\s*\([^)]*\))?"  # template params
+        r"(?:\s*:\s*([^{]+?))?"  # base list / enum base
+        r"\s*\{"
+    )
     _METHOD = re.compile(
         r"(?:" + _ATTR + r")*"
-        r"\b([\w.!]+(?:\s*\[\s*\])?[\w.!()]*(?:\s*\*)?)\s+"   # return type
+        r"\b([\w.!]+(?:\s*\[\s*\])?[\w.!()]*(?:\s*\*)?)\s+"  # return type
         r"([A-Za-z_]\w*)\s*"
-        r"(?:\([^)]*\)\s*)?"                       # optional template param list
-        r"\(([^{;]*?)\)\s*"                        # runtime params
+        r"(?:\([^)]*\)\s*)?"  # optional template param list
+        r"\(([^{;]*?)\)\s*"  # runtime params
         r"(?:(?:@\w+|const|immutable|nothrow|pure|@safe|@trusted|@nogc|"
         r"return|scope|inout)\s*)*"
-        r"\{")
+        r"\{"
+    )
     _FIELD = re.compile(
         r"(?:" + _ATTR + r")*"
         r"\b([\w.]+(?:!\s*[\w.()]+)?(?:\s*\[\s*[^\]]*\])?(?:\s*\*)?)\s+"
-        r"([A-Za-z_]\w*)\s*(?:=\s*([^;]+?))?\s*;")
+        r"([A-Za-z_]\w*)\s*(?:=\s*([^;]+?))?\s*;"
+    )
 
     def _register_types(self, file_id, text, path):
         for m in self._TYPE.finditer(self._strip_comments(text)):
@@ -86,14 +90,24 @@ class DAnalyzer(RegexCodeAnalyzer):
                     base = base.split("!")[0].split(".")[-1].strip()
                     if base in self._class_registry:
                         parents.append(self._class_registry[base])
-            types.append({"name": m.group(2), "kind": m.group(1), "bstart": bstart,
-                          "bend": bend, "parents": parents,
-                          "methods": [], "attrs": []})
+            types.append(
+                {
+                    "name": m.group(2),
+                    "kind": m.group(1),
+                    "bstart": bstart,
+                    "bend": bend,
+                    "parents": parents,
+                    "methods": [],
+                    "attrs": [],
+                }
+            )
 
         def enclosing(pos):
             best = None
             for t in types:
-                if t["bstart"] <= pos < t["bend"] and (best is None or t["bstart"] > best["bstart"]):
+                if t["bstart"] <= pos < t["bend"] and (
+                    best is None or t["bstart"] > best["bstart"]
+                ):
                     best = t
             return best
 
@@ -103,8 +117,19 @@ class DAnalyzer(RegexCodeAnalyzer):
             if m.start() < covered:
                 continue
             ret, name, params = m.group(1).strip(), m.group(2), m.group(3)
-            if name in ("if", "for", "while", "switch", "foreach", "with",
-                        "catch", "return", "version", "static", "unittest"):
+            if name in (
+                "if",
+                "for",
+                "while",
+                "switch",
+                "foreach",
+                "with",
+                "catch",
+                "return",
+                "version",
+                "static",
+                "unittest",
+            ):
                 continue
             if ret in ("else", "do", "in", "out", "return"):
                 continue
@@ -132,18 +157,26 @@ class DAnalyzer(RegexCodeAnalyzer):
             if owner is None:
                 self._add_variable(file_id, name, val.strip() if val else None)
             else:
-                owner["attrs"].append(self._add_arg(name, vtype, val.strip() if val else None))
+                owner["attrs"].append(
+                    self._add_arg(name, vtype, val.strip() if val else None)
+                )
 
         for t in types:
-            self._add_class(file_id, t["name"], description=f"d {t['kind']}",
-                            parent_ids=t["parents"], method_ids=t["methods"],
-                            attr_ids=t["attrs"])
+            self._add_class(
+                file_id,
+                t["name"],
+                description=f"d {t['kind']}",
+                parent_ids=t["parents"],
+                method_ids=t["methods"],
+                attr_ids=t["attrs"],
+            )
 
     def _params(self, params):
         arg_ids = []
         for part in self._split_top_level(params):
-            part = re.sub(r"\b(?:ref|out|in|lazy|scope|return|const|immutable)\b",
-                          "", part).strip()
+            part = re.sub(
+                r"\b(?:ref|out|in|lazy|scope|return|const|immutable)\b", "", part
+            ).strip()
             if not part or part == "...":
                 continue
             default = None

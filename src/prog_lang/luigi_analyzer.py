@@ -22,9 +22,17 @@ class LuigiAnalyzer(PythonEmbeddedAnalyzer):
     LANG_KEY = "luigi"
     EXTENSIONS = (".luigi",)
     DSL_BASECLASSES = (
-        "Task", "luigi.Task", "WrapperTask", "luigi.WrapperTask",
-        "ExternalTask", "luigi.ExternalTask", "Config", "luigi.Config",
-        "luigi.contrib.spark.SparkSubmitTask", "SparkSubmitTask",
-        "luigi.contrib.postgres.CopyToTable", "CopyToTable",
+        "Task",
+        "luigi.Task",
+        "WrapperTask",
+        "luigi.WrapperTask",
+        "ExternalTask",
+        "luigi.ExternalTask",
+        "Config",
+        "luigi.Config",
+        "luigi.contrib.spark.SparkSubmitTask",
+        "SparkSubmitTask",
+        "luigi.contrib.postgres.CopyToTable",
+        "CopyToTable",
         "luigi.contrib.s3.S3Target",
     )

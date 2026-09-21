@@ -14,6 +14,7 @@
 # Comments are '//' and '/* */' inside script; strings use '"', '\'', '`'.
 import re
 from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_$][A-Za-z0-9_$]*"
@@ -26,17 +27,20 @@ class MarkoAnalyzer(RegexCodeAnalyzer):
     BLOCK_COMMENTS = (("/*", "*/"),)
     STRING_DELIMS = ('"', "'", "`")
 
-    _IMPORT_DEF = re.compile(r'(?m)^\s*(?:static\s+)?import\s+(?:(' + _ID +
-                             r')\s*,?\s*)?(?:\{([^}]*)\})?\s*(?:from\s+)?'
-                             r'["\']([^"\']+)["\']')
+    _IMPORT_DEF = re.compile(
+        r"(?m)^\s*(?:static\s+)?import\s+(?:("
+        + _ID
+        + r")\s*,?\s*)?(?:\{([^}]*)\})?\s*(?:from\s+)?"
+        r'["\']([^"\']+)["\']'
+    )
     # `<component-tag>` custom element references (kebab-case, has a hyphen)
     _CUSTOM_TAG = re.compile(r"<([a-z][a-z0-9]*(?:-[a-z0-9]+)+)\b")
     _CLASS = re.compile(r"(?m)^\s*class\s*\{")
-    _STATIC_FUNC = re.compile(r"(?m)^\s*static\s+(?:async\s+)?function\s+(" +
-                              _ID + r")\s*\(([^)]*)\)")
+    _STATIC_FUNC = re.compile(
+        r"(?m)^\s*static\s+(?:async\s+)?function\s+(" + _ID + r")\s*\(([^)]*)\)"
+    )
     # top-level `static <js>` variable declarations
-    _STATIC_VAR = re.compile(r"(?m)^\s*static\s+(?:const|let|var)\s+(" + _ID +
-                             r")\b")
+    _STATIC_VAR = re.compile(r"(?m)^\s*static\s+(?:const|let|var)\s+(" + _ID + r")\b")
     # inline-script assignment:  `$ const x = ...`  / `$ let y = ...`
     _DOLLAR_VAR = re.compile(r"(?m)^\s*\$\s+(?:const|let|var)\s+(" + _ID + r")\b")
     # core tag-variables:  <let/count=0>  <const/x=y>  <id/uid>  <get/v=...>
@@ -76,18 +80,17 @@ class MarkoAnalyzer(RegexCodeAnalyzer):
         cls_id = None
         if self._CLASS.search(clean):
             cls_id = self._register_class(Path(path).stem)
-            self._add_class(file_id, Path(path).stem,
-                            description="marko component")
+            self._add_class(file_id, Path(path).stem, description="marko component")
             self._extract_methods(file_id, clean, cls_id)
 
         for m in self._STATIC_FUNC.finditer(clean):
             args = self._simple_args(m.group(2))
-            self._add_function(file_id, m.group(1), args, [],
-                               description="marko static function")
+            self._add_function(
+                file_id, m.group(1), args, [], description="marko static function"
+            )
 
         seen_var = set()
-        for rx, scope in ((self._STATIC_VAR, "static"),
-                          (self._DOLLAR_VAR, "script")):
+        for rx, scope in ((self._STATIC_VAR, "static"), (self._DOLLAR_VAR, "script")):
             for m in rx.finditer(clean):
                 if m.group(1) in seen_var:
                     continue
@@ -116,8 +119,9 @@ class MarkoAnalyzer(RegexCodeAnalyzer):
                 names = [mm.group(0)]
             for nm in names:
                 if kind == "define":
-                    self._add_function(file_id, nm, [], [],
-                                       description="marko tag definition")
+                    self._add_function(
+                        file_id, nm, [], [], description="marko tag definition"
+                    )
                 elif nm not in seen_var:
                     seen_var.add(nm)
                     self._add_variable(file_id, nm, scope="tag")
@@ -126,13 +130,13 @@ class MarkoAnalyzer(RegexCodeAnalyzer):
         inner = binding[1:-1] if binding and binding[0] in "[{" else binding
         names = []
         for part in self._split_top_level(inner):
-            part = part.strip().lstrip(".")       # rest ...target
-            part = part.split("=")[0].strip()     # drop default value
+            part = part.strip().lstrip(".")  # rest ...target
+            part = part.split("=")[0].strip()  # drop default value
             if not part:
                 continue
             if ":" in part and part[0] not in "[{":  # object rename key:target
                 part = part.split(":", 1)[1].strip()
-            if part and part[0] in "[{":            # nested destructure
+            if part and part[0] in "[{":  # nested destructure
                 names.extend(self._destructure_names(part))
                 continue
             mm = re.match(_ID, part)
@@ -144,17 +148,21 @@ class MarkoAnalyzer(RegexCodeAnalyzer):
         cm = self._CLASS.search(clean)
         brace = clean.index("{", cm.start())
         end = self._find_matching(clean, brace, "{", "}")
-        body = clean[brace + 1:end - 1]
+        body = clean[brace + 1 : end - 1]
         # ES6 method shorthand:  name(args) {
-        meth = re.compile(r"(?m)^\s*(?:async\s+|get\s+|set\s+|\*\s*)*(" + _ID +
-                          r")\s*\(([^)]*)\)\s*\{")
+        meth = re.compile(
+            r"(?m)^\s*(?:async\s+|get\s+|set\s+|\*\s*)*("
+            + _ID
+            + r")\s*\(([^)]*)\)\s*\{"
+        )
         for m in meth.finditer(body):
             name = m.group(1)
             if name in ("if", "for", "while", "switch", "catch", "return"):
                 continue
             args = self._simple_args(m.group(2))
-            self._add_function(file_id, name, args, [], class_id=cls_id,
-                               description="marko method")
+            self._add_function(
+                file_id, name, args, [], class_id=cls_id, description="marko method"
+            )
 
     def _simple_args(self, group):
         if not group or not group.strip():
@@ -162,7 +170,7 @@ class MarkoAnalyzer(RegexCodeAnalyzer):
         arg_ids = []
         for part in self._split_top_level(group):
             part = part.strip().split("=")[0].strip()
-            part = part.lstrip(".")               # rest args
+            part = part.lstrip(".")  # rest args
             m = re.match(_ID, part)
             if m:
                 arg_ids.append(self._add_arg(m.group(0)))

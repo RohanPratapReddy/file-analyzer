@@ -24,7 +24,7 @@
 # OBSERVABLE_INCLUDE is legitimately empty of symbols -- that is the CORRECT
 # outcome, exactly as for the esolang analyzers.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -45,5 +45,10 @@ class StimAnalyzer(RegexCodeAnalyzer):
             if idx in seen:
                 continue
             seen.add(idx)
-            self._add_function(file_id, f"observable_{idx}", [], [],
-                               description="Stim logical observable")
+            self._add_function(
+                file_id,
+                f"observable_{idx}",
+                [],
+                [],
+                description="Stim logical observable",
+            )

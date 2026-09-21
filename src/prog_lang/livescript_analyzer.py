@@ -19,7 +19,7 @@
 # Comments: `#` to EOL, `/* ... */`; backticks embed raw JS (treated as a string
 # so their contents are not mis-parsed).
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_$][A-Za-z0-9_$-]*"
@@ -33,19 +33,29 @@ class LiveScriptAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"', "'", "`")
 
     # name = [!] [(params)] [!] ->|~>        (arrow may be preceded by `!`)
-    _FUNC = re.compile(r"(?m)^\s*(" + _ID + r")\s*=\s*!?\s*(\([^)]*\))?\s*!?\s*(?:~>|->)")
+    _FUNC = re.compile(
+        r"(?m)^\s*(" + _ID + r")\s*=\s*!?\s*(\([^)]*\))?\s*!?\s*(?:~>|->)"
+    )
     # bare arrow assigned via `:` inside a class/object:  name: (params) -> ...
-    _METHOD = re.compile(r"(?m)^\s+(" + _ID + r")\s*:\s*!?\s*(\([^)]*\))?\s*!?\s*(?:~>|->)")
-    _CLASS = re.compile(r"(?m)^\s*class\s+(" + _ID + r")"
-                        r"(?:\s+extends\s+(" + _ID + r"(?:\.[A-Za-z0-9_$]+)*))?")
+    _METHOD = re.compile(
+        r"(?m)^\s+(" + _ID + r")\s*:\s*!?\s*(\([^)]*\))?\s*!?\s*(?:~>|->)"
+    )
+    _CLASS = re.compile(
+        r"(?m)^\s*class\s+(" + _ID + r")"
+        r"(?:\s+extends\s+(" + _ID + r"(?:\.[A-Za-z0-9_$]+)*))?"
+    )
     # imports
-    _REQ_ALIAS = re.compile(r"(?m)^\s*(" + _ID + r")\s*=\s*require\s*!?\s*['\"]([^'\"]+)['\"]")
+    _REQ_ALIAS = re.compile(
+        r"(?m)^\s*(" + _ID + r")\s*=\s*require\s*!?\s*['\"]([^'\"]+)['\"]"
+    )
     _REQ_BANG_STR = re.compile(r"(?m)\brequire!\s*['\"]([^'\"]+)['\"]")
     # bareword sugar:  require! optionator   /   require! prelude-ls
     _REQ_BANG_BARE = re.compile(r"(?m)\brequire!\s+(" + _ID + r")(?![\w$-]*\s*[:={])")
     _REQ_BANG_OBJ = re.compile(r"(?m)\brequire!\s*\{([^}]*)\}")
     _REQ_BANG_LIST = re.compile(r"(?m)\brequire!\s*<\[([^\]]*)\]>")
-    _REQ_DESTRUCT = re.compile(r"(?m)^\s*\{([^}]*)\}\s*=\s*require\s*['\"]([^'\"]+)['\"]")
+    _REQ_DESTRUCT = re.compile(
+        r"(?m)^\s*\{([^}]*)\}\s*=\s*require\s*['\"]([^'\"]+)['\"]"
+    )
     # any top-level assignment (variable candidate)
     _ASSIGN = re.compile(r"(?m)^([ \t]*)(" + _ID + r")\s*=\s*(\S.*)$")
 
@@ -102,8 +112,9 @@ class LiveScriptAnalyzer(RegexCodeAnalyzer):
             if m.group(2):
                 pid = self._register_class(m.group(2).split(".")[-1])
                 parents = [pid] if pid is not None else []
-            self._add_class(file_id, m.group(1), description="livescript class",
-                            parent_ids=parents)
+            self._add_class(
+                file_id, m.group(1), description="livescript class", parent_ids=parents
+            )
             classes.add(m.group(1))
 
         functions = set()
@@ -112,16 +123,26 @@ class LiveScriptAnalyzer(RegexCodeAnalyzer):
             if name in imports or name in functions:
                 continue
             functions.add(name)
-            self._add_function(file_id, name, self._ls_args(m.group(2)), [],
-                               description="livescript function")
+            self._add_function(
+                file_id,
+                name,
+                self._ls_args(m.group(2)),
+                [],
+                description="livescript function",
+            )
         for m in self._METHOD.finditer(clean):
             name = m.group(1)
             key = "method:" + name
             if name in functions:
                 continue
             functions.add(name)
-            self._add_function(file_id, name, self._ls_args(m.group(2)), [],
-                               description="livescript method")
+            self._add_function(
+                file_id,
+                name,
+                self._ls_args(m.group(2)),
+                [],
+                description="livescript method",
+            )
 
         seen_var = set()
         for m in self._ASSIGN.finditer(clean):
@@ -131,8 +152,9 @@ class LiveScriptAnalyzer(RegexCodeAnalyzer):
             if name in seen_var:
                 continue
             # a function/require assignment already handled above
-            if re.match(r"!?\s*(\([^)]*\))?\s*!?\s*(?:~>|->)", rhs) or \
-                    rhs.lstrip().startswith("require"):
+            if re.match(
+                r"!?\s*(\([^)]*\))?\s*!?\s*(?:~>|->)", rhs
+            ) or rhs.lstrip().startswith("require"):
                 continue
             seen_var.add(name)
             self._add_variable(file_id, name, rhs.strip()[:120], scope="module")

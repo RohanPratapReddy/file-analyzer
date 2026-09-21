@@ -14,16 +14,35 @@
 #
 # Comments are '--' and '{- -}'; strings use '"'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[a-z_][A-Za-z0-9_']*"
 _CID = r"[A-Z][A-Za-z0-9_']*"
 _QUAL = r"[A-Za-z_][A-Za-z0-9_'.]*"
 _KEYWORDS = {
-    "module", "import", "type", "alias", "port", "exposing", "as", "where",
-    "let", "in", "case", "of", "if", "then", "else", "effect", "infix",
-    "infixl", "infixr", "hiding", "command", "subscription",
+    "module",
+    "import",
+    "type",
+    "alias",
+    "port",
+    "exposing",
+    "as",
+    "where",
+    "let",
+    "in",
+    "case",
+    "of",
+    "if",
+    "then",
+    "else",
+    "effect",
+    "infix",
+    "infixl",
+    "infixr",
+    "hiding",
+    "command",
+    "subscription",
 }
 
 
@@ -37,7 +56,8 @@ class GrenAnalyzer(RegexCodeAnalyzer):
     _MODULE = re.compile(r"(?m)^\s*(?:port\s+|effect\s+)?module\s+(" + _QUAL + r")")
     _IMPORT = re.compile(
         r"(?m)^\s*import\s+(" + _QUAL + r")(?:\s+as\s+(" + _CID + r"))?"
-        r"(?:\s+exposing\s*\(([^)]*)\))?")
+        r"(?:\s+exposing\s*\(([^)]*)\))?"
+    )
     _TYPE = re.compile(r"(?m)^\s*type\s+(?:alias\s+)?(" + _CID + r")")
     _PORT = re.compile(r"(?m)^\s*port\s+(" + _ID + r")\s*:")
     _SIG = re.compile(r"(?m)^(" + _ID + r")\s*:(?!:)")
@@ -54,8 +74,9 @@ class GrenAnalyzer(RegexCodeAnalyzer):
         clean = self._strip_comments(text)
 
         for m in self._MODULE.finditer(clean):
-            self._add_class(file_id, m.group(1).split(".")[-1],
-                            description="gren module")
+            self._add_class(
+                file_id, m.group(1).split(".")[-1], description="gren module"
+            )
         for m in self._IMPORT.finditer(clean):
             src = m.group(1)
             self._add_import(file_id, src.split(".")[-1], src, alias=m.group(2))
@@ -63,7 +84,7 @@ class GrenAnalyzer(RegexCodeAnalyzer):
                 for nm in m.group(3).split(","):
                     nm = nm.strip().strip("()").split()[0] if nm.strip() else ""
                     nm = nm.split("(")[0].strip()
-                    if nm and re.match(r"[A-Za-z_]", nm) and nm != ".." :
+                    if nm and re.match(r"[A-Za-z_]", nm) and nm != "..":
                         self._add_import(file_id, nm, src + "." + nm)
 
         for m in self._TYPE.finditer(clean):

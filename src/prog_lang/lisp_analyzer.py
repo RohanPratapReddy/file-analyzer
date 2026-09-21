@@ -12,7 +12,7 @@
 #   (defmethod move ((p point) dx) ...)                   -> method of POINT
 #   (defstruct person name (age 0))                       -> struct (class + fields)
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _SYM = r"[A-Za-z0-9+\-*/<>=!?._%&$:~^@]+"
@@ -27,15 +27,21 @@ class LispAnalyzer(RegexCodeAnalyzer):
 
     _FUNC = re.compile(
         r"\(\s*(defun|defmacro|defgeneric|define-compiler-macro|"
-        r"define-modify-macro|defsetf)\s+(" + _SYM + r")", re.IGNORECASE)
+        r"define-modify-macro|defsetf)\s+(" + _SYM + r")",
+        re.IGNORECASE,
+    )
     _METHOD = re.compile(r"\(\s*defmethod\s+(" + _SYM + r")", re.IGNORECASE)
     _CLASS = re.compile(
-        r"\(\s*(defclass|define-condition)\s+(" + _SYM + r")", re.IGNORECASE)
-    _STRUCT = re.compile(r"\(\s*defstruct\s+(?:\(\s*(" + _SYM + r")|(" + _SYM + r"))",
-                         re.IGNORECASE)
+        r"\(\s*(defclass|define-condition)\s+(" + _SYM + r")", re.IGNORECASE
+    )
+    _STRUCT = re.compile(
+        r"\(\s*defstruct\s+(?:\(\s*(" + _SYM + r")|(" + _SYM + r"))", re.IGNORECASE
+    )
     _VAR = re.compile(
         r"\(\s*(defvar|defparameter|defconstant)\s+(" + _SYM + r")"
-        r"(?:\s+([^\s)]+))?", re.IGNORECASE)
+        r"(?:\s+([^\s)]+))?",
+        re.IGNORECASE,
+    )
     _PKG = re.compile(r"\(\s*defpackage\s+", re.IGNORECASE)
     _REQUIRE = re.compile(r"\(\s*require\s+[:']?(" + _SYM + r")", re.IGNORECASE)
     _USE_PKG = re.compile(r"\(\s*use-package\s+[:']?(" + _SYM + r")", re.IGNORECASE)
@@ -66,8 +72,9 @@ class LispAnalyzer(RegexCodeAnalyzer):
 
         # variables
         for m in self._VAR.finditer(text):
-            self._add_variable(file_id, m.group(2),
-                               m.group(3).strip() if m.group(3) else None)
+            self._add_variable(
+                file_id, m.group(2), m.group(3).strip() if m.group(3) else None
+            )
 
         # plain functions / macros
         for m in self._FUNC.finditer(text):
@@ -103,9 +110,14 @@ class LispAnalyzer(RegexCodeAnalyzer):
                 classes[owner]["methods"].append(fid)
 
         for name, c in classes.items():
-            self._add_class(file_id, name, description="lisp class",
-                            parent_ids=c["parents"], method_ids=c["methods"],
-                            attr_ids=c["attrs"])
+            self._add_class(
+                file_id,
+                name,
+                description="lisp class",
+                parent_ids=c["parents"],
+                method_ids=c["methods"],
+                attr_ids=c["attrs"],
+            )
 
     # ------------------------------------------------------------------
     def _form_at(self, text, open_paren_pos):
@@ -121,12 +133,19 @@ class LispAnalyzer(RegexCodeAnalyzer):
         if lp == -1:
             return []
         rp = self._find_matching(text, lp, "(", ")")
-        inner = text[lp + 1:rp - 1]
+        inner = text[lp + 1 : rp - 1]
         params = []
         for tok in re.findall(_SYM, inner):
             if tok.startswith("&"):
                 continue
-            if tok in ("&optional", "&rest", "&key", "&body", "&aux", "&allow-other-keys"):
+            if tok in (
+                "&optional",
+                "&rest",
+                "&key",
+                "&body",
+                "&aux",
+                "&allow-other-keys",
+            ):
                 continue
             params.append(tok)
         return params
@@ -137,12 +156,13 @@ class LispAnalyzer(RegexCodeAnalyzer):
         if lp == -1:
             return None, []
         rp = self._find_matching(text, lp, "(", ")")
-        inner = text[lp + 1:rp - 1]
+        inner = text[lp + 1 : rp - 1]
         owner = None
         params = []
         # each specializer is (var class) or a bare var
-        for spec in re.finditer(r"\(\s*(" + _SYM + r")\s+(" + _SYM + r")\s*\)"
-                                r"|(" + _SYM + r")", inner):
+        for spec in re.finditer(
+            r"\(\s*(" + _SYM + r")\s+(" + _SYM + r")\s*\)" r"|(" + _SYM + r")", inner
+        ):
             if spec.group(1):
                 params.append(spec.group(1))
                 if owner is None and spec.group(2) in self._class_registry:
@@ -156,8 +176,9 @@ class LispAnalyzer(RegexCodeAnalyzer):
 
     def _parse_defclass(self, form, name):
         # (defclass NAME (super...) (slot...) options...)
-        m = re.search(r"defclass\s+" + re.escape(name) + r"\s*\(([^)]*)\)", form,
-                      re.IGNORECASE)
+        m = re.search(
+            r"defclass\s+" + re.escape(name) + r"\s*\(([^)]*)\)", form, re.IGNORECASE
+        )
         parents = []
         if m:
             for s in re.findall(_SYM, m.group(1)):
@@ -166,11 +187,11 @@ class LispAnalyzer(RegexCodeAnalyzer):
         # slot list is the next parenthesised group after the superclass list
         attrs = []
         if m:
-            rest = form[m.end():]
+            rest = form[m.end() :]
             sp = rest.find("(")
             if sp != -1:
                 ep = self._find_matching(rest, sp, "(", ")")
-                slots = rest[sp + 1:ep - 1]
+                slots = rest[sp + 1 : ep - 1]
                 # each slot: symbol or (slotname ...)
                 depth = 0
                 i = 0
@@ -188,12 +209,13 @@ class LispAnalyzer(RegexCodeAnalyzer):
 
     def _parse_defstruct(self, form, name):
         # (defstruct NAME slot (slot default) ...)  OR (defstruct (NAME opts) ...)
-        m = re.search(r"defstruct\s+(?:\([^)]*\)|" + re.escape(name) + r")", form,
-                      re.IGNORECASE)
+        m = re.search(
+            r"defstruct\s+(?:\([^)]*\)|" + re.escape(name) + r")", form, re.IGNORECASE
+        )
         attrs = []
         if not m:
             return attrs
-        rest = form[m.end():-1]
+        rest = form[m.end() : -1]
         i = 0
         while i < len(rest):
             ch = rest[i]

@@ -15,7 +15,7 @@
 #
 # Comments are '//', '#' and '/* */'; strings use '"'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -28,7 +28,9 @@ class VCLAnalyzer(RegexCodeAnalyzer):
     BLOCK_COMMENTS = (("/*", "*/"),)
     STRING_DELIMS = ('"',)
 
-    _IMPORT = re.compile(r"(?m)^\s*import\s+(" + _ID + r")(?:\s+as\s+(" + _ID + r"))?\s*;")
+    _IMPORT = re.compile(
+        r"(?m)^\s*import\s+(" + _ID + r")(?:\s+as\s+(" + _ID + r"))?\s*;"
+    )
     _INCLUDE = re.compile(r'(?m)^\s*include\s+"([^"]+)"\s*;')
     _SUB = re.compile(r"(?m)^\s*sub\s+(" + _ID + r")\s*\{")
     _BACKEND = re.compile(r"(?m)^\s*backend\s+(" + _ID + r")\s*\{")
@@ -38,7 +40,7 @@ class VCLAnalyzer(RegexCodeAnalyzer):
 
     def _block_attrs(self, clean, open_brace_pos):
         end = self._find_matching(clean, open_brace_pos)
-        body = clean[open_brace_pos + 1:end - 1]
+        body = clean[open_brace_pos + 1 : end - 1]
         return [self._add_arg(m.group(1)) for m in self._FIELD.finditer(body)]
 
     def _register_types(self, file_id, text, path):
@@ -57,14 +59,18 @@ class VCLAnalyzer(RegexCodeAnalyzer):
             leaf = re.split(r"[\\/]", src)[-1]
             self._add_import(file_id, leaf, src)
 
-        for rx, desc in ((self._BACKEND, "vcl backend"),
-                         (self._PROBE, "vcl probe"),
-                         (self._ACL, "vcl acl")):
+        for rx, desc in (
+            (self._BACKEND, "vcl backend"),
+            (self._PROBE, "vcl probe"),
+            (self._ACL, "vcl acl"),
+        ):
             for m in rx.finditer(clean):
                 attrs = self._block_attrs(clean, m.end() - 1)
-                self._add_class(file_id, m.group(1), description=desc,
-                                attr_ids=attrs or None)
+                self._add_class(
+                    file_id, m.group(1), description=desc, attr_ids=attrs or None
+                )
 
         for m in self._SUB.finditer(clean):
-            self._add_function(file_id, m.group(1), [], [],
-                               description="vcl subroutine")
+            self._add_function(
+                file_id, m.group(1), [], [], description="vcl subroutine"
+            )

@@ -6,7 +6,7 @@
 # <script> tags); this analyzer isolates those regions and extracts the same
 # entities a JS/TS analyzer would.  The HTML template carries no definitions.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -19,16 +19,19 @@ class AstroAnalyzer(RegexCodeAnalyzer):
     _FENCE = re.compile(r"^---\s*\n(.*?)\n---\s*$", re.DOTALL | re.MULTILINE)
     _SCRIPT = re.compile(r"<script\b[^>]*>(.*?)</script>", re.DOTALL | re.I)
     _IMPORT = re.compile(
-        r"""^\s*import\s+(?:(.+?)\s+from\s+)?['"]([^'"]+)['"]""", re.MULTILINE)
+        r"""^\s*import\s+(?:(.+?)\s+from\s+)?['"]([^'"]+)['"]""", re.MULTILINE
+    )
     _FUNC = re.compile(
-        r"^\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)",
-        re.MULTILINE)
+        r"^\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)", re.MULTILINE
+    )
     _ARROW = re.compile(
         r"^\s*(?:export\s+)?(?:const|let|var)\s+(\w+)\s*(?::[^=]+)?=\s*"
-        r"(?:async\s+)?\(([^)]*)\)\s*=>", re.MULTILINE)
+        r"(?:async\s+)?\(([^)]*)\)\s*=>",
+        re.MULTILINE,
+    )
     _VAR = re.compile(
-        r"^\s*(?:export\s+)?(?:const|let|var)\s+(\w+)\s*(?::[^=]+)?=(?!=)",
-        re.MULTILINE)
+        r"^\s*(?:export\s+)?(?:const|let|var)\s+(\w+)\s*(?::[^=]+)?=(?!=)", re.MULTILINE
+    )
     _INTERFACE = re.compile(r"^\s*(?:export\s+)?interface\s+(\w+)", re.MULTILINE)
 
     def _code(self, text):
@@ -50,8 +53,12 @@ class AstroAnalyzer(RegexCodeAnalyzer):
 
         for m in self._IMPORT.finditer(c):
             src = m.group(2)
-            self._add_import(file_id, src.split("/")[-1], src,
-                             alias=(m.group(1) or "").strip() or None)
+            self._add_import(
+                file_id,
+                src.split("/")[-1],
+                src,
+                alias=(m.group(1) or "").strip() or None,
+            )
 
         for m in self._INTERFACE.finditer(c):
             self._add_class(file_id, m.group(1), description="astro interface")
@@ -69,6 +76,8 @@ class AstroAnalyzer(RegexCodeAnalyzer):
                 self._add_variable(file_id, m.group(1))
 
     def _args(self, params):
-        return [self._add_arg(p.split(":")[0].split("=")[0].strip())
-                for p in self._split_top_level(params)
-                if p.split(":")[0].split("=")[0].strip()]
+        return [
+            self._add_arg(p.split(":")[0].split("=")[0].strip())
+            for p in self._split_top_level(params)
+            if p.split(":")[0].split("=")[0].strip()
+        ]

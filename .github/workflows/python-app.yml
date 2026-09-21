@@ -26,12 +26,21 @@ jobs:
       - name: Install package and test tools
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 pytest
+          # Style tools are version-pinned so `--check` matches the exact
+          # formatting committed to the repo (see [tool.black]/[tool.isort] in
+          # pyproject.toml). Bump these three together with a reformat commit.
+          pip install flake8 pytest black==26.5.1 isort==9.0.1
           # The core is pure-stdlib (project.dependencies is empty); install the
           # package itself plus the MCP extra. Do NOT install requirements.txt --
           # those are OPTIONAL deep-parse libs (GDAL, rasterio, ...) that need
           # system libraries not present on the runner.
           pip install ".[agent]"
+
+      - name: Check formatting (black + isort)
+        run: |
+          # The whole repo is auto-formatted; these gates fail on any drift.
+          black --check --diff .
+          isort --check-only --diff .
 
       - name: Lint with flake8
         run: |

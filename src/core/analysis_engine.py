@@ -28,17 +28,17 @@ class owns the orchestration and lives in ``src/core`` and is re-exported at the
 flat public API as ``from src import AnalysisEngine``.
 """
 
-import shutil
-import stat
 import json
 import os
+import shutil
+import stat
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from .repository_analyzer import RepositoryAnalyzer
-from .import_linkage import ImportLinkageAnalyzer
+from ..router import RouterPlanes
 from .db_generator import RepositoryDatabaseGenerator
-from ..router import RouterPlanes, PlaneError
+from .import_linkage import ImportLinkageAnalyzer
+from .repository_analyzer import RepositoryAnalyzer
 
 
 class AnalysisEngine:
@@ -82,7 +82,11 @@ class AnalysisEngine:
         self.dir_path = Path(dir_path).resolve()
         self.db_path = Path(db_path)
         self.sql_path = Path(sql_path)
-        self.temp_dir = Path(temp_dir).resolve() if temp_dir is not None else (self.dir_path / "temp")
+        self.temp_dir = (
+            Path(temp_dir).resolve()
+            if temp_dir is not None
+            else (self.dir_path / "temp")
+        )
         self.sql_dialect = sql_dialect
         self.git_tracked = git_tracked
         # ``workers`` is the single fallback worker count; the two concurrent
@@ -91,7 +95,9 @@ class AnalysisEngine:
         # back to ``workers`` (then CPU count) when left unset.
         self.workers = workers
         self.plane_workers = plane_workers if plane_workers is not None else workers
-        self.injection_workers = injection_workers if injection_workers is not None else workers
+        self.injection_workers = (
+            injection_workers if injection_workers is not None else workers
+        )
         self.python_exe = python_exe
         self.keep_temp_on_success = keep_temp_on_success
         self.repository_kwargs = repository_kwargs or {}
@@ -133,7 +139,9 @@ class AnalysisEngine:
         # (PNG/WAV/MP4/PDF/TXT/GIF/HTML) and records the structural metrics in the
         # ``conversion_analysis`` table (a 1:1 companion to ``format_conversions``).
         self.enable_conversion_analysis = enable_conversion_analysis
-        self.conversions_dir = Path(conversions_dir).resolve() if conversions_dir is not None else None
+        self.conversions_dir = (
+            Path(conversions_dir).resolve() if conversions_dir is not None else None
+        )
         self._archive_depth = _archive_depth
 
         # The 'readers' directory is the parent of the 'src' package, and is the
@@ -182,7 +190,9 @@ class AnalysisEngine:
         return by_class
 
     def _shard_file_paths(self, analyzer_class: str) -> List[str]:
-        mapping = json.loads((self.temp_dir / "mapping.json").read_text(encoding="utf-8"))
+        mapping = json.loads(
+            (self.temp_dir / "mapping.json").read_text(encoding="utf-8")
+        )
         for shard in mapping["shards"]:
             if shard["analyzer_class"] == analyzer_class:
                 return shard["file_paths"]
@@ -191,12 +201,14 @@ class AnalysisEngine:
     @staticmethod
     def _force_rmtree(path: Path) -> None:
         """Remove a directory tree, forcing read-only files writable (Windows)."""
+
         def _onerror(func, p, exc):
             try:
                 os.chmod(p, stat.S_IWRITE)
                 func(p)
             except OSError:
                 pass
+
         if path.exists():
             shutil.rmtree(path, onerror=_onerror)
 
@@ -226,14 +238,18 @@ class AnalysisEngine:
         self._force_rmtree(self.temp_dir)  # start clean
         repo.emit_analyzer_mapping(self.temp_dir)
 
-        mapping = json.loads((self.temp_dir / "mapping.json").read_text(encoding="utf-8"))
+        mapping = json.loads(
+            (self.temp_dir / "mapping.json").read_text(encoding="utf-8")
+        )
         shards = mapping["shards"]
 
         # 2. Analysis planes (Go + Java, concurrent) fan out per-shard workers.
         #    Any failure raises PlaneError and leaves temp/ intact.
         planes = RouterPlanes(
-            self.readers_root, self.temp_dir,
-            python_exe=self.python_exe, workers_per_plane=self.plane_workers,
+            self.readers_root,
+            self.temp_dir,
+            python_exe=self.python_exe,
+            workers_per_plane=self.plane_workers,
         )
         planes.run(shards)
 
@@ -267,11 +283,13 @@ class AnalysisEngine:
         archive_count = 0
         if self.enable_archives:
             archive_files = [
-                row for row in mapping["mapping"]
+                row
+                for row in mapping["mapping"]
                 if row.get("analyzer_class") == "archive" and row.get("file_location")
             ]
             if archive_files:
                 from ..archive import ArchiveAnalyzer
+
                 archive_tables = ArchiveAnalyzer(self, archive_files).process()
                 archive_count = len(archive_tables.get("archive_index", []))
 
@@ -281,12 +299,18 @@ class AnalysisEngine:
         #     archives -- not driven by the Go/Java shard workers.
         binary_tables: Optional[Dict[str, List[Dict[str, Any]]]] = None
         binary_count = 0
-        binary_files = [
-            row for row in mapping["mapping"]
-            if row.get("analyzer_class") == "binary" and row.get("file_location")
-        ] if self.enable_binary else []
+        binary_files = (
+            [
+                row
+                for row in mapping["mapping"]
+                if row.get("analyzer_class") == "binary" and row.get("file_location")
+            ]
+            if self.enable_binary
+            else []
+        )
         if binary_files:
             from ..binary import MachineCodeAnalyzer
+
             binary_tables = MachineCodeAnalyzer(self, binary_files).process()
             binary_count = len(binary_tables.get("binary_index", []))
 
@@ -309,19 +333,23 @@ class AnalysisEngine:
                 # (so tool_unavailable is recorded too, documenting what *could* be
                 # rendered given the right external tool).
                 convert_rows = [
-                    row for row in mapping["mapping"]
+                    row
+                    for row in mapping["mapping"]
                     if row.get("file_location")
                     and converter.target_for(row["file_location"]) is not None
                 ]
                 if convert_rows:
                     out_dir = self.conversions_dir or (
-                        self.db_path.resolve().parent / f"{self.db_path.stem}_renderable"
+                        self.db_path.resolve().parent
+                        / f"{self.db_path.stem}_renderable"
                     )
                     conversion_tables = converter.convert_files(convert_rows, out_dir)
                     conv = conversion_tables.get("format_conversions", [])
                     by_status: Dict[str, int] = {}
                     for r in conv:
-                        by_status[r.get("status") or "unknown"] = by_status.get(r.get("status") or "unknown", 0) + 1
+                        by_status[r.get("status") or "unknown"] = (
+                            by_status.get(r.get("status") or "unknown", 0) + 1
+                        )
                     conversions_summary = {
                         "conversions_attempted": len(conv),
                         "conversions_converted": by_status.get("converted", 0),
@@ -342,13 +370,21 @@ class AnalysisEngine:
                         conversion_tables["conversion_analysis"] = analysis_rows
                         a_by_status: Dict[str, int] = {}
                         for r in analysis_rows:
-                            a_by_status[r.get("status") or "unknown"] = a_by_status.get(r.get("status") or "unknown", 0) + 1
-                        conversions_summary.update({
-                            "conversion_analysis_rows": len(analysis_rows),
-                            "conversion_analysis_analyzed": a_by_status.get("analyzed", 0),
-                            "conversion_analysis_by_status": a_by_status,
-                        })
-            except Exception as exc:  # conversions are a convenience layer, not load-bearing
+                            a_by_status[r.get("status") or "unknown"] = (
+                                a_by_status.get(r.get("status") or "unknown", 0) + 1
+                            )
+                        conversions_summary.update(
+                            {
+                                "conversion_analysis_rows": len(analysis_rows),
+                                "conversion_analysis_analyzed": a_by_status.get(
+                                    "analyzed", 0
+                                ),
+                                "conversion_analysis_by_status": a_by_status,
+                            }
+                        )
+            except (
+                Exception
+            ) as exc:  # conversions are a convenience layer, not load-bearing
                 conversions_summary = {"conversions_error": str(exc)}
                 conversion_tables = None
 
@@ -379,7 +415,9 @@ class AnalysisEngine:
         #     concurrent export then materializes the binary SQLite file (always
         #     sqlite dialect) for the readers / pgloader.
         generator.generate()
-        generator.export_to_sqlite_db_concurrent(str(self.db_path), workers=self.injection_workers)
+        generator.export_to_sqlite_db_concurrent(
+            str(self.db_path), workers=self.injection_workers
+        )
 
         # 5b. Analysis views: create the convenience VIEW objects (defined once in
         #     py.views.catalog) over whichever base tables landed, and mirror them
@@ -390,7 +428,7 @@ class AnalysisEngine:
         views_error: Optional[str] = None
         if self.enable_views:
             try:
-                from ..views import install_views_sqlite, append_views_to_sql_dump
+                from ..views import append_views_to_sql_dump, install_views_sqlite
 
                 views_installed = install_views_sqlite(str(self.db_path))
                 if self.sql_path and Path(self.sql_path).exists():
@@ -398,7 +436,9 @@ class AnalysisEngine:
                     # dialect, skip the append rather than emit wrong SQL.
                     dump_dialect = self.sql_dialect.lower()
                     if dump_dialect in ("sqlite", "pgsql", "postgresql"):
-                        append_views_to_sql_dump(str(self.sql_path), dialect=dump_dialect)
+                        append_views_to_sql_dump(
+                            str(self.sql_path), dialect=dump_dialect
+                        )
             except Exception as exc:  # views are a convenience layer, not load-bearing
                 views_error = str(exc)
 

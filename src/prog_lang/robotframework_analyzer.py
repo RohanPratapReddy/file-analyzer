@@ -17,7 +17,7 @@
 #       [Arguments]    ${user}    ${pass}                 -> args
 #       Log    ${user}
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 # A header line starts with one or more stars (Robot accepts `*Test Cases*` as
@@ -25,8 +25,7 @@ from .regex_base import RegexCodeAnalyzer
 # ignored, so we do NOT anchor to end-of-line. The known-section whitelist
 # (checked by the caller) guards against matching stray data rows.
 _SECTION = re.compile(r"^\s*\*+\s*([A-Za-z][A-Za-z ]*?)\s*\*+")
-_KNOWN_SECTIONS = {"setting", "variable", "test case", "task", "keyword",
-                   "comment"}
+_KNOWN_SECTIONS = {"setting", "variable", "test case", "task", "keyword", "comment"}
 
 
 class RobotFrameworkAnalyzer(RegexCodeAnalyzer):
@@ -51,12 +50,15 @@ class RobotFrameworkAnalyzer(RegexCodeAnalyzer):
     def _extract_entities(self, file_id, text, path):
         section = None
         # (name, body_lines) blocks for test-case / keyword sections
-        blocks = []          # list of (kind, name, [lines])
+        blocks = []  # list of (kind, name, [lines])
         cur = None
         for raw in text.splitlines():
             # drop trailing comments (a '#' starting a cell)
-            line = re.sub(r"(?:^|\s)#.*$", "", raw) if raw.lstrip().startswith("#") \
+            line = (
+                re.sub(r"(?:^|\s)#.*$", "", raw)
+                if raw.lstrip().startswith("#")
                 else re.sub(r"\s{2,}#.*$", "", raw)
+            )
             sm = _SECTION.match(line)
             if sm and self._norm(sm.group(1)) in _KNOWN_SECTIONS:
                 section = self._norm(sm.group(1))
@@ -102,9 +104,18 @@ class RobotFrameworkAnalyzer(RegexCodeAnalyzer):
                     for a in cells[1:]:
                         am = re.match(r"^[\$@&]\{(.+?)\}(?:=(.*))?$", a)
                         if am:
-                            arg_ids.append(self._add_arg(
-                                am.group(1), None,
-                                am.group(2) if am.lastindex and am.group(2) else None))
-            desc = "robot test case" if kind in ("test case", "task") \
-                else "robot keyword"
+                            arg_ids.append(
+                                self._add_arg(
+                                    am.group(1),
+                                    None,
+                                    (
+                                        am.group(2)
+                                        if am.lastindex and am.group(2)
+                                        else None
+                                    ),
+                                )
+                            )
+            desc = (
+                "robot test case" if kind in ("test case", "task") else "robot keyword"
+            )
             self._add_function(file_id, name, arg_ids, [], description=desc)

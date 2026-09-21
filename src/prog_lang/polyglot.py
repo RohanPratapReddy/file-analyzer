@@ -1,277 +1,278 @@
 # Auto-extracted from code_analyzer.py (verbatim class body).
-import os
-import csv
-import json
-import re
-import ast
-import dis
-import inspect
-import traceback
-import subprocess
-import sqlite3
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
-from .base_code_analyzer import BaseCodeAnalyzer
-from .python_analyzer import PythonCodeAnalyzer
-from .javascript_analyzer import JavaScriptAnalyzer, TypeScriptAnalyzer
-from .go_analyzer import GoAnalyzer
-from .java_analyzer import JavaAnalyzer
-from .csharp_analyzer import CSharpAnalyzer
-from .rust_analyzer import RustAnalyzer
-from .c_analyzer import CAnalyzer, CppAnalyzer
-from .r_analyzer import RAnalyzer
-from .ruby_analyzer import RubyAnalyzer
-from .php_analyzer import PhpAnalyzer
-from .swift_analyzer import SwiftAnalyzer
-from .kotlin_analyzer import KotlinAnalyzer
-from .scala_analyzer import ScalaAnalyzer
-from .elixir_analyzer import ElixirAnalyzer
-from .vala_analyzer import ValaAnalyzer
-from .crystal_analyzer import CrystalAnalyzer
-from .haxe_analyzer import HaxeAnalyzer
-from .d_analyzer import DAnalyzer
-from .odin_analyzer import OdinAnalyzer
-from .pony_analyzer import PonyAnalyzer
-from .wren_analyzer import WrenAnalyzer
-from .gdscript_analyzer import GDScriptAnalyzer
-from .coffeescript_analyzer import CoffeeScriptAnalyzer
-from .mojo_analyzer import MojoAnalyzer
-from .ada_analyzer import AdaAnalyzer
-from .actionscript_analyzer import ActionScriptAnalyzer
-from .al_analyzer import ALAnalyzer
-from .ballerina_analyzer import BallerinaAnalyzer
-from .boo_analyzer import BooAnalyzer
-from .cairo_analyzer import CairoAnalyzer
-from .ceylon_analyzer import CeylonAnalyzer
-from .chapel_analyzer import ChapelAnalyzer
-from .vyper_analyzer import VyperAnalyzer
-from .cobol_analyzer import CobolAnalyzer
-from .fortran_analyzer import FortranAnalyzer
-from .pascal_analyzer import PascalAnalyzer
-from .lisp_analyzer import LispAnalyzer
-from .scheme_analyzer import SchemeAnalyzer
-from .racket_analyzer import RacketAnalyzer
-from .sml_analyzer import SMLAnalyzer
-from .elm_analyzer import ElmAnalyzer
-from .vb_analyzer import VBAnalyzer
+from typing import Any, Dict, List, Union
+
 from .abap_analyzer import AbapAnalyzer
-from .raku_analyzer import RakuAnalyzer
-from .purescript_analyzer import PureScriptAnalyzer
-from .gleam_analyzer import GleamAnalyzer
-from .reasonml_analyzer import ReasonMLAnalyzer
-from .idris_analyzer import IdrisAnalyzer
-from .lean_analyzer import LeanAnalyzer
-from .logtalk_analyzer import LogtalkAnalyzer
-from .eiffel_analyzer import EiffelAnalyzer
-from .fennel_analyzer import FennelAnalyzer
-from .hy_analyzer import HyAnalyzer
-from .janet_analyzer import JanetAnalyzer
-from .emacslisp_analyzer import EmacsLispAnalyzer
-from .factor_analyzer import FactorAnalyzer
-from .forth_analyzer import ForthAnalyzer
-from .prolog_analyzer import PrologAnalyzer
-from .mercury_analyzer import MercuryAnalyzer
-from .curry_analyzer import CurryAnalyzer
-from .move_analyzer import MoveAnalyzer
-from .clarity_analyzer import ClarityAnalyzer
+from .actionscript_analyzer import ActionScriptAnalyzer
+from .ada_analyzer import AdaAnalyzer
+from .afl_analyzer import AFLAnalyzer
 from .agda_analyzer import AgdaAnalyzer
-from .fsharp_analyzer import FSharpAnalyzer
-from .rego_analyzer import RegoAnalyzer
-from .robotframework_analyzer import RobotFrameworkAnalyzer
-from .wat_analyzer import WatAnalyzer
-from .moonscript_analyzer import MoonScriptAnalyzer
-from .squirrel_analyzer import SquirrelAnalyzer
-# ---- Batch 7 ----
-from .lex_analyzer import LexAnalyzer
-from .yacc_analyzer import YaccAnalyzer
-from .ocamllex_analyzer import OCamllexAnalyzer
-from .ocamlyacc_analyzer import OCamlyaccAnalyzer
-from .peg_analyzer import PegAnalyzer
-from .lark_analyzer import LarkAnalyzer
-from .qsharp_analyzer import QSharpAnalyzer
-from .openqasm_analyzer import OpenQASMAnalyzer
-from .quil_analyzer import QuilAnalyzer
-# ---- Batch 8 ----
-from .isabelle_analyzer import IsabelleAnalyzer
-from .teal_analyzer import TealAnalyzer
-from .michelson_analyzer import MichelsonAnalyzer
-from .ligo_analyzer import LigoAnalyzer
-from .scilla_analyzer import ScillaAnalyzer
-from .bluespec_analyzer import BluespecAnalyzer
-from .mlir_analyzer import MLIRAnalyzer
-from .llvmir_analyzer import LLVMIRAnalyzer
-from .smtlib_analyzer import SMTLibAnalyzer
-# ---- Batch 9 ----
-from .nasm_analyzer import NasmAnalyzer
-from .motoko_analyzer import MotokoAnalyzer
-from .bicep_analyzer import BicepAnalyzer
-from .verilog_header_analyzer import VerilogHeaderAnalyzer
-from .devicetree_analyzer import DeviceTreeAnalyzer
-from .pinescript_analyzer import PineScriptAnalyzer
-from .mql_analyzer import MQLAnalyzer
-from .structuredtext_analyzer import StructuredTextAnalyzer
-from .q_analyzer import QAnalyzer
+from .al_analyzer import ALAnalyzer
+from .alembic_analyzer import AlembicAnalyzer
+from .algol_analyzer import AlgolAnalyzer
+from .ampl_analyzer import AMPLAnalyzer
+from .apache_beam_analyzer import ApacheBeamAnalyzer
+
 # ---- Batch 10 ----
 from .apl_analyzer import AplAnalyzer
-from .j_analyzer import JAnalyzer
-from .k_analyzer import KAnalyzer
-from .io_analyzer import IoAnalyzer
-from .smali_analyzer import SmaliAnalyzer
-from .mizar_analyzer import MizarAnalyzer
-from .simula_analyzer import SimulaAnalyzer
-from .rebol_analyzer import RebolAnalyzer
-from .red_analyzer import RedAnalyzer
-from .modula2_analyzer import Modula2Analyzer
-from .modula3_analyzer import Modula3Analyzer
-from .oberon_analyzer import OberonAnalyzer
-from .pli_analyzer import PLIAnalyzer
-from .rpg_analyzer import RPGAnalyzer
-from .yara_analyzer import YaraAnalyzer
-from .puppet_analyzer import PuppetAnalyzer
-from .openscad_analyzer import OpenSCADAnalyzer
-from .icon_analyzer import IconAnalyzer
-# ---- Batch 12 ----
-from .qml_analyzer import QMLAnalyzer
-from .processing_analyzer import ProcessingAnalyzer
-from .frege_analyzer import FregeAnalyzer
-from .roc_analyzer import RocAnalyzer
-from .unison_analyzer import UnisonAnalyzer
-from .vcl_analyzer import VCLAnalyzer
-from .drools_analyzer import DroolsAnalyzer
-from .ampl_analyzer import AMPLAnalyzer
-from .gams_analyzer import GAMSAnalyzer
-# ---- Batch 13 ----
-from .spice_analyzer import SpiceAnalyzer
-from .mermaid_analyzer import MermaidAnalyzer
-from .plantuml_analyzer import PlantUMLAnalyzer
-from .flix_analyzer import FlixAnalyzer
-from .gren_analyzer import GrenAnalyzer
+from .asl_analyzer import AslAnalyzer
+from .aspnet_ashx_analyzer import AspNetAshxAnalyzer
+from .aspnet_asmx_analyzer import AspNetAsmxAnalyzer
+from .astro_analyzer import AstroAnalyzer
+from .ballerina_analyzer import BallerinaAnalyzer
+from .base_code_analyzer import BaseCodeAnalyzer
+from .befunge_analyzer import BefungeAnalyzer
+from .bicep_analyzer import BicepAnalyzer
+from .blackbird_analyzer import BlackbirdAnalyzer
+from .bloqade_analyzer import BloqadeAnalyzer
+from .bluespec_analyzer import BluespecAnalyzer
+from .bms_analyzer import BmsAnalyzer
+from .boo_analyzer import BooAnalyzer
+from .brainfuck_analyzer import BrainfuckAnalyzer
+from .c_analyzer import CAnalyzer, CppAnalyzer
+from .cairo_analyzer import CairoAnalyzer
 from .carbon_analyzer import CarbonAnalyzer
-from .lookml_analyzer import LookMLAnalyzer
+from .cask_analyzer import CaskAnalyzer
+from .cdk_analyzer import CdkAnalyzer
 from .cedar_analyzer import CedarAnalyzer
-from .koka_analyzer import KokaAnalyzer
-# ---- Batch 14 ----
-from .jai_analyzer import JaiAnalyzer
-from .nemerle_analyzer import NemerleAnalyzer
-from .magik_analyzer import MagikAnalyzer
-from .lilypond_analyzer import LilyPondAnalyzer
-from .ink_analyzer import InkAnalyzer
-from .twee_analyzer import TweeAnalyzer
-from .scilab_analyzer import ScilabAnalyzer
-from .wolfram_analyzer import WolframAnalyzer
-from .lolcode_analyzer import LOLCODEAnalyzer
+from .ceylon_analyzer import CeylonAnalyzer
+from .chapel_analyzer import ChapelAnalyzer
+from .chisel_analyzer import ChiselAnalyzer
+
+# ---- Batch 18 (Python-embedded quantum & orchestration DSLs) ----
+from .cirq_analyzer import CirqAnalyzer
+from .clarity_analyzer import ClarityAnalyzer
+from .clojure_analyzer import ClojureAnalyzer
+from .cobol_analyzer import CobolAnalyzer
+from .coffeescript_analyzer import CoffeeScriptAnalyzer
+from .coldfusion_analyzer import ColdFusionAnalyzer
 
 # ---- Batch 15 ----
 from .cppmodule_analyzer import CppModuleAnalyzer
-from .marko_analyzer import MarkoAnalyzer
-from .riot_analyzer import RiotAnalyzer
-from .coldfusion_analyzer import ColdFusionAnalyzer
-from .sentinel_analyzer import SentinelAnalyzer
-from .fourgl_analyzer import FourGLAnalyzer
-from .krl_analyzer import KRLAnalyzer
-from .rapid_analyzer import RAPIDAnalyzer
-from .harbour_analyzer import HarbourAnalyzer
-
-# ---- Batch 16 ----
-from .progress_analyzer import ProgressAnalyzer
-from .natural_analyzer import NaturalAnalyzer
-from .tal_analyzer import TALAnalyzer
-from .stl_analyzer import STLAnalyzer
-from .afl_analyzer import AFLAnalyzer
-from .qmod_analyzer import QmodAnalyzer
-from .algol_analyzer import AlgolAnalyzer
-from .snobol_analyzer import SnobolAnalyzer
-from .urscript_analyzer import URScriptAnalyzer
-# ---- Batch 17 ----
-from .qir_analyzer import QIRAnalyzer
-from .chisel_analyzer import ChiselAnalyzer
-from .sycl_analyzer import SyclAnalyzer
-from .hip_analyzer import HipAnalyzer
-from .upc_analyzer import UPCAnalyzer
+from .crystal_analyzer import CrystalAnalyzer
+from .csharp_analyzer import CSharpAnalyzer
+from .curry_analyzer import CurryAnalyzer
 from .cython_analyzer import CythonAnalyzer
-from .ren_analyzer import RenPyAnalyzer
-from .easytrieve_analyzer import EasytrieveAnalyzer
-from .zimpl_analyzer import ZIMPLAnalyzer
-# ---- Batch 18 (Python-embedded quantum & orchestration DSLs) ----
-from .cirq_analyzer import CirqAnalyzer
-from .pyquil_analyzer import PyQuilAnalyzer
-from .pennylane_analyzer import PennyLaneAnalyzer
-from .triton_analyzer import TritonAnalyzer
-from .dagster_analyzer import DagsterAnalyzer
-from .luigi_analyzer import LuigiAnalyzer
-from .prefect_analyzer import PrefectAnalyzer
-from .locust_analyzer import LocustAnalyzer
-from .k6_analyzer import K6Analyzer
-from .jsbundle_analyzer import JSBundleAnalyzer
-from .edgeworker_analyzer import EdgeWorkerAnalyzer
-from .swiftinterface_analyzer import SwiftInterfaceAnalyzer
-from .livescript_analyzer import LiveScriptAnalyzer
-from .bms_analyzer import BmsAnalyzer
-from .asl_analyzer import AslAnalyzer
-from .rc_analyzer import RcAnalyzer
-from .metafont_analyzer import MetafontAnalyzer
-from .netlogo_analyzer import NetLogoAnalyzer
+from .d_analyzer import DAnalyzer
 from .dagman_analyzer import DagmanAnalyzer
-from .cask_analyzer import CaskAnalyzer
-from .ml4_analyzer import Ml4Analyzer
-from .jbi_analyzer import JbiAnalyzer
-from .brainfuck_analyzer import BrainfuckAnalyzer
-from .befunge_analyzer import BefungeAnalyzer
-from .ook_analyzer import OokAnalyzer
-from .whitespace_analyzer import WhitespaceAnalyzer
-from .intercal_analyzer import IntercalAnalyzer
-from .piet_analyzer import PietAnalyzer
-from .gmsh_geo_analyzer import GmshGeoAnalyzer
-from .opendss_analyzer import OpenDSSAnalyzer
-from .stim_analyzer import StimAnalyzer
-from .spice_lib_analyzer import SpiceLibAnalyzer
-from .gaussian_input_analyzer import GaussianInputAnalyzer
+from .dagster_analyzer import DagsterAnalyzer
+from .dart_analyzer import DartAnalyzer
+from .devicetree_analyzer import DeviceTreeAnalyzer
+from .drools_analyzer import DroolsAnalyzer
 from .dynamics_nav_analyzer import DynamicsNAVAnalyzer
-from .slang_analyzer import SLangAnalyzer
-from .blackbird_analyzer import BlackbirdAnalyzer
-from .tradestation_tsl_analyzer import TradeStationTSLAnalyzer
-from .focus_analyzer import FocusAnalyzer
-from .ramis_analyzer import RamisAnalyzer
-from .rescript_analyzer import ReScriptAnalyzer
+from .easytrieve_analyzer import EasytrieveAnalyzer
+from .edgeworker_analyzer import EdgeWorkerAnalyzer
+from .eiffel_analyzer import EiffelAnalyzer
+from .elixir_analyzer import ElixirAnalyzer
+from .elm_analyzer import ElmAnalyzer
+from .emacslisp_analyzer import EmacsLispAnalyzer
+from .erlang_analyzer import ErlangAnalyzer
 from .esignal_efs_analyzer import ESignalEFSAnalyzer
-from .macro_asm_analyzer import MacroAsmAnalyzer
-from .ideal_analyzer import IdealAnalyzer
-from .aspnet_asmx_analyzer import AspNetAsmxAnalyzer
-from .aspnet_ashx_analyzer import AspNetAshxAnalyzer
-from .vb_usercontrol_analyzer import VBUserControlAnalyzer
-from .quest_analyzer import QuestAnalyzer
-from .bloqade_analyzer import BloqadeAnalyzer
+from .factor_analyzer import FactorAnalyzer
+from .fennel_analyzer import FennelAnalyzer
+from .flix_analyzer import FlixAnalyzer
+from .focus_analyzer import FocusAnalyzer
+from .forth_analyzer import ForthAnalyzer
+from .fortran_analyzer import FortranAnalyzer
+from .fourgl_analyzer import FourGLAnalyzer
+from .frege_analyzer import FregeAnalyzer
+from .fsharp_analyzer import FSharpAnalyzer
+from .gams_analyzer import GAMSAnalyzer
 from .gauge_spec_analyzer import GaugeSpecAnalyzer
-from .test_def_analyzer import TestDefAnalyzer
+from .gaussian_input_analyzer import GaussianInputAnalyzer
+from .gdscript_analyzer import GDScriptAnalyzer
+from .gleam_analyzer import GleamAnalyzer
+from .gmsh_geo_analyzer import GmshGeoAnalyzer
+from .gnu_assembly_analyzer import GnuAssemblyAnalyzer
+from .go_analyzer import GoAnalyzer
+from .gren_analyzer import GrenAnalyzer
+from .groovy_analyzer import GroovyAnalyzer
+from .harbour_analyzer import HarbourAnalyzer
+from .haskell_analyzer import HaskellAnalyzer
+from .haxe_analyzer import HaxeAnalyzer
+from .hip_analyzer import HipAnalyzer
+from .hy_analyzer import HyAnalyzer
+from .icon_analyzer import IconAnalyzer
+from .ideal_analyzer import IdealAnalyzer
+from .idris_analyzer import IdrisAnalyzer
+from .ink_analyzer import InkAnalyzer
+from .intercal_analyzer import IntercalAnalyzer
+from .io_analyzer import IoAnalyzer
+
+# ---- Batch 8 ----
+from .isabelle_analyzer import IsabelleAnalyzer
+from .j_analyzer import JAnalyzer
+
+# ---- Batch 14 ----
+from .jai_analyzer import JaiAnalyzer
+from .janet_analyzer import JanetAnalyzer
+from .java_analyzer import JavaAnalyzer
+from .javascript_analyzer import JavaScriptAnalyzer, TypeScriptAnalyzer
+from .jbi_analyzer import JbiAnalyzer
+from .jsbundle_analyzer import JSBundleAnalyzer
+from .julia_analyzer import JuliaAnalyzer
+from .k6_analyzer import K6Analyzer
+from .k_analyzer import KAnalyzer
+from .koka_analyzer import KokaAnalyzer
+from .kotlin_analyzer import KotlinAnalyzer
+from .krl_analyzer import KRLAnalyzer
 from .labview_vi_analyzer import LabviewViAnalyzer
-from .alembic_analyzer import AlembicAnalyzer
-from .cdk_analyzer import CdkAnalyzer
-from .apache_beam_analyzer import ApacheBeamAnalyzer
-from .tree_sitter_grammar_analyzer import TreeSitterGrammarAnalyzer
+from .lark_analyzer import LarkAnalyzer
+from .lean_analyzer import LeanAnalyzer
+
+# ---- Batch 7 ----
+from .lex_analyzer import LexAnalyzer
+from .ligo_analyzer import LigoAnalyzer
+from .lilypond_analyzer import LilyPondAnalyzer
+from .lisp_analyzer import LispAnalyzer
+from .livescript_analyzer import LiveScriptAnalyzer
+from .llvmir_analyzer import LLVMIRAnalyzer
+from .locust_analyzer import LocustAnalyzer
+from .logtalk_analyzer import LogtalkAnalyzer
+from .lolcode_analyzer import LOLCODEAnalyzer
+from .lookml_analyzer import LookMLAnalyzer
+from .lua_analyzer import LuaAnalyzer
+from .luigi_analyzer import LuigiAnalyzer
+from .macro_asm_analyzer import MacroAsmAnalyzer
+from .magik_analyzer import MagikAnalyzer
+from .marko_analyzer import MarkoAnalyzer
+from .matlab_analyzer import MatlabAnalyzer
+from .mercury_analyzer import MercuryAnalyzer
+from .mermaid_analyzer import MermaidAnalyzer
+from .metafont_analyzer import MetafontAnalyzer
+from .michelson_analyzer import MichelsonAnalyzer
+from .mizar_analyzer import MizarAnalyzer
+from .ml4_analyzer import Ml4Analyzer
+from .mlir_analyzer import MLIRAnalyzer
+from .modula2_analyzer import Modula2Analyzer
+from .modula3_analyzer import Modula3Analyzer
+from .mojo_analyzer import MojoAnalyzer
+from .moonscript_analyzer import MoonScriptAnalyzer
+from .motoko_analyzer import MotokoAnalyzer
+from .move_analyzer import MoveAnalyzer
+from .mql_analyzer import MQLAnalyzer
+
+# ---- Batch 9 ----
+from .nasm_analyzer import NasmAnalyzer
+from .natural_analyzer import NaturalAnalyzer
+from .nemerle_analyzer import NemerleAnalyzer
+from .netlogo_analyzer import NetLogoAnalyzer
+from .nim_analyzer import NimAnalyzer
+from .nix_analyzer import NixAnalyzer
+from .oberon_analyzer import OberonAnalyzer
+from .ocaml_analyzer import OCamlAnalyzer
+from .ocamllex_analyzer import OCamllexAnalyzer
+from .ocamlyacc_analyzer import OCamlyaccAnalyzer
+from .odin_analyzer import OdinAnalyzer
+from .ook_analyzer import OokAnalyzer
+from .opendss_analyzer import OpenDSSAnalyzer
+from .openqasm_analyzer import OpenQASMAnalyzer
+from .openscad_analyzer import OpenSCADAnalyzer
+from .pascal_analyzer import PascalAnalyzer
+from .peg_analyzer import PegAnalyzer
+from .pennylane_analyzer import PennyLaneAnalyzer
+from .perl_analyzer import PerlAnalyzer
+from .php_analyzer import PhpAnalyzer
+from .piet_analyzer import PietAnalyzer
+from .pinescript_analyzer import PineScriptAnalyzer
+
 # Residual source_code plane (Batch 25): 20 new hand-written language analyzers
 # clearing the last `source_code` extensions, plus pure aliases onto existing
 # analyzers wired directly in EXT_MAP below.
 from .plantuml_analyzer import PlantUMLAnalyzer
-from .haskell_analyzer import HaskellAnalyzer
-from .lua_analyzer import LuaAnalyzer
-from .julia_analyzer import JuliaAnalyzer
-from .erlang_analyzer import ErlangAnalyzer
-from .ocaml_analyzer import OCamlAnalyzer
-from .clojure_analyzer import ClojureAnalyzer
-from .dart_analyzer import DartAnalyzer
-from .nim_analyzer import NimAnalyzer
-from .zig_analyzer import ZigAnalyzer
+from .pli_analyzer import PLIAnalyzer
+from .pony_analyzer import PonyAnalyzer
+from .prefect_analyzer import PrefectAnalyzer
+from .processing_analyzer import ProcessingAnalyzer
+
+# ---- Batch 16 ----
+from .progress_analyzer import ProgressAnalyzer
+from .prolog_analyzer import PrologAnalyzer
+from .puppet_analyzer import PuppetAnalyzer
+from .purescript_analyzer import PureScriptAnalyzer
+from .pyquil_analyzer import PyQuilAnalyzer
+from .python_analyzer import PythonCodeAnalyzer
+from .q_analyzer import QAnalyzer
+
+# ---- Batch 17 ----
+from .qir_analyzer import QIRAnalyzer
+
+# ---- Batch 12 ----
+from .qml_analyzer import QMLAnalyzer
+from .qmod_analyzer import QmodAnalyzer
+from .qsharp_analyzer import QSharpAnalyzer
+from .quest_analyzer import QuestAnalyzer
+from .quil_analyzer import QuilAnalyzer
+from .r_analyzer import RAnalyzer
+from .racket_analyzer import RacketAnalyzer
+from .raku_analyzer import RakuAnalyzer
+from .ramis_analyzer import RamisAnalyzer
+from .rapid_analyzer import RAPIDAnalyzer
+from .rc_analyzer import RcAnalyzer
+from .reasonml_analyzer import ReasonMLAnalyzer
+from .rebol_analyzer import RebolAnalyzer
+from .red_analyzer import RedAnalyzer
+from .rego_analyzer import RegoAnalyzer
+from .ren_analyzer import RenPyAnalyzer
+from .rescript_analyzer import ReScriptAnalyzer
+from .riot_analyzer import RiotAnalyzer
+from .robotframework_analyzer import RobotFrameworkAnalyzer
+from .roc_analyzer import RocAnalyzer
+from .rpg_analyzer import RPGAnalyzer
+from .ruby_analyzer import RubyAnalyzer
+from .rust_analyzer import RustAnalyzer
+from .scala_analyzer import ScalaAnalyzer
+from .scheme_analyzer import SchemeAnalyzer
+from .scilab_analyzer import ScilabAnalyzer
+from .scilla_analyzer import ScillaAnalyzer
+from .sentinel_analyzer import SentinelAnalyzer
+from .simula_analyzer import SimulaAnalyzer
+from .slang_analyzer import SLangAnalyzer
+from .smali_analyzer import SmaliAnalyzer
+from .sml_analyzer import SMLAnalyzer
+from .smtlib_analyzer import SMTLibAnalyzer
+from .snobol_analyzer import SnobolAnalyzer
 from .solidity_analyzer import SolidityAnalyzer
+
+# ---- Batch 13 ----
+from .spice_analyzer import SpiceAnalyzer
+from .spice_lib_analyzer import SpiceLibAnalyzer
+from .squirrel_analyzer import SquirrelAnalyzer
+from .stim_analyzer import StimAnalyzer
+from .stl_analyzer import STLAnalyzer
+from .structuredtext_analyzer import StructuredTextAnalyzer
+from .svelte_analyzer import SvelteAnalyzer
+from .swift_analyzer import SwiftAnalyzer
+from .swiftinterface_analyzer import SwiftInterfaceAnalyzer
+from .sycl_analyzer import SyclAnalyzer
+from .tal_analyzer import TALAnalyzer
+from .teal_analyzer import TealAnalyzer
+from .test_def_analyzer import TestDefAnalyzer
+from .tradestation_tsl_analyzer import TradeStationTSLAnalyzer
+from .tree_sitter_grammar_analyzer import TreeSitterGrammarAnalyzer
+from .triton_analyzer import TritonAnalyzer
+from .twee_analyzer import TweeAnalyzer
+from .unison_analyzer import UnisonAnalyzer
+from .upc_analyzer import UPCAnalyzer
+from .urscript_analyzer import URScriptAnalyzer
+from .vala_analyzer import ValaAnalyzer
+from .vb_analyzer import VBAnalyzer
+from .vb_usercontrol_analyzer import VBUserControlAnalyzer
+from .vcl_analyzer import VCLAnalyzer
 from .verilog_analyzer import VerilogAnalyzer
+from .verilog_header_analyzer import VerilogHeaderAnalyzer
 from .vhdl_analyzer import VhdlAnalyzer
 from .vue_analyzer import VueAnalyzer
-from .svelte_analyzer import SvelteAnalyzer
-from .nix_analyzer import NixAnalyzer
-from .groovy_analyzer import GroovyAnalyzer
-from .perl_analyzer import PerlAnalyzer
-from .matlab_analyzer import MatlabAnalyzer
-from .gnu_assembly_analyzer import GnuAssemblyAnalyzer
-from .astro_analyzer import AstroAnalyzer
+from .vyper_analyzer import VyperAnalyzer
+from .wat_analyzer import WatAnalyzer
+from .whitespace_analyzer import WhitespaceAnalyzer
+from .wolfram_analyzer import WolframAnalyzer
+from .wren_analyzer import WrenAnalyzer
+from .yacc_analyzer import YaccAnalyzer
+from .yara_analyzer import YaraAnalyzer
+from .zig_analyzer import ZigAnalyzer
+from .zimpl_analyzer import ZIMPLAnalyzer
+
 
 class PolyglotCodeAnalyzer:
     """
@@ -323,7 +324,7 @@ class PolyglotCodeAnalyzer:
         ".coffee": CoffeeScriptAnalyzer,
         ".litcoffee": CoffeeScriptAnalyzer,
         ".mojo": MojoAnalyzer,
-        ".\U0001F525": MojoAnalyzer,
+        ".\U0001f525": MojoAnalyzer,
         # ---- Batch 2: hand-written (regex/heuristic) analyzers ----
         ".ada": AdaAnalyzer,
         ".adb": AdaAnalyzer,
@@ -603,36 +604,50 @@ class PolyglotCodeAnalyzer:
         ".cdk": CdkAnalyzer,
         ".beam": ApacheBeamAnalyzer,
         ".tree-sitter": TreeSitterGrammarAnalyzer,
-
         # ----------------------------------------------------------------
         # Batch 25 -- residual `source_code` extensions.
         # Pure aliases onto existing analyzers (same syntax family):
-        ".c++": CppAnalyzer, ".hh": CppAnalyzer, ".hxx": CppAnalyzer,
-        ".ino": CppAnalyzer, ".cu": CppAnalyzer, ".cuh": CppAnalyzer,
+        ".c++": CppAnalyzer,
+        ".hh": CppAnalyzer,
+        ".hxx": CppAnalyzer,
+        ".ino": CppAnalyzer,
+        ".cu": CppAnalyzer,
+        ".cuh": CppAnalyzer,
         ".cjs": JavaScriptAnalyzer,
         ".cts": TypeScriptAnalyzer,
         ".cl": LispAnalyzer,
-        ".pyx": CythonAnalyzer, ".pxd": CythonAnalyzer,
-        ".pyi": PythonCodeAnalyzer, ".pyw": PythonCodeAnalyzer,
+        ".pyx": CythonAnalyzer,
+        ".pxd": CythonAnalyzer,
+        ".pyi": PythonCodeAnalyzer,
+        ".pyw": PythonCodeAnalyzer,
         ".nbconvert": PythonCodeAnalyzer,
         ".mmd": MermaidAnalyzer,
         ".puml": PlantUMLAnalyzer,
-        ".f": FortranAnalyzer, ".f77": FortranAnalyzer, ".f90": FortranAnalyzer,
-        ".f95": FortranAnalyzer, ".for": FortranAnalyzer,
-        ".fs": FSharpAnalyzer, ".fsi": FSharpAnalyzer,
+        ".f": FortranAnalyzer,
+        ".f77": FortranAnalyzer,
+        ".f90": FortranAnalyzer,
+        ".f95": FortranAnalyzer,
+        ".for": FortranAnalyzer,
+        ".fs": FSharpAnalyzer,
+        ".fsi": FSharpAnalyzer,
         # New dedicated per-language analyzers:
-        ".hs": HaskellAnalyzer, ".lhs": HaskellAnalyzer,
+        ".hs": HaskellAnalyzer,
+        ".lhs": HaskellAnalyzer,
         ".lua": LuaAnalyzer,
         ".jl": JuliaAnalyzer,
-        ".erl": ErlangAnalyzer, ".hrl": ErlangAnalyzer,
-        ".ml": OCamlAnalyzer, ".mli": OCamlAnalyzer,
-        ".clj": ClojureAnalyzer, ".cljc": ClojureAnalyzer,
+        ".erl": ErlangAnalyzer,
+        ".hrl": ErlangAnalyzer,
+        ".ml": OCamlAnalyzer,
+        ".mli": OCamlAnalyzer,
+        ".clj": ClojureAnalyzer,
+        ".cljc": ClojureAnalyzer,
         ".cljs": ClojureAnalyzer,
         ".dart": DartAnalyzer,
         ".nim": NimAnalyzer,
         ".zig": ZigAnalyzer,
         ".sol": SolidityAnalyzer,
-        ".v": VerilogAnalyzer, ".sv": VerilogAnalyzer,
+        ".v": VerilogAnalyzer,
+        ".sv": VerilogAnalyzer,
         ".vhdl": VhdlAnalyzer,
         ".vue": VueAnalyzer,
         ".svelte": SvelteAnalyzer,
@@ -648,7 +663,7 @@ class PolyglotCodeAnalyzer:
         self,
         file_paths: List[Union[str, Path]],
         dump_file_path: str = "polyglot_analysis.json",
-        dump_file_type: str = "json"
+        dump_file_type: str = "json",
     ):
         self.file_paths = [Path(p).resolve() for p in file_paths]
         self.dump_file_path = dump_file_path
@@ -710,19 +725,27 @@ class PolyglotCodeAnalyzer:
         }
         shift_list = {
             "functions_table": ["args_ids", "function_outputs_ids"],
-            "classes_table": ["parent_class_ids", "method_ids",
-                              "args_ids", "attr_ids", "tensor_member_ids"],
+            "classes_table": [
+                "parent_class_ids",
+                "method_ids",
+                "args_ids",
+                "attr_ids",
+                "tensor_member_ids",
+            ],
         }
         pk_by_table = {
-            "imports_table": "import_id", "variables_table": "variable_id",
-            "functions_table": "function_id", "classes_table": "class_id",
-            "args_table": "args_id", "outputs_table": "output_id",
+            "imports_table": "import_id",
+            "variables_table": "variable_id",
+            "functions_table": "function_id",
+            "classes_table": "class_id",
+            "args_table": "args_id",
+            "outputs_table": "output_id",
             "tensor_members_table": "member_id",
             "introspection_metadata_table": "metadata_id",
             "symbol_index": "symbol_id",
         }
 
-        id_offset = 0           # running base for the next analyzer's id range
+        id_offset = 0  # running base for the next analyzer's id range
         kind_ref_set = False
 
         for analyzer_cls, paths in grouped.items():
@@ -734,18 +757,24 @@ class PolyglotCodeAnalyzer:
                 tables = analyzer.analyze()
             except ImportError as err:
                 exts = "/".join(sorted({p.suffix for p in paths}))
-                print(f"Warning: skipping {len(paths)} {exts} file(s); "
-                      f"{analyzer_cls.__name__} backend unavailable: {err}")
+                print(
+                    f"Warning: skipping {len(paths)} {exts} file(s); "
+                    f"{analyzer_cls.__name__} backend unavailable: {err}"
+                )
                 continue
             except Exception as err:
                 exts = "/".join(sorted({p.suffix for p in paths}))
-                print(f"Warning: {analyzer_cls.__name__} failed on {len(paths)} "
-                      f"{exts} file(s); skipping them: {err}")
+                print(
+                    f"Warning: {analyzer_cls.__name__} failed on {len(paths)} "
+                    f"{exts} file(s); skipping them: {err}"
+                )
                 continue
 
             # kind_reference is a constant lookup table; keep exactly one copy.
             if not kind_ref_set:
-                merged_tables["kind_reference"] = [dict(r) for r in tables.get("kind_reference", [])]
+                merged_tables["kind_reference"] = [
+                    dict(r) for r in tables.get("kind_reference", [])
+                ]
                 kind_ref_set = True
 
             # Reconstruct this analyzer's local file_id -> global file_id map.
@@ -755,8 +784,9 @@ class PolyglotCodeAnalyzer:
             # that ordered list.
             if hasattr(analyzer, "extensions"):
                 _exts = {e.lower() for e in analyzer.extensions}
-                ordered_files = [p for p in paths
-                                 if p.suffix.lower() in _exts and p.exists()]
+                ordered_files = [
+                    p for p in paths if p.suffix.lower() in _exts and p.exists()
+                ]
             else:
                 ordered_files = list(paths)
             local_to_global_file = {
@@ -804,8 +834,7 @@ class PolyglotCodeAnalyzer:
                 merged_tables[k].extend(tables.get(k, []))
 
         exporter = BaseCodeAnalyzer(
-            dump_file_path=self.dump_file_path,
-            dump_file_type=self.dump_file_type
+            dump_file_path=self.dump_file_path, dump_file_type=self.dump_file_type
         )
         for k in merged_tables:
             setattr(exporter, k, merged_tables[k])
@@ -833,7 +862,8 @@ for _ext, _cls in _SHELL_EXT_MAP.items():
     if _existing is not None and _existing is not _cls:
         raise RuntimeError(
             f"shell extension {_ext} collides with programming-language "
-            f"analyzer {_existing.__name__}")
+            f"analyzer {_existing.__name__}"
+        )
     PolyglotCodeAnalyzer.EXT_MAP[_ext] = _cls
 
 
@@ -851,5 +881,6 @@ for _ext, _cls in _SCRIPT_EXT_MAP.items():
     if _existing is not None and _existing is not _cls:
         raise RuntimeError(
             f"script extension {_ext} collides with existing "
-            f"analyzer {_existing.__name__}")
+            f"analyzer {_existing.__name__}"
+        )
     PolyglotCodeAnalyzer.EXT_MAP[_ext] = _cls

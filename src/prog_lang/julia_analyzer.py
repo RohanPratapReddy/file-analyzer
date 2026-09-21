@@ -11,7 +11,7 @@
 #   g(x) = x^2                                     -> function (assignment form)
 #   const C = 3.0                                  -> variable
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -25,16 +25,18 @@ class JuliaAnalyzer(RegexCodeAnalyzer):
     # newline into the following declaration.
     _USING = re.compile(
         r"^[ \t]*(using|import)[ \t]+([\w.]+(?:[ \t]*,[ \t]*[\w.]+)*)"
-        r"(?:[ \t]*:[ \t]*([\w,! \t*+]+))?", re.MULTILINE)
+        r"(?:[ \t]*:[ \t]*([\w,! \t*+]+))?",
+        re.MULTILINE,
+    )
     _MODULE = re.compile(r"^\s*(?:module|baremodule)\s+(\w+)", re.MULTILINE)
     _STRUCT = re.compile(
         r"^\s*(?:mutable\s+)?struct\s+(\w+)(?:\{[^}]*\})?(?:\s*<:\s*[\w.{}]+)?"
-        r"(.*?)^\s*end", re.MULTILINE | re.DOTALL)
-    _ABSTRACT = re.compile(r"^\s*(?:abstract|primitive)\s+type\s+(\w+)",
-                           re.MULTILINE)
+        r"(.*?)^\s*end",
+        re.MULTILINE | re.DOTALL,
+    )
+    _ABSTRACT = re.compile(r"^\s*(?:abstract|primitive)\s+type\s+(\w+)", re.MULTILINE)
     _FUNC = re.compile(r"^\s*function\s+([\w.!]+)\s*\(([^)]*)\)", re.MULTILINE)
-    _ASSIGN_FUNC = re.compile(
-        r"^\s*([\w.!]+)\s*\(([^)]*)\)\s*=(?!=)", re.MULTILINE)
+    _ASSIGN_FUNC = re.compile(r"^\s*([\w.!]+)\s*\(([^)]*)\)\s*=(?!=)", re.MULTILINE)
     _CONST = re.compile(r"^\s*(?:const|global)\s+(\w+)\s*=", re.MULTILINE)
     _FIELD = re.compile(r"^\s*(\w+)\s*(?:::\s*([\w.{}, ]+))?\s*$", re.MULTILINE)
 
@@ -75,8 +77,9 @@ class JuliaAnalyzer(RegexCodeAnalyzer):
                 if fname in ("end", "function", "return"):
                     continue
                 attr_ids.append(self._add_arg(fname, fm.group(2)))
-            self._add_class(file_id, name, description="julia struct",
-                            attr_ids=attr_ids)
+            self._add_class(
+                file_id, name, description="julia struct", attr_ids=attr_ids
+            )
 
         for m in self._ABSTRACT.finditer(t):
             self._add_class(file_id, m.group(1), description="julia abstract type")
@@ -93,8 +96,12 @@ class JuliaAnalyzer(RegexCodeAnalyzer):
             if in_struct(m.start()):
                 continue
             name = m.group(1).split(".")[-1]
-            self._add_function(file_id, name, self._args(m.group(2)),
-                               description="julia short-form function")
+            self._add_function(
+                file_id,
+                name,
+                self._args(m.group(2)),
+                description="julia short-form function",
+            )
 
         for m in self._CONST.finditer(t):
             self._add_variable(file_id, m.group(1))

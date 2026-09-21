@@ -14,11 +14,11 @@
 # Comments are nested '(* ... *)'; strings use '"'.  Case-sensitive; a trailing
 # '*' (or '-') on an identifier is the export mark and is stripped.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z][A-Za-z0-9_]*"
-_MARK = r"[*-]?"          # export / read-only mark
+_MARK = r"[*-]?"  # export / read-only mark
 
 
 class OberonAnalyzer(RegexCodeAnalyzer):
@@ -33,16 +33,24 @@ class OberonAnalyzer(RegexCodeAnalyzer):
     # optional "(recv: Type)" receiver, then name, then export mark, then '('
     _PROC = re.compile(
         r"\bPROCEDURE\s*(?:\(\s*" + _ID + r"\s*:\s*" + _ID + r"\s*\)\s*)?"
-        r"(" + _ID + r")" + _MARK + r"\s*(\([^)]*\))?")
+        r"(" + _ID + r")" + _MARK + r"\s*(\([^)]*\))?"
+    )
     _RECTYPE = re.compile(
-        r"\b(" + _ID + r")" + _MARK +
-        r"\s*=\s*(?:POINTER\s+TO\s+)?RECORD\b")
+        r"\b(" + _ID + r")" + _MARK + r"\s*=\s*(?:POINTER\s+TO\s+)?RECORD\b"
+    )
     _CONST = re.compile(
-        r"^[ \t]*(?:CONST[ \t]+)?(" + _ID + r")" + _MARK + r"\s*=\s*[^=;]",
-        re.MULTILINE)
+        r"^[ \t]*(?:CONST[ \t]+)?(" + _ID + r")" + _MARK + r"\s*=\s*[^=;]", re.MULTILINE
+    )
     _VARLINE = re.compile(
-        r"^[ \t]*(?:VAR[ \t]+)?(" + _ID + _MARK + r"(?:\s*,\s*" + _ID +
-        _MARK + r")*)\s*:\s*[^;]+", re.MULTILINE)
+        r"^[ \t]*(?:VAR[ \t]+)?("
+        + _ID
+        + _MARK
+        + r"(?:\s*,\s*"
+        + _ID
+        + _MARK
+        + r")*)\s*:\s*[^;]+",
+        re.MULTILINE,
+    )
 
     @staticmethod
     def _clean_id(tok):
@@ -87,20 +95,25 @@ class OberonAnalyzer(RegexCodeAnalyzer):
                     alias, mod = None, chunk.strip()
                 nm = re.match(_ID, mod)
                 if nm:
-                    self._add_import(file_id, (alias or nm.group(0)),
-                                     nm.group(0), alias)
+                    self._add_import(
+                        file_id, (alias or nm.group(0)), nm.group(0), alias
+                    )
 
         cls_id = None
         for m in self._MODULE.finditer(clean):
-            cls_id = self._add_class(file_id, m.group(1),
-                                     description="oberon module")
+            cls_id = self._add_class(file_id, m.group(1), description="oberon module")
         for m in self._RECTYPE.finditer(clean):
             self._add_class(file_id, m.group(1), description="oberon record")
 
         for m in self._PROC.finditer(clean):
-            self._add_function(file_id, m.group(1),
-                               self._proc_args(m.group(2)), [],
-                               class_id=cls_id, description="oberon procedure")
+            self._add_function(
+                file_id,
+                m.group(1),
+                self._proc_args(m.group(2)),
+                [],
+                class_id=cls_id,
+                description="oberon procedure",
+            )
 
         for m in self._CONST.finditer(clean):
             self._add_variable(file_id, m.group(1), scope="module")

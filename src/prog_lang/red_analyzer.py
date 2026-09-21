@@ -14,7 +14,7 @@
 #
 # Comment token is ';' to end of line; strings use '"' (and {...} blocks).
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _WORD = r"[A-Za-z][A-Za-z0-9!?~+='*&|._-]*"
@@ -30,12 +30,15 @@ class RedAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"',)
 
     _FUNC = re.compile(
-        r"^[ \t]*(" + _WORD + r"):\s+" + _FUNC_KW + r"(?![\w!?])", re.MULTILINE)
+        r"^[ \t]*(" + _WORD + r"):\s+" + _FUNC_KW + r"(?![\w!?])", re.MULTILINE
+    )
     _OBJ = re.compile(
-        r"^[ \t]*(" + _WORD + r"):\s+" + _OBJ_KW + r"(?![\w!?])", re.MULTILINE)
+        r"^[ \t]*(" + _WORD + r"):\s+" + _OBJ_KW + r"(?![\w!?])", re.MULTILINE
+    )
     _SET = re.compile(
-        r"^[ \t]*(" + _WORD + r"):\s+(?!" + _FUNC_KW + r"\b)(?!" +
-        _OBJ_KW + r"\b)\S", re.MULTILINE)
+        r"^[ \t]*(" + _WORD + r"):\s+(?!" + _FUNC_KW + r"\b)(?!" + _OBJ_KW + r"\b)\S",
+        re.MULTILINE,
+    )
     _DO = re.compile(r"^[ \t]*do\s+%(\S+)", re.MULTILINE)
     _INCLUDE = re.compile(r"^[ \t]*#include\s+%(\S+)", re.MULTILINE)
 
@@ -61,15 +64,18 @@ class RedAnalyzer(RegexCodeAnalyzer):
         for rx in (self._DO, self._INCLUDE):
             for m in rx.finditer(clean):
                 src = m.group(1)
-                self._add_import(
-                    file_id, src.replace("\\", "/").split("/")[-1], src)
+                self._add_import(file_id, src.replace("\\", "/").split("/")[-1], src)
 
         func_pos = set()
         for m in self._FUNC.finditer(clean):
             func_pos.add(m.start())
-            self._add_function(file_id, m.group(1),
-                               self._spec_args(clean, m.end()), [],
-                               description="red function")
+            self._add_function(
+                file_id,
+                m.group(1),
+                self._spec_args(clean, m.end()),
+                [],
+                description="red function",
+            )
         obj_pos = set()
         for m in self._OBJ.finditer(clean):
             obj_pos.add(m.start())

@@ -18,7 +18,7 @@
 #
 # A leading '+' continues the previous logical line.  Strings use '"'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -29,7 +29,7 @@ _TOK = r"[A-Za-z0-9_:!$#.+/\\-]+"
 class SpiceAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "spice"
     EXTENSIONS = (".cir", ".sp", ".spi", ".subckt")
-    LINE_COMMENTS = ()          # '*' is column-0 only -> handled in _decomment
+    LINE_COMMENTS = ()  # '*' is column-0 only -> handled in _decomment
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ('"', "'")
 
@@ -84,7 +84,7 @@ class SpiceAnalyzer(RegexCodeAnalyzer):
 
         for m in self._INCLUDE.finditer(clean):
             tail = m.group(1).strip()
-            fname = tail.split()[0].strip('"\'') if tail else ""
+            fname = tail.split()[0].strip("\"'") if tail else ""
             if fname:
                 leaf = re.split(r"[\\/]", fname)[-1]
                 self._add_import(file_id, leaf, fname)
@@ -92,8 +92,12 @@ class SpiceAnalyzer(RegexCodeAnalyzer):
         for m in self._SUBCKT.finditer(clean):
             nodes, params = self._nodes_and_params(m.group(2))
             attrs = [self._add_arg(n) for n in nodes]
-            self._add_class(file_id, m.group(1), description="spice subcircuit",
-                            attr_ids=attrs or None)
+            self._add_class(
+                file_id,
+                m.group(1),
+                description="spice subcircuit",
+                attr_ids=attrs or None,
+            )
             for pm in self._ASSIGN.finditer(params):
                 self._add_variable(file_id, pm.group(1), scope="param")
 
@@ -101,10 +105,12 @@ class SpiceAnalyzer(RegexCodeAnalyzer):
             self._add_class(file_id, m.group(1), description="spice model")
 
         for m in self._FUNC.finditer(clean):
-            args = [self._add_arg(a.strip()) for a in m.group(2).split(",")
-                    if a.strip()]
-            self._add_function(file_id, m.group(1), args, [],
-                               description="spice function")
+            args = [
+                self._add_arg(a.strip()) for a in m.group(2).split(",") if a.strip()
+            ]
+            self._add_function(
+                file_id, m.group(1), args, [], description="spice function"
+            )
 
         for m in self._PARAM.finditer(clean):
             for pm in self._ASSIGN.finditer(m.group(1)):

@@ -14,7 +14,7 @@
 # function.  A leading `{ package ... }` action block (pointlander/peg) is
 # scanned for `import` lines.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -26,8 +26,7 @@ class PegAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"', "'")
 
     # Name followed by a definition arrow: <- , <~ , =  or the unicode LEFTARROW
-    _RULE = re.compile(r"^[ \t]*([A-Za-z_]\w*)\s*(?:<-|<~|←|=(?!=))",
-                       re.MULTILINE)
+    _RULE = re.compile(r"^[ \t]*([A-Za-z_]\w*)\s*(?:<-|<~|←|=(?!=))", re.MULTILINE)
     # pointlander/peg embeds Go: `package x` + import block / single imports
     _PACKAGE = re.compile(r"^[ \t]*package\s+([A-Za-z_]\w*)", re.MULTILINE)
     _IMPORT1 = re.compile(r'^[ \t]*import\s+"([^"]+)"', re.MULTILINE)
@@ -42,8 +41,9 @@ class PegAnalyzer(RegexCodeAnalyzer):
         for m in self._IMPORT1.finditer(clean):
             src = m.group(1)
             self._add_import(file_id, re.split(r"/", src)[-1], src)
-        for gm in re.finditer(r"^[ \t]*import\s*\((.*?)\)", clean,
-                              re.MULTILINE | re.DOTALL):
+        for gm in re.finditer(
+            r"^[ \t]*import\s*\((.*?)\)", clean, re.MULTILINE | re.DOTALL
+        ):
             for line in gm.group(1).splitlines():
                 sm = re.search(r'"([^"]+)"', line)
                 if sm:

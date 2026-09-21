@@ -24,7 +24,7 @@
 # `*` starts a comment line; `$` and `;` start in-line comments; a leading `+`
 # continues the previous logical line.  Directives are case-insensitive.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _NM = r"[A-Za-z0-9_]+"
@@ -64,8 +64,7 @@ class SpiceLibAnalyzer(RegexCodeAnalyzer):
             name = m.group(1)
             if name.lower() not in seen_c:
                 seen_c.add(name.lower())
-                self._add_class(file_id, name,
-                                description=f"SPICE .model {m.group(2)}")
+                self._add_class(file_id, name, description=f"SPICE .model {m.group(2)}")
         for m in self._SUBCKT.finditer(clean):
             name = m.group(1)
             if name.lower() not in seen_c:
@@ -73,10 +72,13 @@ class SpiceLibAnalyzer(RegexCodeAnalyzer):
                 self._add_class(file_id, name, description="SPICE subcircuit")
 
         for m in self._FUNC.finditer(clean):
-            arg_ids = [self._add_arg(a.split("=")[0].strip())
-                       for a in self._split_top_level(m.group(2))]
-            self._add_function(file_id, m.group(1), arg_ids, [],
-                               description="SPICE .func")
+            arg_ids = [
+                self._add_arg(a.split("=")[0].strip())
+                for a in self._split_top_level(m.group(2))
+            ]
+            self._add_function(
+                file_id, m.group(1), arg_ids, [], description="SPICE .func"
+            )
 
         seen_v = set()
         for m in self._PARAM.finditer(clean):

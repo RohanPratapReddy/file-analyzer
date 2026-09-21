@@ -11,7 +11,7 @@
 # Comments are '//' and '/* ... */'; strings use '"'.  OpenSCAD has no classes;
 # 'module' and 'function' are the only definitional forms.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_$][A-Za-z0-9_]*"
@@ -32,7 +32,7 @@ class OpenSCADAnalyzer(RegexCodeAnalyzer):
 
     def _params(self, text, open_paren):
         end = self._find_matching(text, open_paren, "(", ")")
-        inner = text[open_paren + 1:end - 1]
+        inner = text[open_paren + 1 : end - 1]
         ids = []
         for grp in self._split_top_level(inner):
             grp = grp.strip()
@@ -64,15 +64,17 @@ class OpenSCADAnalyzer(RegexCodeAnalyzer):
 
         for m in self._MODULE.finditer(clean):
             args, _ = self._params(clean, m.end() - 1)
-            self._add_function(file_id, m.group(1), args, [],
-                               description="openscad module")
+            self._add_function(
+                file_id, m.group(1), args, [], description="openscad module"
+            )
 
         for m in self._FUNCTION.finditer(clean):
             args, end = self._params(clean, m.end() - 1)
             # a function has a single expression body after '='
             out = [self._add_output("expr")]
-            self._add_function(file_id, m.group(1), args, out,
-                               description="openscad function")
+            self._add_function(
+                file_id, m.group(1), args, out, description="openscad function"
+            )
 
         # only top-level (module-scope) assignments -> variables
         for m in self._ASSIGN.finditer(clean):

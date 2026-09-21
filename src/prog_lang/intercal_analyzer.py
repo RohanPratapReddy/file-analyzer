@@ -23,14 +23,15 @@
 # This analyzer extracts labels as functions (references to undefined labels
 # become imports) and every distinct sigil+number as a variable.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 # a label that DEFINES a statement: `(n)` followed by DO / PLEASE
 _LABEL_DEF = re.compile(r"(?mi)^\s*\((\d+)\)\s*(?:PLEASE|DO)\b")
 # a label used as an operand of a transfer/abstention statement
-_LABEL_REF = re.compile(r"(?i)\b(?:NEXT|COME\s+FROM|ABSTAIN\s+FROM|REINSTATE)\b"
-                        r"|\((\d+)\)")
+_LABEL_REF = re.compile(
+    r"(?i)\b(?:NEXT|COME\s+FROM|ABSTAIN\s+FROM|REINSTATE)\b" r"|\((\d+)\)"
+)
 _LABEL_TARGET = re.compile(r"\((\d+)\)")
 _VAR = re.compile(r"(?<![0-9])([.,:;])(\d+)")
 # statements that transfer/abstain by label — their `(n)` operands are refs
@@ -40,9 +41,9 @@ _XFER_LINE = re.compile(r"(?mi)^.*\b(?:NEXT|COME\s+FROM|ABSTAIN|REINSTATE)\b.*$"
 class IntercalAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "intercal"
     EXTENSIONS = (".intercal",)
-    LINE_COMMENTS = ()          # INTERCAL has no comment syntax
+    LINE_COMMENTS = ()  # INTERCAL has no comment syntax
     BLOCK_COMMENTS = ()
-    STRING_DELIMS = ()          # '/" are grouping operators, not strings
+    STRING_DELIMS = ()  # '/" are grouping operators, not strings
 
     def _extract_entities(self, file_id, text, path):
         defined = set()
@@ -56,8 +57,9 @@ class IntercalAnalyzer(RegexCodeAnalyzer):
                 referenced.add(int(t.group(1)))
 
         for lbl in sorted(defined):
-            self._add_function(file_id, f"label_{lbl}", [], [],
-                               description="INTERCAL line label")
+            self._add_function(
+                file_id, f"label_{lbl}", [], [], description="INTERCAL line label"
+            )
         for lbl in sorted(referenced - defined):
             self._add_import(file_id, f"label_{lbl}", f"label_{lbl}")
 
@@ -67,6 +69,10 @@ class IntercalAnalyzer(RegexCodeAnalyzer):
             if name in seen:
                 continue
             seen.add(name)
-            kind = {".": "spot", ":": "twospot",
-                    ",": "tail-array", ";": "hybrid-array"}[m.group(1)]
+            kind = {
+                ".": "spot",
+                ":": "twospot",
+                ",": "tail-array",
+                ";": "hybrid-array",
+            }[m.group(1)]
             self._add_variable(file_id, name, None, scope=kind)

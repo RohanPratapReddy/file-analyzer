@@ -9,7 +9,7 @@
 #   msg: .asciz "hi"   count: .word 0                -> data label (variable)
 #   .section .text / .data                          -> section (informational)
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -21,14 +21,14 @@ class GnuAssemblyAnalyzer(RegexCodeAnalyzer):
 
     _INCLUDE = re.compile(r'^\s*\.include\s+"([^"]+)"', re.MULTILINE)
     _GLOBAL = re.compile(r"^\s*\.globa?l\s+([\w.$,\s]+)", re.MULTILINE)
-    _TYPE_FUNC = re.compile(r"^\s*\.type\s+(\w+)\s*,\s*[@%]function",
-                            re.MULTILINE)
-    _EQU = re.compile(r"^\s*\.(?:equ|set|equiv)\s+(\w+)\s*,\s*([^\n]+)",
-                      re.MULTILINE)
+    _TYPE_FUNC = re.compile(r"^\s*\.type\s+(\w+)\s*,\s*[@%]function", re.MULTILINE)
+    _EQU = re.compile(r"^\s*\.(?:equ|set|equiv)\s+(\w+)\s*,\s*([^\n]+)", re.MULTILINE)
     _LABEL = re.compile(r"^(\w+)\s*:", re.MULTILINE)
     _DATA_DIRECTIVE = re.compile(
         r"^(\w+)\s*:\s*\.(?:byte|word|long|quad|asciz?|ascii|string|float|"
-        r"double|space|zero|skip|fill)\b", re.MULTILINE)
+        r"double|space|zero|skip|fill)\b",
+        re.MULTILINE,
+    )
 
     def _register_types(self, file_id, text, path):
         pass
@@ -52,8 +52,9 @@ class GnuAssemblyAnalyzer(RegexCodeAnalyzer):
             data_syms.add(m.group(1))
 
         for m in self._EQU.finditer(t):
-            self._add_variable(file_id, m.group(1), m.group(2).strip(),
-                               scope="constant")
+            self._add_variable(
+                file_id, m.group(1), m.group(2).strip(), scope="constant"
+            )
             data_syms.add(m.group(1))
 
         # Emit labels: those declared .type @function or .global are functions;
@@ -69,8 +70,11 @@ class GnuAssemblyAnalyzer(RegexCodeAnalyzer):
                 if name not in {v["variable_name"] for v in self.variables_table}:
                     self._add_variable(file_id, name, scope="data")
             else:
-                self._add_function(file_id, name, description="asm label"
-                                   if name not in func_syms else "asm global")
+                self._add_function(
+                    file_id,
+                    name,
+                    description="asm label" if name not in func_syms else "asm global",
+                )
         # Globals that were declared but whose label lives in another file.
         for sym in func_syms:
             if sym not in seen:

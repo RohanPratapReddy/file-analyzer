@@ -21,17 +21,15 @@
 # the grid (it measures the playfield and tracks string-mode toggles so a
 # quoted region is not mistaken for anything) and emits nothing.  An "empty"
 # Befunge file is the CORRECT outcome.
-import re
-from pathlib import Path
 from .regex_base import RegexCodeAnalyzer
 
 
 class BefungeAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "befunge"
     EXTENSIONS = (".befunge",)
-    LINE_COMMENTS = ()          # there is no line-comment syntax
+    LINE_COMMENTS = ()  # there is no line-comment syntax
     BLOCK_COMMENTS = ()
-    STRING_DELIMS = ()          # `"` is run-time string mode, handled below
+    STRING_DELIMS = ()  # `"` is run-time string mode, handled below
 
     def _extract_entities(self, file_id, text, path):
         # Walk the playfield honouring `"` string-mode toggles, purely to parse

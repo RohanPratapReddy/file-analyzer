@@ -15,7 +15,7 @@
 # Comments '//' and '/* */'; strings '"'. (Also tolerates JSON-model .qmod:
 #   "function_name": "..." pairs are NOT parsed -- native syntax only.)
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -45,10 +45,11 @@ class QmodAnalyzer(RegexCodeAnalyzer):
         for m in self._QFUNC.finditer(clean):
             popen = clean.index("(", m.start())
             pclose = self._find_matching(clean, popen, "(", ")")
-            args = self._qmod_args(clean[popen + 1:pclose - 1])
-            outs = self._qmod_outputs(clean[popen + 1:pclose - 1])
-            self._add_function(file_id, m.group(1), args, outs,
-                               description="qmod qfunc")
+            args = self._qmod_args(clean[popen + 1 : pclose - 1])
+            outs = self._qmod_outputs(clean[popen + 1 : pclose - 1])
+            self._add_function(
+                file_id, m.group(1), args, outs, description="qmod qfunc"
+            )
 
     def _qmod_args(self, inner):
         arg_ids = []
@@ -57,8 +58,9 @@ class QmodAnalyzer(RegexCodeAnalyzer):
             if not part:
                 continue
             # direction qualifiers / plain flags: `output x: QNum`, `permutable`
-            m = re.match(r"(?:(input|output|inout)\s+)?(" + _ID + r")\s*"
-                         r"(?::\s*(.+))?$", part)
+            m = re.match(
+                r"(?:(input|output|inout)\s+)?(" + _ID + r")\s*" r"(?::\s*(.+))?$", part
+            )
             if not m:
                 continue
             name, atype = m.group(2), (m.group(3) or "").strip() or None

@@ -17,7 +17,7 @@
 #
 # Comments are '//', '&&', '*' (line-lead) and '/* */'; strings '"', '\'', '['.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -38,23 +38,30 @@ class HarbourAnalyzer(RegexCodeAnalyzer):
     _REQUEST = re.compile(r"(?im)^\s*(?:REQUEST|EXTERNAL|DYNAMIC)\s+(.+)$")
     #   ANNOUNCE RDDSYS         -> module symbol this file provides
     _ANNOUNCE = re.compile(r"(?im)^\s*ANNOUNCE\s+(" + _ID + r")")
-    _FUNC = re.compile(r"(?im)^\s*(?:STATIC\s+|INIT\s+|EXIT\s+)?"
-                       r"(?:FUNCTION|FUNC|PROCEDURE|PROC)\s+(" + _ID +
-                       r")\s*(\([^)]*\))?")
+    _FUNC = re.compile(
+        r"(?im)^\s*(?:STATIC\s+|INIT\s+|EXIT\s+)?"
+        r"(?:FUNCTION|FUNC|PROCEDURE|PROC)\s+(" + _ID + r")\s*(\([^)]*\))?"
+    )
     # method, both forms in one pass:
     #   METHOD Class:Name( args )              -> owner=Class, name=Name
     #   METHOD Name( args ) [CLASS Class]      -> name=Name, owner=Class?
-    _METHOD = re.compile(r"(?im)^\s*METHOD\s+(" + _ID + r")"
-                         r"(?:\s*:\s*(" + _ID + r"))?"
-                         r"\s*(\([^)]*\))?"
-                         r"(?:\s+CLASS\s+(" + _ID + r"))?")
-    _CLASS = re.compile(r"(?im)^\s*CREATE\s+CLASS\s+(" + _ID + r")|"
-                        r"^\s*CLASS\s+(" + _ID + r")\b"
-                        r"(?:\s+(?:FROM|INHERIT)\s+([\w, ]+))?")
-    _VAR = re.compile(r"(?im)^\s*(?:LOCAL|STATIC|PUBLIC|PRIVATE|MEMVAR|FIELD|"
-                      r"PARAMETERS|VAR|DATA|CLASSVAR|CLASSDATA|INSTANCE)\s+"
-                      r"(?!FUNCTION\b|PROCEDURE\b|FUNC\b|PROC\b|CLASS\b|METHOD\b)"
-                      r"(.+)$")
+    _METHOD = re.compile(
+        r"(?im)^\s*METHOD\s+(" + _ID + r")"
+        r"(?:\s*:\s*(" + _ID + r"))?"
+        r"\s*(\([^)]*\))?"
+        r"(?:\s+CLASS\s+(" + _ID + r"))?"
+    )
+    _CLASS = re.compile(
+        r"(?im)^\s*CREATE\s+CLASS\s+(" + _ID + r")|"
+        r"^\s*CLASS\s+(" + _ID + r")\b"
+        r"(?:\s+(?:FROM|INHERIT)\s+([\w, ]+))?"
+    )
+    _VAR = re.compile(
+        r"(?im)^\s*(?:LOCAL|STATIC|PUBLIC|PRIVATE|MEMVAR|FIELD|"
+        r"PARAMETERS|VAR|DATA|CLASSVAR|CLASSDATA|INSTANCE)\s+"
+        r"(?!FUNCTION\b|PROCEDURE\b|FUNC\b|PROC\b|CLASS\b|METHOD\b)"
+        r"(.+)$"
+    )
 
     def _register_types(self, file_id, text, path):
         clean = self._strip_comments(text)
@@ -94,25 +101,28 @@ class HarbourAnalyzer(RegexCodeAnalyzer):
                     p = p.strip()
                     if p:
                         pids.append(self._register_class(p))
-            self._add_class(file_id, name, description="xbase class",
-                            parent_ids=pids or None)
+            self._add_class(
+                file_id, name, description="xbase class", parent_ids=pids or None
+            )
 
         for m in self._FUNC.finditer(clean):
             args = self._prg_args(m.group(2))
-            self._add_function(file_id, m.group(1), args, [],
-                               description="xbase function")
+            self._add_function(
+                file_id, m.group(1), args, [], description="xbase function"
+            )
 
         for m in self._METHOD.finditer(clean):
-            if m.group(2):                        # METHOD Class:Name(...)
+            if m.group(2):  # METHOD Class:Name(...)
                 owner, name, argsrc = m.group(1), m.group(2), m.group(3)
-            else:                                 # METHOD Name(...) [CLASS X]
+            else:  # METHOD Name(...) [CLASS X]
                 owner, name, argsrc = m.group(4), m.group(1), m.group(3)
             if name.upper() in ("CLASS", "FUNCTION", "PROCEDURE"):
                 continue
             cls_id = self._register_class(owner) if owner else None
             args = self._prg_args(argsrc)
-            self._add_function(file_id, name, args, [], class_id=cls_id,
-                               description="xbase method")
+            self._add_function(
+                file_id, name, args, [], class_id=cls_id, description="xbase method"
+            )
 
         seen = set()
         for m in self._VAR.finditer(clean):

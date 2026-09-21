@@ -25,7 +25,7 @@
 # A leading `--- ... ---` YAML front-matter block (title/config) is skipped when
 # detecting the diagram type.  Comments are '%%'; strings use '"'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -46,24 +46,29 @@ class MermaidAnalyzer(RegexCodeAnalyzer):
     # Any class relation: association/composition/aggregation/dependency/realization.
     _REL = re.compile(
         r"(?m)^\s*(" + _ID + r")\s*(?:\"[^\"]*\"\s*)?"
-        r"[<*o|}]?[.\-]{2,}[|>*o{]?\s*(?:\"[^\"]*\"\s*)?(" + _ID + r")\b")
+        r"[<*o|}]?[.\-]{2,}[|>*o{]?\s*(?:\"[^\"]*\"\s*)?(" + _ID + r")\b"
+    )
     _PARTICIPANT = re.compile(r"(?m)^\s*(?:participant|actor)\s+(" + _ID + r")")
     _SEQ_MSG = re.compile(
         r"(?m)^\s*(" + _ID + r")\s*"
         r"(?:<<)?[-x]?(?:--?|==?)[>x)]{1,2}(?:>>)?\s*"
-        r"([+\-]?\s*" + _ID + r")")
+        r"([+\-]?\s*" + _ID + r")"
+    )
     _SUBGRAPH = re.compile(r"(?m)^\s*subgraph\s+(?:\"([^\"]+)\"|(" + _ID + r"))")
     _ENTITY = re.compile(r"(?m)^\s*([A-Za-z_][\w]*)\s*\{")
     # er relation: `CUSTOMER ||--o{ ORDER : places` (entities need no {} body)
     _ER_REL = re.compile(
-        r"(?m)^\s*(" + _ID + r")\s+[|}o{][ox|}{.\-]*\s+(" + _ID + r")\b")
+        r"(?m)^\s*(" + _ID + r")\s+[|}o{][ox|}{.\-]*\s+(" + _ID + r")\b"
+    )
     _STATE = re.compile(r"(?m)^\s*state\s+(?:\"[^\"]*\"\s+as\s+)?(" + _ID + r")")
     # state transition: `[*] --> Still`, `Moving --> Crash` (states are implicit)
     _STATE_TRANS = re.compile(
-        r"(?m)^\s*(\[\*\]|" + _ID + r")\s*-->\s*(\[\*\]|" + _ID + r")")
+        r"(?m)^\s*(\[\*\]|" + _ID + r")\s*-->\s*(\[\*\]|" + _ID + r")"
+    )
     _NODE = re.compile(
         r"(?<![\w>])(" + _ID + r")\s*(?:\[[^\]]*\]|\(\([^)]*\)\)|\([^)]*\)|"
-        r"\{[^}]*\}|\>[^\]]*\])")
+        r"\{[^}]*\}|\>[^\]]*\])"
+    )
 
     # Flowchart edge operators (-->, ---, -.->, ==>, --x, --o, <-->, ~~~, ...).
     _EDGEOP = re.compile(r"[ox<]?[.\-=~]{2,}[->ox]?")
@@ -71,19 +76,78 @@ class MermaidAnalyzer(RegexCodeAnalyzer):
     _SHAPES = re.compile(
         r"\(\([^()]*\)\)|\[\[[^\]]*\]\]|\[\([^\]]*\)\]|\{\{[^{}]*\}\}|"
         r"\[/[^\]]*/\]|\[\\[^\]]*\\\]|\[[^\]]*\]|\([^()]*\)|\{[^{}]*\}|"
-        r"\|[^|]*\||>[^\]]*\]")
-    _FLOWSKIP = {"subgraph", "end", "graph", "flowchart", "direction", "tb", "td",
-                 "bt", "rl", "lr", "class", "classdef", "style", "linkstyle",
-                 "click", "call", "href", "callback", "acctitle", "accdescr",
-                 "title", "default", "interpolate"}
-    _CKW = {"class", "namespace", "direction", "note", "click", "callback",
-            "link", "style", "cssclass", "classdef"}
-    _SEQKW = {"note", "loop", "alt", "opt", "par", "and", "else", "end", "rect",
-              "activate", "deactivate", "autonumber", "critical", "break", "box"}
+        r"\|[^|]*\||>[^\]]*\]"
+    )
+    _FLOWSKIP = {
+        "subgraph",
+        "end",
+        "graph",
+        "flowchart",
+        "direction",
+        "tb",
+        "td",
+        "bt",
+        "rl",
+        "lr",
+        "class",
+        "classdef",
+        "style",
+        "linkstyle",
+        "click",
+        "call",
+        "href",
+        "callback",
+        "acctitle",
+        "accdescr",
+        "title",
+        "default",
+        "interpolate",
+    }
+    _CKW = {
+        "class",
+        "namespace",
+        "direction",
+        "note",
+        "click",
+        "callback",
+        "link",
+        "style",
+        "cssclass",
+        "classdef",
+    }
+    _SEQKW = {
+        "note",
+        "loop",
+        "alt",
+        "opt",
+        "par",
+        "and",
+        "else",
+        "end",
+        "rect",
+        "activate",
+        "deactivate",
+        "autonumber",
+        "critical",
+        "break",
+        "box",
+    }
     # directive lines in block diagrams that must not yield block ids
-    _BLOCK_DIRECTIVE = {"block", "block-beta", "classdef", "class", "style",
-                        "click", "linkstyle", "direction", "columns", "space",
-                        "accdescr", "acctitle", "title"}
+    _BLOCK_DIRECTIVE = {
+        "block",
+        "block-beta",
+        "classdef",
+        "class",
+        "style",
+        "click",
+        "linkstyle",
+        "direction",
+        "columns",
+        "space",
+        "accdescr",
+        "acctitle",
+        "title",
+    }
 
     def _diagram_type(self, clean):
         lines = clean.split("\n")
@@ -117,7 +181,7 @@ class MermaidAnalyzer(RegexCodeAnalyzer):
 
     def _class_body(self, clean, brace_pos):
         end = self._find_matching(clean, brace_pos)
-        return clean[brace_pos + 1:end - 1], end
+        return clean[brace_pos + 1 : end - 1], end
 
     def _extract_entities(self, file_id, text, path):
         clean = self._strip_comments(text)
@@ -161,12 +225,20 @@ class MermaidAnalyzer(RegexCodeAnalyzer):
                         continue
                     mname = mm.group(1)
                     if mm.group(2):  # '(' -> method
-                        methods.append(self._add_function(
-                            file_id, mname, [], [], description="mermaid method"))
+                        methods.append(
+                            self._add_function(
+                                file_id, mname, [], [], description="mermaid method"
+                            )
+                        )
                     else:
                         attrs.append(self._add_arg(mname))
-            self._add_class(file_id, name, description="mermaid class",
-                            method_ids=methods or None, attr_ids=attrs or None)
+            self._add_class(
+                file_id,
+                name,
+                description="mermaid class",
+                method_ids=methods or None,
+                attr_ids=attrs or None,
+            )
         # external members: `Animal : +int age` / `Animal : +run()`
         for m in self._CMEMBER.finditer(clean):
             cls = m.group(1)
@@ -176,20 +248,24 @@ class MermaidAnalyzer(RegexCodeAnalyzer):
             if not nm:
                 continue
             if is_method:
-                fid = self._add_function(file_id, nm, [], [],
-                                         description="mermaid method")
-                self._add_class(file_id, cls, description="mermaid class",
-                                method_ids=[fid])
+                fid = self._add_function(
+                    file_id, nm, [], [], description="mermaid method"
+                )
+                self._add_class(
+                    file_id, cls, description="mermaid class", method_ids=[fid]
+                )
             else:
                 aid = self._add_arg(nm)
-                self._add_class(file_id, cls, description="mermaid class",
-                                attr_ids=[aid])
+                self._add_class(
+                    file_id, cls, description="mermaid class", attr_ids=[aid]
+                )
         # inheritance A <|-- B  (A base, B derived)
         for m in self._INHERIT.finditer(clean):
             base, derived = m.group(1), m.group(2)
             bid = self._add_class(file_id, base, description="mermaid class")
-            self._add_class(file_id, derived, description="mermaid class",
-                            parent_ids=[bid])
+            self._add_class(
+                file_id, derived, description="mermaid class", parent_ids=[bid]
+            )
         # every other relation: both endpoints are classes
         for m in self._REL.finditer(clean):
             self._add_class(file_id, m.group(1), description="mermaid class")
@@ -225,10 +301,14 @@ class MermaidAnalyzer(RegexCodeAnalyzer):
             attrs = []
             for line in body.split("\n"):
                 parts = line.split()
-                if len(parts) >= 2:            # "type name [PK]"
+                if len(parts) >= 2:  # "type name [PK]"
                     attrs.append(self._add_arg(parts[1]))
-            self._add_class(file_id, m.group(1), description="mermaid entity",
-                            attr_ids=attrs or None)
+            self._add_class(
+                file_id,
+                m.group(1),
+                description="mermaid entity",
+                attr_ids=attrs or None,
+            )
         # entities named only in relations (no {} body)
         for m in self._ER_REL.finditer(clean):
             self._add_class(file_id, m.group(1), description="mermaid entity")
@@ -265,8 +345,9 @@ class MermaidAnalyzer(RegexCodeAnalyzer):
 
     def _flow_diagram(self, file_id, clean):
         for m in self._SUBGRAPH.finditer(clean):
-            self._add_class(file_id, m.group(1) or m.group(2),
-                            description="mermaid subgraph")
+            self._add_class(
+                file_id, m.group(1) or m.group(2), description="mermaid subgraph"
+            )
         seen = set()
 
         def emit(nm):

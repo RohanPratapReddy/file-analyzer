@@ -1,17 +1,6 @@
 # Auto-extracted from code_analyzer.py (verbatim class body).
-import os
-import csv
-import json
-import re
-import ast
-import dis
-import inspect
-import traceback
-import subprocess
-import sqlite3
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
 from .tree_sitter_base import BaseTreeSitterAnalyzer
+
 
 class KotlinAnalyzer(BaseTreeSitterAnalyzer):
     """
@@ -29,7 +18,7 @@ class KotlinAnalyzer(BaseTreeSitterAnalyzer):
             lang_key="kotlin",
             extensions=[".kt", ".kts"],
             introspection_source="kotlin.reflect.KClass + java.lang.reflect Interop",
-            **kwargs
+            **kwargs,
         )
 
     # This grammar names things `identifier` (not simple_identifier), imports as
@@ -99,8 +88,9 @@ class KotlinAnalyzer(BaseTreeSitterAnalyzer):
                 self._kt_walk(file_id, child, source, class_id, in_error=True)
 
     def _kt_import(self, file_id, node, source: bytes):
-        parts = [c for c in node.children
-                 if c.type in ("qualified_identifier", "identifier")]
+        parts = [
+            c for c in node.children if c.type in ("qualified_identifier", "identifier")
+        ]
         if not parts:
             return
         target = self._node_text(parts[0], source)
@@ -117,15 +107,20 @@ class KotlinAnalyzer(BaseTreeSitterAnalyzer):
 
     def _kt_property_var(self, file_id, node, source: bytes):
         n = self._kt_var_name(node, source)
-        self._ts_add_variable(file_id, self._node_text(n, source) if n else "var",
-                              None, scope="module")
+        self._ts_add_variable(
+            file_id, self._node_text(n, source) if n else "var", None, scope="module"
+        )
 
     def _kt_class_prop(self, node, source: bytes):
         vd = self._child_of(node, "variable_declaration") or node
         n = self._kt_name_node(vd)
         t = self._child_of(vd, *self._KT_TYPES)
-        return [self._ts_add_arg(self._node_text(n, source) if n else "prop",
-                                 self._node_text(t, source) if t else None)]
+        return [
+            self._ts_add_arg(
+                self._node_text(n, source) if n else "prop",
+                self._node_text(t, source) if t else None,
+            )
+        ]
 
     def _kt_super_name(self, ds, source: bytes):
         ut = self._kt_deep(ds, "user_type")
@@ -165,9 +160,12 @@ class KotlinAnalyzer(BaseTreeSitterAnalyzer):
                 if p.type in ("parameter", "class_parameter"):
                     pn = self._kt_name_node(p)
                     pt = self._child_of(p, *self._KT_TYPES)
-                    arg_ids.append(self._ts_add_arg(
-                        self._node_text(pn, source) if pn else "arg",
-                        self._node_text(pt, source) if pt else None))
+                    arg_ids.append(
+                        self._ts_add_arg(
+                            self._node_text(pn, source) if pn else "arg",
+                            self._node_text(pt, source) if pt else None,
+                        )
+                    )
         out = []
         rt = self._kt_return_type(node)
         if rt is not None:
@@ -190,9 +188,12 @@ class KotlinAnalyzer(BaseTreeSitterAnalyzer):
                     if p.type == "class_parameter":
                         pn = self._kt_name_node(p)
                         pt = self._child_of(p, *self._KT_TYPES)
-                        attr_ids.append(self._ts_add_arg(
-                            self._node_text(pn, source) if pn else "param",
-                            self._node_text(pt, source) if pt else None))
+                        attr_ids.append(
+                            self._ts_add_arg(
+                                self._node_text(pn, source) if pn else "param",
+                                self._node_text(pt, source) if pt else None,
+                            )
+                        )
         body = self._child_of(node, "class_body", "enum_class_body")
         if body is not None:
             for m in self._kt_members(body):
@@ -202,10 +203,18 @@ class KotlinAnalyzer(BaseTreeSitterAnalyzer):
                     attr_ids.extend(self._kt_class_prop(m, source))
                 elif m.type == "enum_entry":
                     en = self._kt_name_node(m)
-                    attr_ids.append(self._ts_add_arg(
-                        self._node_text(en, source) if en else "entry", "enum_entry"))
+                    attr_ids.append(
+                        self._ts_add_arg(
+                            self._node_text(en, source) if en else "entry", "enum_entry"
+                        )
+                    )
                 elif m.type in self._TYPE_DECLS:
                     self._kt_type(file_id, m, source)
-        self._ts_add_class(file_id, name,
-                           description=f"kotlin {node.type.replace('_declaration', '')}",
-                           parent_ids=parent_ids, method_ids=method_ids, attr_ids=attr_ids)
+        self._ts_add_class(
+            file_id,
+            name,
+            description=f"kotlin {node.type.replace('_declaration', '')}",
+            parent_ids=parent_ids,
+            method_ids=method_ids,
+            attr_ids=attr_ids,
+        )

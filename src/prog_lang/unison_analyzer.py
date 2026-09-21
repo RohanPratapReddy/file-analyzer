@@ -13,7 +13,7 @@
 #
 # Comments are '--' and '{- -}'; strings use '"'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _NAME = r"[A-Za-z_][A-Za-z0-9_'.]*"
@@ -28,10 +28,10 @@ class UnisonAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"',)
 
     _USE = re.compile(r"(?m)^\s*use\s+(" + _NAME + r")((?:\s+" + _NAME + r")*)")
-    _TYPE = re.compile(
-        r"(?m)^\s*(?:unique\s+|structural\s+)?type\s+(" + _UID + r")\b")
+    _TYPE = re.compile(r"(?m)^\s*(?:unique\s+|structural\s+)?type\s+(" + _UID + r")\b")
     _ABILITY = re.compile(
-        r"(?m)^\s*(?:unique\s+|structural\s+)?ability\s+(" + _UID + r")\b")
+        r"(?m)^\s*(?:unique\s+|structural\s+)?ability\s+(" + _UID + r")\b"
+    )
     _SIG = re.compile(r"(?m)^(" + _NAME + r")\s*:(?!:)")
     _DEF = re.compile(r"(?m)^(" + _NAME + r")\s+[^=\n]*=(?!=)")
     _DEF0 = re.compile(r"(?m)^(" + _NAME + r")\s*=(?!=)")
@@ -52,8 +52,7 @@ class UnisonAnalyzer(RegexCodeAnalyzer):
             for extra in (m.group(2) or "").split():
                 extra = extra.strip()
                 if extra:
-                    self._add_import(file_id, extra.split(".")[-1],
-                                     base + "." + extra)
+                    self._add_import(file_id, extra.split(".")[-1], base + "." + extra)
 
         for m in self._TYPE.finditer(clean):
             self._add_class(file_id, m.group(1), description="unison type")
@@ -63,7 +62,7 @@ class UnisonAnalyzer(RegexCodeAnalyzer):
         seen = set()
         for m in self._SIG.finditer(clean):
             nm = m.group(1)
-            if nm[0:1].isupper():        # data constructor / type, not a term def
+            if nm[0:1].isupper():  # data constructor / type, not a term def
                 continue
             if nm not in seen:
                 self._add_function(file_id, nm, [], [], description="unison function")

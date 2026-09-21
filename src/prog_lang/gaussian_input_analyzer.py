@@ -22,7 +22,7 @@
 # The title, charge/multiplicity and Cartesian coordinates name nothing.
 # `!` starts a comment.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -44,8 +44,7 @@ class GaussianInputAnalyzer(RegexCodeAnalyzer):
         for m in self._LINK0.finditer(clean):
             key, val = m.group(1), m.group(2)
             if key.lower() in self._FILE_KEYS and val:
-                self._add_import(file_id, val.replace("\\", "/").split("/")[-1],
-                                 val)
+                self._add_import(file_id, val.replace("\\", "/").split("/")[-1], val)
             else:
                 if key.lower() not in seen_v:
                     seen_v.add(key.lower())

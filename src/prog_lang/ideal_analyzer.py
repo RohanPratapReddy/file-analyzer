@@ -25,7 +25,7 @@
 # `<< ... >>` is a comment; keywords are case-insensitive; statements end in a
 # period.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z][A-Za-z0-9_-]*"
@@ -39,8 +39,10 @@ class IdealAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ("'", '"')
 
     _PROC = re.compile(r"(?mi)^[ \t]*(?:PROCEDURE|SUBROUTINE)\s+(" + _ID + r")\b")
-    _COMPONENT = re.compile(r"(?mi)^[ \t]*(PANEL|REPORT|DATASET|DATATABLE|"
-                            r"MESSAGE|APPLICATION)\s+(" + _ID + r")\b")
+    _COMPONENT = re.compile(
+        r"(?mi)^[ \t]*(PANEL|REPORT|DATASET|DATATABLE|"
+        r"MESSAGE|APPLICATION)\s+(" + _ID + r")\b"
+    )
     _DEFINE = re.compile(r"(?mi)^[ \t]*DEFINE\s+(" + _ID + r")\s+TYPE\b")
     _CALL = re.compile(r"(?mi)^[ \t]*(?:CALL|RUN|USE)\s+(" + _ID + r")\b")
 
@@ -52,8 +54,7 @@ class IdealAnalyzer(RegexCodeAnalyzer):
             name = m.group(1)
             if name.lower() not in seen_fn:
                 seen_fn.add(name.lower())
-                self._add_function(file_id, name, [], [],
-                                   description="Ideal procedure")
+                self._add_function(file_id, name, [], [], description="Ideal procedure")
 
         seen_c = set()
         for m in self._COMPONENT.finditer(clean):

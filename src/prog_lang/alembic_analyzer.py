@@ -18,6 +18,7 @@
 # PythonEmbeddedAnalyzer; `_dsl_enrich` additionally tags the upgrade/downgrade
 # entry points and the revision identifiers as Alembic-specific metadata.
 import ast
+
 from .python_embedded_base import PythonEmbeddedAnalyzer
 
 _REV_VARS = {"revision", "down_revision", "branch_labels", "depends_on"}
@@ -40,5 +41,6 @@ class AlembicAnalyzer(PythonEmbeddedAnalyzer):
                         val = None
                         if isinstance(node.value, ast.Constant):
                             val = node.value.value
-                        self._dsl_tag(file_id, tgt.id, "revision-field",
-                                      extra={"value": val})
+                        self._dsl_tag(
+                            file_id, tgt.id, "revision-field", extra={"value": val}
+                        )

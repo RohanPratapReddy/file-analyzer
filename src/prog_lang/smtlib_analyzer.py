@@ -14,7 +14,7 @@
 #
 # Symbols may be plain tokens or |quoted|.  Comments are ';'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _SYM = r"(\|[^|]*\||[^\s()]+)"
@@ -57,18 +57,22 @@ class SMTLibAnalyzer(RegexCodeAnalyzer):
         clean = self._strip_comments(text)
 
         for m in self._DECL_SORT.finditer(clean):
-            self._add_class(file_id, self._clean_sym(m.group(1)),
-                            description="smt sort")
+            self._add_class(
+                file_id, self._clean_sym(m.group(1)), description="smt sort"
+            )
         for m in self._DEF_SORT.finditer(clean):
-            self._add_class(file_id, self._clean_sym(m.group(1)),
-                            description="smt sort-def")
+            self._add_class(
+                file_id, self._clean_sym(m.group(1)), description="smt sort-def"
+            )
         for m in self._DECL_DT.finditer(clean):
-            self._add_class(file_id, self._clean_sym(m.group(1)),
-                            description="smt datatype")
+            self._add_class(
+                file_id, self._clean_sym(m.group(1)), description="smt datatype"
+            )
         for m in self._DECL_DTS.finditer(clean):
             for pm in re.finditer(r"\(\s*(\|[^|]*\||[^\s()]+)", m.group(1)):
-                self._add_class(file_id, self._clean_sym(pm.group(1)),
-                                description="smt datatype")
+                self._add_class(
+                    file_id, self._clean_sym(pm.group(1)), description="smt datatype"
+                )
 
         for m in self._DECL_CONST.finditer(clean):
             self._add_variable(file_id, self._clean_sym(m.group(1)), "const")
@@ -81,13 +85,13 @@ class SMTLibAnalyzer(RegexCodeAnalyzer):
             # nested sorts such as (_ BitVec 128); the return sort follows it.
             lp = clean.find("(", m.end())
             if lp < 0:
-                self._add_function(file_id, name, [], [],
-                                   description="smt declare-fun")
+                self._add_function(file_id, name, [], [], description="smt declare-fun")
                 continue
             rp = self._find_matching(clean, lp, "(", ")")
-            arg_ids = [self._add_arg(s, "sort")
-                       for s in self._split_top_level(clean[lp + 1:rp - 1],
-                                                      sep=" ")]
+            arg_ids = [
+                self._add_arg(s, "sort")
+                for s in self._split_top_level(clean[lp + 1 : rp - 1], sep=" ")
+            ]
             rest = clean[rp:].lstrip()
             if rest.startswith("("):
                 re_end = self._find_matching(rest, 0, "(", ")")
@@ -96,15 +100,17 @@ class SMTLibAnalyzer(RegexCodeAnalyzer):
                 rm = re.match(r"[^\s()]+", rest)
                 ret = rm.group(0) if rm else "?"
             out_ids = [self._add_output(ret)]
-            self._add_function(file_id, name, arg_ids, out_ids,
-                               description="smt declare-fun")
+            self._add_function(
+                file_id, name, arg_ids, out_ids, description="smt declare-fun"
+            )
 
         for m in self._DEF_FUN.finditer(clean):
             name = self._clean_sym(m.group(1))
             lp = clean.find("(", m.end() - 1)
             rp = self._find_matching(clean, lp, "(", ")")
-            params = clean[lp + 1:rp - 1]
-            arg_ids = [self._add_arg(self._clean_sym(pm.group(1)))
-                       for pm in self._PARAM.finditer(params)]
-            self._add_function(file_id, name, arg_ids, [],
-                               description="smt define-fun")
+            params = clean[lp + 1 : rp - 1]
+            arg_ids = [
+                self._add_arg(self._clean_sym(pm.group(1)))
+                for pm in self._PARAM.finditer(params)
+            ]
+            self._add_function(file_id, name, arg_ids, [], description="smt define-fun")

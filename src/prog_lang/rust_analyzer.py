@@ -1,17 +1,8 @@
 # Auto-extracted from code_analyzer.py (verbatim class body).
-import os
-import csv
-import json
-import re
-import ast
-import dis
-import inspect
-import traceback
-import subprocess
-import sqlite3
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional
+
 from .tree_sitter_base import BaseTreeSitterAnalyzer
+
 
 class RustAnalyzer(BaseTreeSitterAnalyzer):
     """
@@ -31,7 +22,7 @@ class RustAnalyzer(BaseTreeSitterAnalyzer):
             lang_key="rust",
             extensions=[".rs"],
             introspection_source="std::any::TypeId + std::backtrace::Backtrace + bevy_reflect",
-            **kwargs
+            **kwargs,
         )
         # class_id -> classes_table row, so impl blocks can append method ids
         # to a type declared elsewhere in the same file.
@@ -72,19 +63,25 @@ class RustAnalyzer(BaseTreeSitterAnalyzer):
         for impl_node in deferred_impls:
             self._rust_impl(file_id, impl_node, source)
 
-    def _rust_extract(self, file_id: int, container, source: bytes, deferred_impls: List[Any]):
+    def _rust_extract(
+        self, file_id: int, container, source: bytes, deferred_impls: List[Any]
+    ):
         for child in container.children:
             ctype = child.type
             if ctype == "use_declaration":
                 imp_id = self._import_counter
                 self._import_counter += 1
-                imp_text = self._node_text(child, source).replace("use ", "").rstrip(";")
-                self.imports_table.append({
-                    "import_id": imp_id,
-                    "import_name": imp_text.split("::")[-1],
-                    "import_source": imp_text,
-                    "alias": None,
-                })
+                imp_text = (
+                    self._node_text(child, source).replace("use ", "").rstrip(";")
+                )
+                self.imports_table.append(
+                    {
+                        "import_id": imp_id,
+                        "import_name": imp_text.split("::")[-1],
+                        "import_source": imp_text,
+                        "alias": None,
+                    }
+                )
                 self._record_symbol(file_id, "import", imp_id)
             elif ctype == "function_item":
                 self._rust_function(file_id, child, source, class_id=None)
@@ -99,7 +96,9 @@ class RustAnalyzer(BaseTreeSitterAnalyzer):
                 if body:
                     self._rust_extract(file_id, body, source, deferred_impls)
 
-    def _rust_function(self, file_id: int, node, source: bytes, class_id: Optional[int]) -> int:
+    def _rust_function(
+        self, file_id: int, node, source: bytes, class_id: Optional[int]
+    ) -> int:
         name_node = node.child_by_field_name("name")
         fn_name = self._node_text(name_node, source) if name_node else "anon_fn"
 
@@ -113,13 +112,15 @@ class RustAnalyzer(BaseTreeSitterAnalyzer):
                 typ = pc.child_by_field_name("type")
                 aid = self._arg_counter
                 self._arg_counter += 1
-                self.args_table.append({
-                    "args_id": aid,
-                    "args_name": self._node_text(pat, source) if pat else "arg",
-                    "args_type": self._node_text(typ, source) if typ else "Any",
-                    "default_value": None,
-                    "permitted_values": None,
-                })
+                self.args_table.append(
+                    {
+                        "args_id": aid,
+                        "args_name": self._node_text(pat, source) if pat else "arg",
+                        "args_type": self._node_text(typ, source) if typ else "Any",
+                        "default_value": None,
+                        "permitted_values": None,
+                    }
+                )
                 arg_ids.append(aid)
 
         output_ids: List[int] = []
@@ -127,34 +128,41 @@ class RustAnalyzer(BaseTreeSitterAnalyzer):
         if rt:
             oid = self._output_counter
             self._output_counter += 1
-            self.outputs_table.append({
-                "output_id": oid,
-                "output_type": self._node_text(rt, source),
-                "description": None,
-            })
+            self.outputs_table.append(
+                {
+                    "output_id": oid,
+                    "output_type": self._node_text(rt, source),
+                    "description": None,
+                }
+            )
             output_ids.append(oid)
 
         fn_id = self._func_counter
         self._func_counter += 1
-        self.functions_table.append({
-            "function_id": fn_id,
-            "function_name": fn_name,
-            "args_ids": arg_ids,
-            "function_outputs_ids": output_ids,
-            "class_id": class_id,
-            "function_description": None,
-            "function_forward_pass": f"```pseudocode\n// Rust Forward Pass: {fn_name}\nRESULT = {fn_name}(ARGS...)\nRETURN RESULT\n```",
-            "function_backward_pass": f"```pseudocode\n// Rust Backward Pass: {fn_name}\nPROPAGATE_GRADIENTS()\n```",
-            "is_imported": False,
-            "source_import_id": None,
-        })
+        self.functions_table.append(
+            {
+                "function_id": fn_id,
+                "function_name": fn_name,
+                "args_ids": arg_ids,
+                "function_outputs_ids": output_ids,
+                "class_id": class_id,
+                "function_description": None,
+                "function_forward_pass": f"```pseudocode\n// Rust Forward Pass: {fn_name}\nRESULT = {fn_name}(ARGS...)\nRETURN RESULT\n```",
+                "function_backward_pass": f"```pseudocode\n// Rust Backward Pass: {fn_name}\nPROPAGATE_GRADIENTS()\n```",
+                "is_imported": False,
+                "source_import_id": None,
+            }
+        )
         self._record_symbol(file_id, "function", fn_id)
         self.record_introspection_metadata(
             file_id=file_id,
             entity_id=fn_id,
             entity_type="function",
             inspection_source=self.introspection_source,
-            structural_properties={"params": len(arg_ids), "has_return": bool(output_ids)},
+            structural_properties={
+                "params": len(arg_ids),
+                "has_return": bool(output_ids),
+            },
         )
         return fn_id
 
@@ -163,14 +171,20 @@ class RustAnalyzer(BaseTreeSitterAnalyzer):
         val_node = node.child_by_field_name("value")
         var_id = self._var_counter
         self._var_counter += 1
-        self.variables_table.append({
-            "variable_id": var_id,
-            "variable_name": self._node_text(name_node, source) if name_node else "anon_const",
-            "variable_value": self._node_text(val_node, source) if val_node else None,
-            "scope": "module",
-            "is_imported": False,
-            "source_import_id": None,
-        })
+        self.variables_table.append(
+            {
+                "variable_id": var_id,
+                "variable_name": (
+                    self._node_text(name_node, source) if name_node else "anon_const"
+                ),
+                "variable_value": (
+                    self._node_text(val_node, source) if val_node else None
+                ),
+                "scope": "module",
+                "is_imported": False,
+                "source_import_id": None,
+            }
+        )
         self._record_symbol(file_id, "variable", var_id)
 
     def _rust_type(self, file_id: int, node, source: bytes):
@@ -191,25 +205,35 @@ class RustAnalyzer(BaseTreeSitterAnalyzer):
                     ftype = member.child_by_field_name("type")
                     aid = self._arg_counter
                     self._arg_counter += 1
-                    self.args_table.append({
-                        "args_id": aid,
-                        "args_name": self._node_text(fname, source) if fname else "field",
-                        "args_type": self._node_text(ftype, source) if ftype else "Any",
-                        "default_value": None,
-                        "permitted_values": None,
-                    })
+                    self.args_table.append(
+                        {
+                            "args_id": aid,
+                            "args_name": (
+                                self._node_text(fname, source) if fname else "field"
+                            ),
+                            "args_type": (
+                                self._node_text(ftype, source) if ftype else "Any"
+                            ),
+                            "default_value": None,
+                            "permitted_values": None,
+                        }
+                    )
                     attr_ids.append(aid)
                 elif member.type == "enum_variant":
                     vname = member.child_by_field_name("name")
                     aid = self._arg_counter
                     self._arg_counter += 1
-                    self.args_table.append({
-                        "args_id": aid,
-                        "args_name": self._node_text(vname, source) if vname else "variant",
-                        "args_type": "EnumVariant",
-                        "default_value": None,
-                        "permitted_values": None,
-                    })
+                    self.args_table.append(
+                        {
+                            "args_id": aid,
+                            "args_name": (
+                                self._node_text(vname, source) if vname else "variant"
+                            ),
+                            "args_type": "EnumVariant",
+                            "default_value": None,
+                            "permitted_values": None,
+                        }
+                    )
                     attr_ids.append(aid)
                 elif member.type == "function_item":
                     # trait method signatures / default methods

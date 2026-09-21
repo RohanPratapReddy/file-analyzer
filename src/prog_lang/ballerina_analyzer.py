@@ -10,7 +10,7 @@
 #   enum Color { RED, GREEN, BLUE }                  -> enum (class row)
 #   int x = 5;  final string NAME = "a";             -> variable
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _VIS = r"(?:public|private|isolated|transactional|distinct|readonly|client|service)\s+"
@@ -20,16 +20,14 @@ class BallerinaAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "ballerina"
     EXTENSIONS = (".bal", ".ballerina")
 
-    _IMPORT = re.compile(
-        r"^\s*import\s+([\w./]+)(?:\s+as\s+(\w+))?\s*;", re.MULTILINE)
+    _IMPORT = re.compile(r"^\s*import\s+([\w./]+)(?:\s+as\s+(\w+))?\s*;", re.MULTILINE)
     _TYPE = re.compile(
         r"(?:" + _VIS + r")*"
         r"\btype\s+([A-Za-z_]\w*)\s+"
-        r"(record|object|table|abstract\s+object)\s*\{")
+        r"(record|object|table|abstract\s+object)\s*\{"
+    )
     _ENUM = re.compile(r"(?:" + _VIS + r")*\benum\s+([A-Za-z_]\w*)\s*\{([^}]*)\}")
-    _CLASS = re.compile(
-        r"(?:" + _VIS + r")*"
-        r"\bclass\s+([A-Za-z_]\w*)\s*\{")
+    _CLASS = re.compile(r"(?:" + _VIS + r")*" r"\bclass\s+([A-Za-z_]\w*)\s*\{")
     _SERVICE = re.compile(r"\bservice\s+(?:([\w./]+)\s+)?on\b")
     _METHOD = re.compile(
         r"(?:" + _VIS + r")*"
@@ -37,9 +35,9 @@ class BallerinaAnalyzer(RegexCodeAnalyzer):
         r"(?:(get|post|put|delete|patch|head|options)\s+)?"
         r"([A-Za-z_][\w./\\]*)\s*"
         r"\(([^{;]*?)\)\s*"
-        r"(?:returns\s+([\w:?|<>\[\], ]+?)\s*)?\{")
-    _FIELD = re.compile(
-        r"([\w:<>?\[\], ]+?)\s+([A-Za-z_]\w*)\s*(?:=\s*([^;]+?))?\s*;")
+        r"(?:returns\s+([\w:?|<>\[\], ]+?)\s*)?\{"
+    )
+    _FIELD = re.compile(r"([\w:<>?\[\], ]+?)\s+([A-Za-z_]\w*)\s*(?:=\s*([^;]+?))?\s*;")
 
     def _register_types(self, file_id, text, path):
         t = self._strip_comments(text)
@@ -61,25 +59,48 @@ class BallerinaAnalyzer(RegexCodeAnalyzer):
         for m in self._TYPE.finditer(text):
             bstart = text.index("{", m.start())
             bend = self._find_matching(text, bstart)
-            types.append({"name": m.group(1), "kind": m.group(2).split()[-1],
-                          "bstart": bstart, "bend": bend, "isrec": True,
-                          "methods": [], "attrs": []})
+            types.append(
+                {
+                    "name": m.group(1),
+                    "kind": m.group(2).split()[-1],
+                    "bstart": bstart,
+                    "bend": bend,
+                    "isrec": True,
+                    "methods": [],
+                    "attrs": [],
+                }
+            )
         for m in self._CLASS.finditer(text):
             bstart = text.index("{", m.start())
             bend = self._find_matching(text, bstart)
-            types.append({"name": m.group(1), "kind": "class", "bstart": bstart,
-                          "bend": bend, "isrec": False, "methods": [], "attrs": []})
+            types.append(
+                {
+                    "name": m.group(1),
+                    "kind": "class",
+                    "bstart": bstart,
+                    "bend": bend,
+                    "isrec": False,
+                    "methods": [],
+                    "attrs": [],
+                }
+            )
 
         for m in self._ENUM.finditer(text):
-            attr_ids = [self._add_arg(v.split("=")[0].strip(), "enum")
-                        for v in m.group(2).split(",") if v.strip()]
-            self._add_class(file_id, m.group(1), description="ballerina enum",
-                            attr_ids=attr_ids)
+            attr_ids = [
+                self._add_arg(v.split("=")[0].strip(), "enum")
+                for v in m.group(2).split(",")
+                if v.strip()
+            ]
+            self._add_class(
+                file_id, m.group(1), description="ballerina enum", attr_ids=attr_ids
+            )
 
         def enclosing(pos):
             best = None
             for t in types:
-                if t["bstart"] <= pos < t["bend"] and (best is None or t["bstart"] > best["bstart"]):
+                if t["bstart"] <= pos < t["bend"] and (
+                    best is None or t["bstart"] > best["bstart"]
+                ):
                     best = t
             return best
 
@@ -93,7 +114,11 @@ class BallerinaAnalyzer(RegexCodeAnalyzer):
             covered = self._find_matching(text, body)
             method_spans.append((body, covered))
             arg_ids = self._params(params)
-            out_ids = [self._add_output(ret.strip())] if ret and ret.strip() not in ("()", "") else []
+            out_ids = (
+                [self._add_output(ret.strip())]
+                if ret and ret.strip() not in ("()", "")
+                else []
+            )
             owner = enclosing(m.start())
             cid = self._class_registry.get(owner["name"]) if owner else None
             fname = f"{verb} {name}" if verb else name
@@ -108,23 +133,49 @@ class BallerinaAnalyzer(RegexCodeAnalyzer):
             if in_method(m.start()):
                 continue
             vtype, name, val = m.group(1).strip(), m.group(2), m.group(3)
-            if vtype.split()[0] in ("import", "function", "type", "class", "enum",
-                                    "service", "return", "returns", "public",
-                                    "private", "const", "final", "isolated"):
+            if vtype.split()[0] in (
+                "import",
+                "function",
+                "type",
+                "class",
+                "enum",
+                "service",
+                "return",
+                "returns",
+                "public",
+                "private",
+                "const",
+                "final",
+                "isolated",
+            ):
                 # keep const/final/public as valid var modifiers only if a real type follows
-                if vtype.split()[-1] in ("import", "function", "type", "class",
-                                         "enum", "service", "return", "returns"):
+                if vtype.split()[-1] in (
+                    "import",
+                    "function",
+                    "type",
+                    "class",
+                    "enum",
+                    "service",
+                    "return",
+                    "returns",
+                ):
                     continue
             owner = enclosing(m.start())
             if owner is None:
                 self._add_variable(file_id, name, val.strip() if val else None)
             else:
-                owner["attrs"].append(self._add_arg(name, vtype,
-                                                    val.strip() if val else None))
+                owner["attrs"].append(
+                    self._add_arg(name, vtype, val.strip() if val else None)
+                )
 
         for t in types:
-            self._add_class(file_id, t["name"], description=f"ballerina {t['kind']}",
-                            method_ids=t["methods"], attr_ids=t["attrs"])
+            self._add_class(
+                file_id,
+                t["name"],
+                description=f"ballerina {t['kind']}",
+                method_ids=t["methods"],
+                attr_ids=t["attrs"],
+            )
 
     def _params(self, params):
         arg_ids = []

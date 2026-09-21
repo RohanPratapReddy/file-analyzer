@@ -18,20 +18,21 @@
 # Named definitions become variables, start-condition states become classes and
 # any C function found in the `%{ %}` blocks / epilogue becomes a function.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 # a C function definition:  ret_type  name ( args ) {
 _C_FUNC = re.compile(
     r"^[ \t]*(?:static\s+|inline\s+|extern\s+)*"
     r"(?:[A-Za-z_][\w\s\*]*?[\s\*])([A-Za-z_]\w*)\s*\(([^;{)]*)\)\s*\{",
-    re.MULTILINE)
+    re.MULTILINE,
+)
 
 
 class LexAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "lex"
     EXTENSIONS = (".l",)
-    LINE_COMMENTS = ()                 # lex '//' is not a comment; C /* */ only
+    LINE_COMMENTS = ()  # lex '//' is not a comment; C /* */ only
     BLOCK_COMMENTS = (("/*", "*/"),)
     STRING_DELIMS = ('"',)
 
@@ -82,8 +83,9 @@ class LexAnalyzer(RegexCodeAnalyzer):
                 self._add_variable(file_id, m.group(1), m.group(2).strip()[:80])
 
         # C functions in the `%{ %}` blocks of the definition section + epilogue
-        c_code = "\n".join(re.findall(r"%\{(.*?)%\}", defs, re.DOTALL)) \
-            + "\n" + epilogue
+        c_code = (
+            "\n".join(re.findall(r"%\{(.*?)%\}", defs, re.DOTALL)) + "\n" + epilogue
+        )
         c_code = self._strip_comments(c_code)
         for m in _C_FUNC.finditer(c_code):
             name = m.group(1)

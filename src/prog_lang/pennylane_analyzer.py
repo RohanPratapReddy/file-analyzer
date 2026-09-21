@@ -15,19 +15,34 @@
 # The @qml.qnode / @qnode decorator marks a quantum node (the framework's core
 # entry point); qml.device(...) marks a device.  Both are tagged.
 import ast
+
 from .python_embedded_base import PythonEmbeddedAnalyzer
 
 
 class PennyLaneAnalyzer(PythonEmbeddedAnalyzer):
     LANG_KEY = "pennylane"
     EXTENSIONS = (".pennylane",)
-    DSL_DECORATORS = ("qml.qnode", "qnode", "pennylane.qnode", "qml.qjit",
-                      "qjit", "qml.transform", "transform")
-    DSL_BASECLASSES = ("Operation", "qml.Operation", "Observable",
-                       "qml.Observable", "Channel", "Operator", "qml.operation.Operation")
+    DSL_DECORATORS = (
+        "qml.qnode",
+        "qnode",
+        "pennylane.qnode",
+        "qml.qjit",
+        "qjit",
+        "qml.transform",
+        "transform",
+    )
+    DSL_BASECLASSES = (
+        "Operation",
+        "qml.Operation",
+        "Observable",
+        "qml.Observable",
+        "Channel",
+        "Operator",
+        "qml.operation.Operation",
+    )
 
     def _dsl_enrich(self, file_id, tree, code_text):
-        super()._dsl_enrich(file_id, tree, code_text)   # qnode decorators + ops
+        super()._dsl_enrich(file_id, tree, code_text)  # qnode decorators + ops
         seen = set()
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):

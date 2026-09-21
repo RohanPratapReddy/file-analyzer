@@ -20,7 +20,7 @@
 # next card when column 72 is non-blank, but the label + macro always sit on the
 # first card, which is all symbol extraction needs.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _NM = r"[A-Za-z$#@][A-Za-z0-9$#@]*"
@@ -29,7 +29,7 @@ _NM = r"[A-Za-z$#@][A-Za-z0-9$#@]*"
 class BmsAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "bms"
     EXTENSIONS = (".bms",)
-    LINE_COMMENTS = ()          # column-1 `*` handled in _decomment
+    LINE_COMMENTS = ()  # column-1 `*` handled in _decomment
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ("'",)
 
@@ -70,8 +70,13 @@ class BmsAnalyzer(RegexCodeAnalyzer):
 
         for m in self._FIELD.finditer(clean):
             name = m.group(1)
-            line = clean[m.start():clean.find("\n", m.start()) if
-                         clean.find("\n", m.start()) != -1 else len(clean)]
+            line = clean[
+                m.start() : (
+                    clean.find("\n", m.start())
+                    if clean.find("\n", m.start()) != -1
+                    else len(clean)
+                )
+            ]
             pos = self._POS.search(line)
             ln = self._LEN.search(line)
             desc = "BMS field"

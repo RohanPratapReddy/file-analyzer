@@ -21,53 +21,93 @@
 # self-register the shell extensions, so building the map first breaks the cycle
 # no matter which of the two modules is imported first.  None of the analyzer
 # modules imported here reach back into `polyglot`.
-from .shell_base import ShellScriptBase
-from .posix_shell import PosixShellAnalyzer
+from .applescript import AppleScriptAnalyzer
+from .automation import AutoHotkeyAnalyzer, AutoItAnalyzer, GdbInitAnalyzer
+from .binary_template import BinaryTemplateAnalyzer
 from .bitbake import BitBakeAnalyzer
-from .python_dsls import (
-    ConanRecipeAnalyzer, SConsBuildAnalyzer, SpackRecipeAnalyzer,
-    SageScriptAnalyzer, AbaqusJournalAnalyzer, StarlarkAnalyzer,
+from .build_scripts import JenkinsfileAnalyzer, M4Analyzer, VagrantfileAnalyzer
+from .compiled_scripts import CompiledScriptAnalyzer
+from .domain_scripts import (
+    NukeAnalyzer,
+    PainlessAnalyzer,
+    ProxyAutoConfigAnalyzer,
+    WeztermAnalyzer,
 )
-from .tcl_family import TclAnalyzer
-from .statistics import StataAnalyzer, SasAnalyzer, SpssAnalyzer
-from .math_scripting import GapAnalyzer, PariGpAnalyzer, MapleAnalyzer
-from .text_processing import AwkAnalyzer, SedAnalyzer
-from .modern_shells import ElvishAnalyzer, NushellAnalyzer
-from .windows_scripting import VbScriptAnalyzer, WsfAnalyzer
-from .automation import AutoItAnalyzer, AutoHotkeyAnalyzer, GdbInitAnalyzer
 from .installers import InnoSetupAnalyzer, NsisAnalyzer
 from .mainframe import (
-    JclAnalyzer, RexxAnalyzer, ClistAnalyzer, ClpAnalyzer, DclAnalyzer,
+    ClistAnalyzer,
+    ClpAnalyzer,
+    DclAnalyzer,
+    JclAnalyzer,
+    RexxAnalyzer,
 )
-from .build_scripts import M4Analyzer, JenkinsfileAnalyzer, VagrantfileAnalyzer
+from .math_scripting import GapAnalyzer, MapleAnalyzer, PariGpAnalyzer
 from .misc_langs import CsxAnalyzer, ElixirMixAnalyzer, NimScriptAnalyzer
-from .domain_scripts import (
-    NukeAnalyzer, PainlessAnalyzer, WeztermAnalyzer, ProxyAutoConfigAnalyzer,
+from .modern_shells import ElvishAnalyzer, NushellAnalyzer
+from .posix_shell import PosixShellAnalyzer
+from .python_dsls import (
+    AbaqusJournalAnalyzer,
+    ConanRecipeAnalyzer,
+    SageScriptAnalyzer,
+    SConsBuildAnalyzer,
+    SpackRecipeAnalyzer,
+    StarlarkAnalyzer,
 )
-from .binary_template import BinaryTemplateAnalyzer
-from .compiled_scripts import CompiledScriptAnalyzer
-from .applescript import AppleScriptAnalyzer
-
+from .shell_base import ShellScriptBase
+from .statistics import SasAnalyzer, SpssAnalyzer, StataAnalyzer
+from .tcl_family import TclAnalyzer
+from .text_processing import AwkAnalyzer, SedAnalyzer
+from .windows_scripting import VbScriptAnalyzer, WsfAnalyzer
 
 # ----------------------------------------------------------------------------
 # Extension -> analyzer class.  Built from each analyzer's own EXTENSIONS tuple
 # so this map can never drift out of sync with the analyzers themselves.
 # ----------------------------------------------------------------------------
 _ANALYZERS = (
-    PosixShellAnalyzer, BitBakeAnalyzer,
-    ConanRecipeAnalyzer, SConsBuildAnalyzer, SpackRecipeAnalyzer,
-    SageScriptAnalyzer, AbaqusJournalAnalyzer, StarlarkAnalyzer,
-    TclAnalyzer, StataAnalyzer, SasAnalyzer, SpssAnalyzer,
-    GapAnalyzer, PariGpAnalyzer, MapleAnalyzer,
-    AwkAnalyzer, SedAnalyzer, ElvishAnalyzer, NushellAnalyzer,
-    VbScriptAnalyzer, WsfAnalyzer,
-    AutoItAnalyzer, AutoHotkeyAnalyzer, GdbInitAnalyzer,
-    InnoSetupAnalyzer, NsisAnalyzer,
-    JclAnalyzer, RexxAnalyzer, ClistAnalyzer, ClpAnalyzer, DclAnalyzer,
-    M4Analyzer, JenkinsfileAnalyzer, VagrantfileAnalyzer,
-    CsxAnalyzer, ElixirMixAnalyzer, NimScriptAnalyzer,
-    NukeAnalyzer, PainlessAnalyzer, WeztermAnalyzer, ProxyAutoConfigAnalyzer,
-    BinaryTemplateAnalyzer, CompiledScriptAnalyzer, AppleScriptAnalyzer,
+    PosixShellAnalyzer,
+    BitBakeAnalyzer,
+    ConanRecipeAnalyzer,
+    SConsBuildAnalyzer,
+    SpackRecipeAnalyzer,
+    SageScriptAnalyzer,
+    AbaqusJournalAnalyzer,
+    StarlarkAnalyzer,
+    TclAnalyzer,
+    StataAnalyzer,
+    SasAnalyzer,
+    SpssAnalyzer,
+    GapAnalyzer,
+    PariGpAnalyzer,
+    MapleAnalyzer,
+    AwkAnalyzer,
+    SedAnalyzer,
+    ElvishAnalyzer,
+    NushellAnalyzer,
+    VbScriptAnalyzer,
+    WsfAnalyzer,
+    AutoItAnalyzer,
+    AutoHotkeyAnalyzer,
+    GdbInitAnalyzer,
+    InnoSetupAnalyzer,
+    NsisAnalyzer,
+    JclAnalyzer,
+    RexxAnalyzer,
+    ClistAnalyzer,
+    ClpAnalyzer,
+    DclAnalyzer,
+    M4Analyzer,
+    JenkinsfileAnalyzer,
+    VagrantfileAnalyzer,
+    CsxAnalyzer,
+    ElixirMixAnalyzer,
+    NimScriptAnalyzer,
+    NukeAnalyzer,
+    PainlessAnalyzer,
+    WeztermAnalyzer,
+    ProxyAutoConfigAnalyzer,
+    BinaryTemplateAnalyzer,
+    CompiledScriptAnalyzer,
+    AppleScriptAnalyzer,
 )
 
 SHELL_EXT_MAP = {}
@@ -77,7 +117,8 @@ for _cls in _ANALYZERS:
         if _key in SHELL_EXT_MAP and SHELL_EXT_MAP[_key] is not _cls:
             raise RuntimeError(
                 f"shell extension collision on {_key}: "
-                f"{SHELL_EXT_MAP[_key].__name__} vs {_cls.__name__}")
+                f"{SHELL_EXT_MAP[_key].__name__} vs {_cls.__name__}"
+            )
         SHELL_EXT_MAP[_key] = _cls
 
 
@@ -97,29 +138,65 @@ class ShellScriptAnalyzer(PolyglotCodeAnalyzer):
     ``SHELL_EXT_MAP`` into ``PolyglotCodeAnalyzer.EXT_MAP`` so shell files are
     analyzed in the same ``code`` pass as programming-language files.
     """
+
     EXT_MAP = dict(SHELL_EXT_MAP)
 
-    def __init__(self, file_paths, dump_file_path="shell_analysis.json",
-                 dump_file_type="json"):
-        super().__init__(file_paths=file_paths, dump_file_path=dump_file_path,
-                         dump_file_type=dump_file_type)
+    def __init__(
+        self, file_paths, dump_file_path="shell_analysis.json", dump_file_type="json"
+    ):
+        super().__init__(
+            file_paths=file_paths,
+            dump_file_path=dump_file_path,
+            dump_file_type=dump_file_type,
+        )
 
 
 __all__ = [
-    "ShellScriptBase", "ShellScriptAnalyzer", "SHELL_EXT_MAP",
-    "PosixShellAnalyzer", "BitBakeAnalyzer",
-    "ConanRecipeAnalyzer", "SConsBuildAnalyzer", "SpackRecipeAnalyzer",
-    "SageScriptAnalyzer", "AbaqusJournalAnalyzer", "StarlarkAnalyzer",
-    "TclAnalyzer", "StataAnalyzer", "SasAnalyzer", "SpssAnalyzer",
-    "GapAnalyzer", "PariGpAnalyzer", "MapleAnalyzer",
-    "AwkAnalyzer", "SedAnalyzer", "ElvishAnalyzer", "NushellAnalyzer",
-    "VbScriptAnalyzer", "WsfAnalyzer",
-    "AutoItAnalyzer", "AutoHotkeyAnalyzer", "GdbInitAnalyzer",
-    "InnoSetupAnalyzer", "NsisAnalyzer",
-    "JclAnalyzer", "RexxAnalyzer", "ClistAnalyzer", "ClpAnalyzer", "DclAnalyzer",
-    "M4Analyzer", "JenkinsfileAnalyzer", "VagrantfileAnalyzer",
-    "CsxAnalyzer", "ElixirMixAnalyzer", "NimScriptAnalyzer",
-    "NukeAnalyzer", "PainlessAnalyzer", "WeztermAnalyzer",
+    "ShellScriptBase",
+    "ShellScriptAnalyzer",
+    "SHELL_EXT_MAP",
+    "PosixShellAnalyzer",
+    "BitBakeAnalyzer",
+    "ConanRecipeAnalyzer",
+    "SConsBuildAnalyzer",
+    "SpackRecipeAnalyzer",
+    "SageScriptAnalyzer",
+    "AbaqusJournalAnalyzer",
+    "StarlarkAnalyzer",
+    "TclAnalyzer",
+    "StataAnalyzer",
+    "SasAnalyzer",
+    "SpssAnalyzer",
+    "GapAnalyzer",
+    "PariGpAnalyzer",
+    "MapleAnalyzer",
+    "AwkAnalyzer",
+    "SedAnalyzer",
+    "ElvishAnalyzer",
+    "NushellAnalyzer",
+    "VbScriptAnalyzer",
+    "WsfAnalyzer",
+    "AutoItAnalyzer",
+    "AutoHotkeyAnalyzer",
+    "GdbInitAnalyzer",
+    "InnoSetupAnalyzer",
+    "NsisAnalyzer",
+    "JclAnalyzer",
+    "RexxAnalyzer",
+    "ClistAnalyzer",
+    "ClpAnalyzer",
+    "DclAnalyzer",
+    "M4Analyzer",
+    "JenkinsfileAnalyzer",
+    "VagrantfileAnalyzer",
+    "CsxAnalyzer",
+    "ElixirMixAnalyzer",
+    "NimScriptAnalyzer",
+    "NukeAnalyzer",
+    "PainlessAnalyzer",
+    "WeztermAnalyzer",
     "ProxyAutoConfigAnalyzer",
-    "BinaryTemplateAnalyzer", "CompiledScriptAnalyzer", "AppleScriptAnalyzer",
+    "BinaryTemplateAnalyzer",
+    "CompiledScriptAnalyzer",
+    "AppleScriptAnalyzer",
 ]

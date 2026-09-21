@@ -10,6 +10,7 @@ Data-meaningful single-file containers (``.npz``/``.docx``/``.xlsx``/``.pdf``/
 ``.glb``/``.gpkg``/``.ods``) are NOT archives here -- they stay with
 ``DataAnalyzer``, which profiles them in place.
 """
+
 from .archive_analyzer import ArchiveAnalyzer
 
 __all__ = ["ArchiveAnalyzer"]

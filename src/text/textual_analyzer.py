@@ -86,9 +86,17 @@ class TextualAnalyzer:
         self.text_properties_table: List[Dict[str, Any]] = []
         self.text_file_index: List[Dict[str, Any]] = []
 
-        self._ids = {k: 0 for k in (
-            "file", "section", "record", "field", "property", "tfi",
-        )}
+        self._ids = {
+            k: 0
+            for k in (
+                "file",
+                "section",
+                "record",
+                "field",
+                "property",
+                "tfi",
+            )
+        }
 
     # ------------------------------------------------------------------
     # id helpers
@@ -150,8 +158,9 @@ class TextualAnalyzer:
     # ==================================================================
     # Row builders
     # ==================================================================
-    def _emit_file(self, path: Path, ext: str, profile: Dict[str, Any],
-                   local_fid: int) -> None:
+    def _emit_file(
+        self, path: Path, ext: str, profile: Dict[str, Any], local_fid: int
+    ) -> None:
         text_file_id = self._next("file")
         status = self._as_text(profile.get("status")) or "ok"
 
@@ -180,12 +189,12 @@ class TextualAnalyzer:
 
         # file-level metadata / forensic profile -> properties
         prop_count = 0
-        for entry in (profile.get("properties") or []):
+        for entry in profile.get("properties") or []:
             if self._emit_property(text_file_id, entry, local_fid):
                 prop_count += 1
 
         sec_count = rec_count = fld_count = 0
-        for sec in (profile.get("sections") or []):
+        for sec in profile.get("sections") or []:
             section_id = self._emit_section(text_file_id, sec, local_fid)
             sec_count += 1
             local_recs = 0
@@ -193,7 +202,8 @@ class TextualAnalyzer:
                 rec_count += 1
                 local_recs += 1
                 fld_count += self._emit_record(
-                    text_file_id, section_id, rindex, rec, local_fid)
+                    text_file_id, section_id, rindex, rec, local_fid
+                )
             self.text_sections_table[-1]["record_count"] = local_recs
 
         file_row["section_count"] = sec_count
@@ -203,59 +213,77 @@ class TextualAnalyzer:
 
     def _emit_section(self, tfid: int, sec: Dict[str, Any], local_fid: int) -> int:
         section_id = self._next("section")
-        self.text_sections_table.append({
-            "text_section_id": section_id,
-            "text_file_id": tfid,
-            "section_name": self._as_text(sec.get("name")),
-            "section_path": self._as_text(sec.get("path")),
-            "section_type": self._as_text(sec.get("type")),
-            "ordinal": self._as_int(sec.get("ordinal")),
-            "record_count": 0,
-            "notes": self._as_text(sec.get("notes")),
-            "file_id": local_fid,
-        })
+        self.text_sections_table.append(
+            {
+                "text_section_id": section_id,
+                "text_file_id": tfid,
+                "section_name": self._as_text(sec.get("name")),
+                "section_path": self._as_text(sec.get("path")),
+                "section_type": self._as_text(sec.get("type")),
+                "ordinal": self._as_int(sec.get("ordinal")),
+                "record_count": 0,
+                "notes": self._as_text(sec.get("notes")),
+                "file_id": local_fid,
+            }
+        )
         return section_id
 
-    def _emit_record(self, tfid: int, section_id: int, rindex: int,
-                     rec: Dict[str, Any], local_fid: int) -> int:
+    def _emit_record(
+        self,
+        tfid: int,
+        section_id: int,
+        rindex: int,
+        rec: Dict[str, Any],
+        local_fid: int,
+    ) -> int:
         record_id = self._next("record")
         fields = rec.get("fields") or []
-        self.text_records_table.append({
-            "text_record_id": record_id,
-            "text_file_id": tfid,
-            "text_section_id": section_id,
-            "record_index": rindex,
-            "record_type": self._as_text(rec.get("rtype")),
-            "record_label": self._as_text(rec.get("label")),
-            "start_line": self._as_int(rec.get("start_line")),
-            "end_line": self._as_int(rec.get("end_line")),
-            "field_count": len(fields),
-            "text_preview": self._as_text(rec.get("text")),
-            "notes": self._as_text(rec.get("notes")),
-            "file_id": local_fid,
-        })
+        self.text_records_table.append(
+            {
+                "text_record_id": record_id,
+                "text_file_id": tfid,
+                "text_section_id": section_id,
+                "record_index": rindex,
+                "record_type": self._as_text(rec.get("rtype")),
+                "record_label": self._as_text(rec.get("label")),
+                "start_line": self._as_int(rec.get("start_line")),
+                "end_line": self._as_int(rec.get("end_line")),
+                "field_count": len(fields),
+                "text_preview": self._as_text(rec.get("text")),
+                "notes": self._as_text(rec.get("notes")),
+                "file_id": local_fid,
+            }
+        )
         n = 0
         for fld in fields:
             if self._emit_field(tfid, section_id, record_id, fld, local_fid):
                 n += 1
         return n
 
-    def _emit_field(self, tfid: int, section_id: int, record_id: int,
-                    fld: Dict[str, Any], local_fid: int) -> bool:
+    def _emit_field(
+        self,
+        tfid: int,
+        section_id: int,
+        record_id: int,
+        fld: Dict[str, Any],
+        local_fid: int,
+    ) -> bool:
         if not isinstance(fld, dict):
             return False
-        self.text_fields_table.append({
-            "text_field_id": self._next("field"),
-            "text_record_id": record_id,
-            "text_file_id": tfid,
-            "text_section_id": section_id,
-            "field_name": self._as_text(fld.get("name")),
-            "field_key": self._as_text(fld.get("key")),
-            "field_type": self._as_text(fld.get("type")) or "STRING",
-            "field_value": self._as_text(fld.get("value")),
-            "ordinal": self._as_int(fld.get("ordinal")),
-            "file_id": local_fid,
-        })
+        self.text_fields_table.append(
+            {
+                "text_field_id": self._next("field"),
+                "text_record_id": record_id,
+                "text_file_id": tfid,
+                "text_section_id": section_id,
+                "field_name": self._as_text(fld.get("name")),
+                "field_key": self._as_text(fld.get("key")),
+                "field_type": self._as_text(fld.get("type")) or "STRING",
+                "field_value": self._as_text(fld.get("value")),
+                "ordinal": self._as_int(fld.get("ordinal")),
+                "file_id": local_fid,
+            }
+        )
         return True
 
     def _emit_property(self, tfid: int, entry: Any, local_fid: int) -> bool:
@@ -276,15 +304,17 @@ class TextualAnalyzer:
             pv, vtype = str(value), "str"
         if pv is None:
             return False
-        self.text_properties_table.append({
-            "property_id": self._next("property"),
-            "text_file_id": tfid,
-            "property_name": str(name)[:256],
-            "property_value": pv[:2048],
-            "value_type": vtype,
-            "group_name": str(group_name)[:128],
-            "file_id": local_fid,
-        })
+        self.text_properties_table.append(
+            {
+                "property_id": self._next("property"),
+                "text_file_id": tfid,
+                "property_name": str(name)[:256],
+                "property_value": pv[:2048],
+                "value_type": vtype,
+                "group_name": str(group_name)[:128],
+                "file_id": local_fid,
+            }
+        )
         return True
 
     # ------------------------------------------------------------------
@@ -325,7 +355,9 @@ class TextualAnalyzer:
     # ==================================================================
     def link_repository(
         self,
-        repository_tables: Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]],
+        repository_tables: Tuple[
+            List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]
+        ],
         analyzed_file_paths: Optional[List[Union[str, Path]]] = None,
     ) -> List[Dict[str, Any]]:
         folders, extensions, files = repository_tables
@@ -341,7 +373,9 @@ class TextualAnalyzer:
             deepest = location[-1] if location else 1
             folder_path = folder_by_id.get(deepest, ".")
             fname = f["file_name"] + (f".{ext}" if ext else "")
-            relpath = fname if folder_path in (".", "", None) else f"{folder_path}/{fname}"
+            relpath = (
+                fname if folder_path in (".", "", None) else f"{folder_path}/{fname}"
+            )
             repo_by_relpath.setdefault(relpath, f["file_id"])
             repo_by_basename.setdefault(Path(relpath).name, []).append(f["file_id"])
 
@@ -375,10 +409,14 @@ class TextualAnalyzer:
                 repo_id = local_to_repo.get(row.get("file_id"))
                 row["file_id"] = repo_id
                 if repo_id is not None:
-                    self.text_file_index.append({
-                        "tfi_id": self._next("tfi"), "file_id": repo_id,
-                        "entity_kind": kind, "entity_id": row[id_key],
-                    })
+                    self.text_file_index.append(
+                        {
+                            "tfi_id": self._next("tfi"),
+                            "file_id": repo_id,
+                            "entity_kind": kind,
+                            "entity_id": row[id_key],
+                        }
+                    )
         return self.text_file_index
 
     # ==================================================================

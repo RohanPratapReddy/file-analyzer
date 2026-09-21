@@ -12,7 +12,7 @@
 #   balances: public(HashMap[address, uint256])     -> state variable
 #   TOTAL: constant(uint256) = 100                  -> constant variable
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -23,15 +23,14 @@ class VyperAnalyzer(RegexCodeAnalyzer):
     BLOCK_COMMENTS = (('"""', '"""'), ("'''", "'''"))
 
     _IMPORT = re.compile(r"^\s*import\s+([\w.]+)(?:\s+as\s+(\w+))?", re.MULTILINE)
-    _FROM = re.compile(
-        r"^\s*from\s+([\w.]+)\s+import\s+([\w., *]+)", re.MULTILINE)
+    _FROM = re.compile(r"^\s*from\s+([\w.]+)\s+import\s+([\w., *]+)", re.MULTILINE)
     _TYPE = re.compile(
-        r"^(\s*)(interface|struct|event|enum|flag)\s+([A-Za-z_]\w*)\s*:", )
+        r"^(\s*)(interface|struct|event|enum|flag)\s+([A-Za-z_]\w*)\s*:",
+    )
     _DEF = re.compile(
-        r"^(\s*)def\s+([A-Za-z_]\w*)\s*\(([^)]*)\)\s*"
-        r"(?:->\s*([^:]+?)\s*)?:")
-    _STATEVAR = re.compile(
-        r"^([A-Za-z_]\w*)\s*:\s*(.+)$")
+        r"^(\s*)def\s+([A-Za-z_]\w*)\s*\(([^)]*)\)\s*" r"(?:->\s*([^:]+?)\s*)?:"
+    )
+    _STATEVAR = re.compile(r"^([A-Za-z_]\w*)\s*:\s*(.+)$")
 
     def _register_types(self, file_id, text, path):
         for line in self._strip_comments(text).splitlines():
@@ -93,10 +92,15 @@ class VyperAnalyzer(RegexCodeAnalyzer):
                         dm = self._DEF.match(lines[j])
                         if dm:
                             arg_ids = self._params(dm.group(3))
-                            out_ids = [self._add_output(dm.group(4).strip())] if dm.group(4) else []
+                            out_ids = (
+                                [self._add_output(dm.group(4).strip())]
+                                if dm.group(4)
+                                else []
+                            )
                             cid = self._class_registry.get(name)
-                            fid = self._add_function(file_id, dm.group(2), arg_ids,
-                                                     out_ids, class_id=cid)
+                            fid = self._add_function(
+                                file_id, dm.group(2), arg_ids, out_ids, class_id=cid
+                            )
                             methods.append(fid)
                         elif ":" in member:
                             fn = member.split(":", 1)[0].strip()
@@ -121,7 +125,9 @@ class VyperAnalyzer(RegexCodeAnalyzer):
                 # skip body
                 bi = body_indent(i, indent)
                 j = i + 1
-                while j < n and (not lines[j].strip() or self._indent_of(lines[j]) >= bi):
+                while j < n and (
+                    not lines[j].strip() or self._indent_of(lines[j]) >= bi
+                ):
                     j += 1
                 i = j
                 continue
@@ -129,15 +135,31 @@ class VyperAnalyzer(RegexCodeAnalyzer):
             # top-level state variable / constant: `name: type` at indent 0
             if indent == 0:
                 sm = self._STATEVAR.match(line)
-                if sm and sm.group(1) not in ("import", "from", "def", "interface",
-                                              "struct", "event", "enum", "flag",
-                                              "implements", "if", "for", "return"):
+                if sm and sm.group(1) not in (
+                    "import",
+                    "from",
+                    "def",
+                    "interface",
+                    "struct",
+                    "event",
+                    "enum",
+                    "flag",
+                    "implements",
+                    "if",
+                    "for",
+                    "return",
+                ):
                     self._add_variable(file_id, sm.group(1), sm.group(2).strip())
             i += 1
 
         for name, row in emitted.items():
-            self._add_class(file_id, name, description=f"vyper {row['kind']}",
-                            method_ids=row["methods"], attr_ids=row["attrs"])
+            self._add_class(
+                file_id,
+                name,
+                description=f"vyper {row['kind']}",
+                method_ids=row["methods"],
+                attr_ids=row["attrs"],
+            )
 
     def _params(self, params):
         arg_ids = []

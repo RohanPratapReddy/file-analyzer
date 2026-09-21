@@ -43,7 +43,9 @@ def _norm_dialect(dialect: str) -> str:
     if d == "postgresql":
         d = "pgsql"
     if d not in ("sqlite", "pgsql"):
-        raise ValueError(f"views: unsupported dialect {dialect!r} (use sqlite or pgsql)")
+        raise ValueError(
+            f"views: unsupported dialect {dialect!r} (use sqlite or pgsql)"
+        )
     return d
 
 
@@ -61,7 +63,9 @@ def _selectable(view: ViewDef, present_tables: Optional[Set[str]]) -> bool:
     return all(t in present_tables for t in view.tables)
 
 
-def views_ddl(dialect: str = "sqlite", present_tables: Optional[Set[str]] = None) -> str:
+def views_ddl(
+    dialect: str = "sqlite", present_tables: Optional[Set[str]] = None
+) -> str:
     """
     Return the CREATE VIEW DDL for the catalog. When ``present_tables`` is given,
     only views whose base tables are all present are emitted.
@@ -157,7 +161,7 @@ def append_views_to_sql_dump(
     # Strip any previously-appended section so re-runs stay clean.
     if _BEGIN_MARKER in text and _END_MARKER in text:
         pre = text[: text.index(_BEGIN_MARKER)]
-        post = text[text.index(_END_MARKER) + len(_END_MARKER):]
+        post = text[text.index(_END_MARKER) + len(_END_MARKER) :]
         text = pre.rstrip() + "\n" + post.lstrip()
 
     d = _norm_dialect(dialect) if dialect else _detect_dialect_from_dump(text)
@@ -175,7 +179,11 @@ def export_catalog_json(path: Union[str, Path]) -> Path:
     """Write the catalog (name/object_name/tables/select) as JSON."""
     path = Path(path)
     payload = {
-        "view_prefix": VIEW_CATALOG[0].object_name[: -len(VIEW_CATALOG[0].name)] if VIEW_CATALOG else "v_",
+        "view_prefix": (
+            VIEW_CATALOG[0].object_name[: -len(VIEW_CATALOG[0].name)]
+            if VIEW_CATALOG
+            else "v_"
+        ),
         "count": len(VIEW_CATALOG),
         "views": [
             {

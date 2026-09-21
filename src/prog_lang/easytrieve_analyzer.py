@@ -19,7 +19,7 @@
 # A FILE introduces a record whose indented field lines are its attributes;
 # DEFINE binds a working/temporary field; JOB/PROC/SORT are activities.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z][A-Za-z0-9_#@$-]*"
@@ -28,7 +28,7 @@ _ID = r"[A-Za-z][A-Za-z0-9_#@$-]*"
 class EasytrieveAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "easytrieve"
     EXTENSIONS = (".easytrieve",)
-    LINE_COMMENTS = ()          # '*' only when in column 1 (handled below)
+    LINE_COMMENTS = ()  # '*' only when in column 1 (handled below)
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ("'", '"')
 
@@ -41,21 +41,52 @@ class EasytrieveAnalyzer(RegexCodeAnalyzer):
     _PROC = re.compile(r"(?im)^[ \t]*PROC\s+(" + _ID + r")\b")
     _SORT = re.compile(r"(?im)^[ \t]*SORT\s+(" + _ID + r")\b")
     # an indented field line inside a FILE:  NAME  start  len  type
-    _FIELD = re.compile(r"(?im)^[ \t]+(" + _ID + r")\s+"
-                        r"(?:\*\s+)?\d+\s+\d+\s+[A-Za-z]\b")
+    _FIELD = re.compile(
+        r"(?im)^[ \t]+(" + _ID + r")\s+" r"(?:\*\s+)?\d+\s+\d+\s+[A-Za-z]\b"
+    )
 
-    _KEYWORDS = {"file", "report", "define", "job", "proc", "sort", "if", "else",
-                 "end-if", "end-proc", "do", "end-do", "print", "display",
-                 "input", "goto", "stop", "move", "put", "get", "select",
-                 "while", "call", "perform", "compute", "let", "parm",
-                 "system", "heading", "title", "line", "control", "sum"}
+    _KEYWORDS = {
+        "file",
+        "report",
+        "define",
+        "job",
+        "proc",
+        "sort",
+        "if",
+        "else",
+        "end-if",
+        "end-proc",
+        "do",
+        "end-do",
+        "print",
+        "display",
+        "input",
+        "goto",
+        "stop",
+        "move",
+        "put",
+        "get",
+        "select",
+        "while",
+        "call",
+        "perform",
+        "compute",
+        "let",
+        "parm",
+        "system",
+        "heading",
+        "title",
+        "line",
+        "control",
+        "sum",
+    }
 
     def _strip_star_comments(self, text):
         out = []
         for ln in text.splitlines(keepends=True):
             if ln[:1] == "*":
-                nl = ln[len(ln.rstrip("\r\n")):]
-                out.append(nl)          # preserve the newline only
+                nl = ln[len(ln.rstrip("\r\n")) :]
+                out.append(nl)  # preserve the newline only
             else:
                 out.append(ln)
         return "".join(out)
@@ -94,8 +125,9 @@ class EasytrieveAnalyzer(RegexCodeAnalyzer):
             if key in seen_field:
                 continue
             seen_field.add(key)
-            self._add_variable(file_id, nm,
-                               scope="field" if oid is not None else "module")
+            self._add_variable(
+                file_id, nm, scope="field" if oid is not None else "module"
+            )
 
         for m in self._DEFINE.finditer(clean):
             self._add_variable(file_id, m.group(1), scope="working")
@@ -105,22 +137,33 @@ class EasytrieveAnalyzer(RegexCodeAnalyzer):
             job_n += 1
             inp = m.group(1)
             arg_ids = [self._add_arg(inp, "file")] if inp else []
-            self._add_function(file_id, "JOB_%d" % job_n if not inp else "JOB_" + inp,
-                               arg_ids, [], description="easytrieve job")
+            self._add_function(
+                file_id,
+                "JOB_%d" % job_n if not inp else "JOB_" + inp,
+                arg_ids,
+                [],
+                description="easytrieve job",
+            )
         seen_proc = set()
         for m in self._PROC_LABEL.finditer(clean):
             seen_proc.add(m.group(1).upper())
-            self._add_function(file_id, m.group(1), [], [],
-                               description="easytrieve proc")
+            self._add_function(
+                file_id, m.group(1), [], [], description="easytrieve proc"
+            )
         for m in self._PROC.finditer(clean):
             if m.group(1).upper() in seen_proc:
                 continue
-            self._add_function(file_id, m.group(1), [], [],
-                               description="easytrieve proc")
+            self._add_function(
+                file_id, m.group(1), [], [], description="easytrieve proc"
+            )
         for m in self._SORT.finditer(clean):
-            self._add_function(file_id, "SORT_" + m.group(1),
-                               [self._add_arg(m.group(1), "file")], [],
-                               description="easytrieve sort")
+            self._add_function(
+                file_id,
+                "SORT_" + m.group(1),
+                [self._add_arg(m.group(1), "file")],
+                [],
+                description="easytrieve sort",
+            )
 
     def _record_spans(self, clean):
         lines = clean.splitlines(keepends=True)
@@ -129,8 +172,10 @@ class EasytrieveAnalyzer(RegexCodeAnalyzer):
             offsets.append(pos)
             pos += len(ln)
         # top-level statement = FILE/DEFINE/JOB/PROC/REPORT/SORT at column start
-        top = re.compile(r"(?i)^[ \t]*(?:(?:FILE|DEFINE|JOB|PROC|REPORT|SORT|PARM)\b"
-                         r"|" + _ID + r"\s*\.\s+PROC\b)")
+        top = re.compile(
+            r"(?i)^[ \t]*(?:(?:FILE|DEFINE|JOB|PROC|REPORT|SORT|PARM)\b"
+            r"|" + _ID + r"\s*\.\s+PROC\b)"
+        )
         spans = []
         for m in self._FILE.finditer(clean):
             name = m.group(1)

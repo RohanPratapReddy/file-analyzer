@@ -10,10 +10,11 @@ These four modules tie the per-domain analyzers together:
 The package top level (``src/__init__.py``) re-exports the public classes, so
 ``from src import AnalysisEngine`` keeps working exactly as before this move.
 """
-from .repository_analyzer import RepositoryAnalyzer
-from .import_linkage import ImportLinkageAnalyzer
-from .db_generator import RepositoryDatabaseGenerator
+
 from .analysis_engine import AnalysisEngine
+from .db_generator import RepositoryDatabaseGenerator
+from .import_linkage import ImportLinkageAnalyzer
+from .repository_analyzer import RepositoryAnalyzer
 
 __all__ = [
     "RepositoryAnalyzer",

@@ -22,8 +22,7 @@ from .javascript_analyzer import JavaScriptAnalyzer
 
 class TreeSitterGrammarAnalyzer(JavaScriptAnalyzer):
     def __init__(self, **kwargs):
-        super().__init__(lang_key="javascript", extensions=[".tree-sitter"],
-                         **kwargs)
+        super().__init__(lang_key="javascript", extensions=[".tree-sitter"], **kwargs)
         self.language_name = "tree-sitter"
         self.introspection_source = (
             "Tree-sitter grammar.js (module.exports = grammar({name, rules}) + "

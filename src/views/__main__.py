@@ -16,13 +16,13 @@ import argparse
 import sys
 
 from . import (
-    install_views_sqlite,
     append_views_to_sql_dump,
+    install_views_sqlite,
+    list_views,
+    read_all_views,
+    read_view,
     views_ddl,
     write_sql_artifacts,
-    list_views,
-    read_view,
-    read_all_views,
 )
 
 

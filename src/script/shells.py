@@ -26,13 +26,13 @@ class PosixScriptShellAnalyzer(PosixShellAnalyzer):
 class FishShellAnalyzer(ShellScriptBase):
     """Fish shell (`.fish`).  Fish deliberately breaks from POSIX:
 
-        function fish_prompt --description 'my prompt'   -> function (+params)
-            ...
-        end
-        set -gx PATH $PATH /usr/local/bin                -> variable
-        set -l tmp value                                 -> variable(local)
-        source ~/.config/fish/aliases.fish               -> import
-        abbr -a gco 'git checkout'                       -> variable(alias)
+    function fish_prompt --description 'my prompt'   -> function (+params)
+        ...
+    end
+    set -gx PATH $PATH /usr/local/bin                -> variable
+    set -l tmp value                                 -> variable(local)
+    source ~/.config/fish/aliases.fish               -> import
+    abbr -a gco 'git checkout'                       -> variable(alias)
     """
 
     LANG_KEY = "fish"
@@ -46,7 +46,9 @@ class FishShellAnalyzer(ShellScriptBase):
     # set [-flags] NAME value...   (scope from -g/-l/-U/-x flags)
     _SET = re.compile(r"(?m)^[ \t]*set[ \t]+((?:-\w+[ \t]+)*)([A-Za-z_]\w*)([^\n]*)")
     # abbr -a name 'expansion'   |   alias name 'cmd'
-    _ABBR = re.compile(r"(?m)^[ \t]*abbr[ \t]+(?:-\w+[ \t]+)*([A-Za-z_][\w-]*)[ \t]*(.*)")
+    _ABBR = re.compile(
+        r"(?m)^[ \t]*abbr[ \t]+(?:-\w+[ \t]+)*([A-Za-z_][\w-]*)[ \t]*(.*)"
+    )
     _ALIAS = re.compile(r"(?m)^[ \t]*alias[ \t]+([A-Za-z_][\w-]*)[ \t]*(?:=|[ \t])(.*)")
     # source FILE   |   . FILE
     _SOURCE = re.compile(r"(?m)^[ \t]*(?:source|\.)[ \t]+(\S+)")
@@ -84,17 +86,33 @@ class FishShellAnalyzer(ShellScriptBase):
                 if tok in ("-a", "--argument-names"):
                     i += 1
                     while i < len(toks) and not toks[i].startswith("-"):
-                        params.append(toks[i]); i += 1
+                        params.append(toks[i])
+                        i += 1
                     continue
                 if tok.startswith("-"):
                     # option that consumes a value (e.g. --description 'x')
-                    i += 2 if tok in ("-d", "--description", "-w", "--wraps",
-                                      "-V", "--inherit-variable", "-e",
-                                      "--on-event", "-s", "--on-signal") else 1
+                    i += (
+                        2
+                        if tok
+                        in (
+                            "-d",
+                            "--description",
+                            "-w",
+                            "--wraps",
+                            "-V",
+                            "--inherit-variable",
+                            "-e",
+                            "--on-event",
+                            "-s",
+                            "--on-signal",
+                        )
+                        else 1
+                    )
                     continue
                 i += 1
-            self._add_shell_function(file_id, name, params=params,
-                                     description="fish function")
+            self._add_shell_function(
+                file_id, name, params=params, description="fish function"
+            )
 
         seen_var = set()
         for m in self._SET.finditer(clean):
@@ -105,8 +123,9 @@ class FishShellAnalyzer(ShellScriptBase):
             if name in seen_var:
                 continue
             seen_var.add(name)
-            self._add_variable(file_id, name, (tail.strip()[:120] or None),
-                               scope=self._scope_of(flags))
+            self._add_variable(
+                file_id, name, (tail.strip()[:120] or None), scope=self._scope_of(flags)
+            )
 
         seen_alias = set()
         for rx in (self._ABBR, self._ALIAS):
@@ -126,6 +145,9 @@ class FishShellAnalyzer(ShellScriptBase):
             self._add_sourced(file_id, tgt, keyword="source")
 
         self._record_module_meta(
-            file_id, dialect="fish",
+            file_id,
+            dialect="fish",
             control_blocks=len(self._CONTROL.findall(clean)),
-            functions=len(seen_fn), variables=len(seen_var))
+            functions=len(seen_fn),
+            variables=len(seen_var),
+        )

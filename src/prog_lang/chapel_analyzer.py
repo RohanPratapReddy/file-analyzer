@@ -10,7 +10,7 @@
 #   record R { var a: real; }                         -> record (class row)
 #   var x: int = 5;   const PI = 3.14;   config var n -> variable
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _MOD = r"(?:inline|override|proc\s+)?"
@@ -22,17 +22,17 @@ class ChapelAnalyzer(RegexCodeAnalyzer):
 
     _USE = re.compile(r"^\s*(?:use|import)\s+([\w., ]+?)\s*;", re.MULTILINE)
     _TYPE = re.compile(
-        r"\b(class|record|union)\s+([A-Za-z_]\w*)"
-        r"(?:\s*:\s*([\w., ]+?))?"
-        r"\s*\{")
+        r"\b(class|record|union)\s+([A-Za-z_]\w*)" r"(?:\s*:\s*([\w., ]+?))?" r"\s*\{"
+    )
     _PROC = re.compile(
         r"(?:inline\s+|override\s+|proc\s+)*"
         r"\b(?:proc|iter|operator)\s+"
-        r"(?:([A-Za-z_]\w*)\s*\.\s*)?"                   # optional receiver type
+        r"(?:([A-Za-z_]\w*)\s*\.\s*)?"  # optional receiver type
         r"([A-Za-z_]\w*|[-+*/<>=!]+)\s*"
         r"(?:\(([^{;]*?)\))?\s*"
         r"(?::\s*([\w()., \[\]]+?)\s*)?"
-        r"(?:throws\s*)?\{")
+        r"(?:throws\s*)?\{"
+    )
     _PROTO = re.compile(
         r"^\s*(?:export\s+|extern\s+(?:\"[^\"]*\"\s+)?)"
         r"proc\s+"
@@ -40,13 +40,19 @@ class ChapelAnalyzer(RegexCodeAnalyzer):
         r"([A-Za-z_]\w*)\s*"
         r"(?:\(([^{;]*?)\))?\s*"
         r"(?::\s*([\w()., \[\]]+?)\s*)?"
-        r"(?:throws\s*)?;", re.MULTILINE)
+        r"(?:throws\s*)?;",
+        re.MULTILINE,
+    )
     _VAR = re.compile(
         r"^\s*(?:config\s+)?(?:var|const|param)\s+([A-Za-z_]\w*)\s*"
-        r"(?::\s*([\w()., \[\]]+?))?\s*(?:=\s*([^;]+?))?\s*;", re.MULTILINE)
+        r"(?::\s*([\w()., \[\]]+?))?\s*(?:=\s*([^;]+?))?\s*;",
+        re.MULTILINE,
+    )
     _FIELD = re.compile(
         r"^\s*(?:var|const|param)\s+([A-Za-z_]\w*)\s*"
-        r"(?::\s*([\w()., \[\]]+?))?\s*(?:=\s*([^;]+?))?\s*;", re.MULTILINE)
+        r"(?::\s*([\w()., \[\]]+?))?\s*(?:=\s*([^;]+?))?\s*;",
+        re.MULTILINE,
+    )
 
     def _register_types(self, file_id, text, path):
         for m in self._TYPE.finditer(self._strip_comments(text)):
@@ -70,13 +76,24 @@ class ChapelAnalyzer(RegexCodeAnalyzer):
                     p = p.strip().split(".")[-1]
                     if p in self._class_registry:
                         parents.append(self._class_registry[p])
-            types.append({"name": m.group(2), "kind": m.group(1), "bstart": bstart,
-                          "bend": bend, "parents": parents, "methods": [], "attrs": []})
+            types.append(
+                {
+                    "name": m.group(2),
+                    "kind": m.group(1),
+                    "bstart": bstart,
+                    "bend": bend,
+                    "parents": parents,
+                    "methods": [],
+                    "attrs": [],
+                }
+            )
 
         def enclosing(pos):
             best = None
             for t in types:
-                if t["bstart"] <= pos < t["bend"] and (best is None or t["bstart"] > best["bstart"]):
+                if t["bstart"] <= pos < t["bend"] and (
+                    best is None or t["bstart"] > best["bstart"]
+                ):
                     best = t
             return best
 
@@ -90,7 +107,9 @@ class ChapelAnalyzer(RegexCodeAnalyzer):
             covered = self._find_matching(text, body)
             proc_spans.append((body, covered))
             arg_ids = self._params(params or "")
-            out_ids = [self._add_output(ret.strip())] if ret and ret.strip() != "void" else []
+            out_ids = (
+                [self._add_output(ret.strip())] if ret and ret.strip() != "void" else []
+            )
             owner = enclosing(m.start())
             cid = None
             if recv and recv in self._class_registry:
@@ -115,7 +134,9 @@ class ChapelAnalyzer(RegexCodeAnalyzer):
                 continue
             recv, name, params, ret = m.group(1), m.group(2), m.group(3), m.group(4)
             arg_ids = self._params(params or "")
-            out_ids = [self._add_output(ret.strip())] if ret and ret.strip() != "void" else []
+            out_ids = (
+                [self._add_output(ret.strip())] if ret and ret.strip() != "void" else []
+            )
             cid = None
             if recv and recv in self._class_registry:
                 cid = self._class_registry[recv]
@@ -127,26 +148,36 @@ class ChapelAnalyzer(RegexCodeAnalyzer):
 
         # class/record fields
         for t in types:
-            body = text[t["bstart"] + 1:t["bend"] - 1]
+            body = text[t["bstart"] + 1 : t["bend"] - 1]
             for fm in self._FIELD.finditer(body):
                 # ensure the field isn't inside a nested proc of this type
                 abs_pos = t["bstart"] + 1 + fm.start()
                 if in_proc(abs_pos):
                     continue
-                t["attrs"].append(self._add_arg(fm.group(1),
-                                  fm.group(2).strip() if fm.group(2) else None,
-                                  fm.group(3).strip() if fm.group(3) else None))
+                t["attrs"].append(
+                    self._add_arg(
+                        fm.group(1),
+                        fm.group(2).strip() if fm.group(2) else None,
+                        fm.group(3).strip() if fm.group(3) else None,
+                    )
+                )
 
         for m in self._VAR.finditer(text):
             if in_proc(m.start()) or enclosing(m.start()) is not None:
                 continue
-            self._add_variable(file_id, m.group(1),
-                               m.group(3).strip() if m.group(3) else None)
+            self._add_variable(
+                file_id, m.group(1), m.group(3).strip() if m.group(3) else None
+            )
 
         for t in types:
-            self._add_class(file_id, t["name"], description=f"chapel {t['kind']}",
-                            parent_ids=t["parents"], method_ids=t["methods"],
-                            attr_ids=t["attrs"])
+            self._add_class(
+                file_id,
+                t["name"],
+                description=f"chapel {t['kind']}",
+                parent_ids=t["parents"],
+                method_ids=t["methods"],
+                attr_ids=t["attrs"],
+            )
 
     def _params(self, params):
         arg_ids = []
@@ -154,8 +185,9 @@ class ChapelAnalyzer(RegexCodeAnalyzer):
             part = part.strip()
             if not part:
                 continue
-            part = re.sub(r"^(in|out|inout|ref|const\s+ref|const|param|type)\s+",
-                          "", part)
+            part = re.sub(
+                r"^(in|out|inout|ref|const\s+ref|const|param|type)\s+", "", part
+            )
             default = None
             if "=" in part:
                 part, default = part.split("=", 1)

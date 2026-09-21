@@ -17,7 +17,7 @@
 #   procedure TPoint.Move(dx: Integer); begin ... end;     -> method impl (TPoint)
 #   function  StandAlone(x: Integer): Integer;             -> free function
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -31,26 +31,38 @@ class PascalAnalyzer(RegexCodeAnalyzer):
     _USES = re.compile(r"\buses\b([^;]+);", re.IGNORECASE | re.DOTALL)
     _CLASS = re.compile(
         r"\b([A-Za-z_]\w*)\s*=\s*(class|object|interface)\b"
-        r"(?:\s*\(\s*([\w., ]+?)\s*\))?", re.IGNORECASE)
-    _RECORD = re.compile(r"\b([A-Za-z_]\w*)\s*=\s*(?:packed\s+)?record\b", re.IGNORECASE)
+        r"(?:\s*\(\s*([\w., ]+?)\s*\))?",
+        re.IGNORECASE,
+    )
+    _RECORD = re.compile(
+        r"\b([A-Za-z_]\w*)\s*=\s*(?:packed\s+)?record\b", re.IGNORECASE
+    )
     _ENUM = re.compile(r"\b([A-Za-z_]\w*)\s*=\s*\(([^)]*)\)\s*;", re.IGNORECASE)
     _METHOD = re.compile(
         r"^\s*(?:class\s+)?(procedure|function|constructor|destructor)\s+"
-        r"(?:([A-Za-z_]\w*)\s*\.\s*)?"                    # optional receiver
+        r"(?:([A-Za-z_]\w*)\s*\.\s*)?"  # optional receiver
         r"([A-Za-z_]\w*)\s*"
         r"(?:\(([^)]*)\))?"
-        r"(?:\s*:\s*([\w.]+))?", re.IGNORECASE)
+        r"(?:\s*:\s*([\w.]+))?",
+        re.IGNORECASE,
+    )
     _PROPERTY = re.compile(
-        r"^\s*property\s+([A-Za-z_]\w*)\s*(?::\s*([\w.]+))?", re.IGNORECASE)
+        r"^\s*property\s+([A-Za-z_]\w*)\s*(?::\s*([\w.]+))?", re.IGNORECASE
+    )
     _FIELD = re.compile(
         r"^\s*([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)*)\s*:\s*([\w.\[\]<> ]+?)\s*;",
-        re.IGNORECASE)
+        re.IGNORECASE,
+    )
     _VAR = re.compile(
         r"^\s*([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)*)\s*:\s*([\w.\[\]<> ]+?)\s*"
-        r"(?:=\s*[^;]+)?;", re.IGNORECASE)
+        r"(?:=\s*[^;]+)?;",
+        re.IGNORECASE,
+    )
     _VISIBILITY = re.compile(
         r"^\s*(private|public|protected|published|strict\s+private|"
-        r"strict\s+protected)\b", re.IGNORECASE)
+        r"strict\s+protected)\b",
+        re.IGNORECASE,
+    )
 
     def _register_types(self, file_id, text, path):
         text = self._strip_comments(text)
@@ -85,9 +97,9 @@ class PascalAnalyzer(RegexCodeAnalyzer):
             enums[name] = attrs
 
         # class / record type declarations with bodies ending at matching 'end'.
-        types = {}          # name -> dict
-        type_spans = []     # (start_line, end_line, type_name) inclusive-exclusive
-        seen_fn = set()     # (owner_or_None, name) to emit each routine once
+        types = {}  # name -> dict
+        type_spans = []  # (start_line, end_line, type_name) inclusive-exclusive
+        seen_fn = set()  # (owner_or_None, name) to emit each routine once
         i = 0
         while i < n:
             line = lines[i]
@@ -105,12 +117,14 @@ class PascalAnalyzer(RegexCodeAnalyzer):
                         p = p.strip()
                         if p in self._class_registry:
                             parents.append(self._class_registry[p])
-                kind = (cm.group(2).lower() if cm else "record")
+                kind = cm.group(2).lower() if cm else "record"
                 # forward decl (class;) on same line -> no body
-                tail = line[decl.end():]
+                tail = line[decl.end() :]
                 if re.match(r"\s*;", tail) and kind in ("class", "object", "interface"):
-                    types.setdefault(name, {"kind": kind, "parents": parents,
-                                            "methods": [], "attrs": []})
+                    types.setdefault(
+                        name,
+                        {"kind": kind, "parents": parents, "methods": [], "attrs": []},
+                    )
                     i += 1
                     continue
                 methods, attrs = [], []
@@ -119,8 +133,9 @@ class PascalAnalyzer(RegexCodeAnalyzer):
                 # scan body until the matching 'end'
                 while j < n and depth_end > 0:
                     bl = lines[j]
-                    if re.search(r"\brecord\b", bl, re.IGNORECASE) and \
-                       not re.search(r"=\s*(?:packed\s+)?record", bl, re.IGNORECASE):
+                    if re.search(r"\brecord\b", bl, re.IGNORECASE) and not re.search(
+                        r"=\s*(?:packed\s+)?record", bl, re.IGNORECASE
+                    ):
                         depth_end += len(re.findall(r"\brecord\b", bl, re.IGNORECASE))
                     if re.match(r"^\s*end\b", bl, re.IGNORECASE):
                         depth_end -= 1
@@ -142,7 +157,12 @@ class PascalAnalyzer(RegexCodeAnalyzer):
                     if not self._VISIBILITY.match(bl):
                         fm = self._FIELD.match(bl)
                         if fm and fm.group(1).lower() not in (
-                                "procedure", "function", "property", "type", "const"):
+                            "procedure",
+                            "function",
+                            "property",
+                            "type",
+                            "const",
+                        ):
                             for fn in fm.group(1).split(","):
                                 fn = fn.strip()
                                 if fn:
@@ -153,8 +173,12 @@ class PascalAnalyzer(RegexCodeAnalyzer):
                     types[name]["attrs"].extend(attrs)
                     types[name]["parents"] = types[name]["parents"] or parents
                 else:
-                    types[name] = {"kind": kind, "parents": parents,
-                                   "methods": methods, "attrs": attrs}
+                    types[name] = {
+                        "kind": kind,
+                        "parents": parents,
+                        "methods": methods,
+                        "attrs": attrs,
+                    }
                 type_spans.append((i, j + 1, name))
                 i = j + 1
                 continue
@@ -180,8 +204,10 @@ class PascalAnalyzer(RegexCodeAnalyzer):
                 if recv in types:
                     types[recv]["methods"].append(fid)
                 elif recv in self._class_registry:
-                    types.setdefault(recv, {"kind": "class", "parents": [],
-                                            "methods": [], "attrs": []})["methods"].append(fid)
+                    types.setdefault(
+                        recv,
+                        {"kind": "class", "parents": [], "methods": [], "attrs": []},
+                    )["methods"].append(fid)
             else:
                 key = (None, name)
                 if key in seen_fn:
@@ -197,8 +223,12 @@ class PascalAnalyzer(RegexCodeAnalyzer):
             if re.match(r"^\s*var\b", line, re.IGNORECASE):
                 in_var = True
                 continue
-            if re.match(r"^\s*(begin|const|type|implementation|procedure|function|"
-                        r"initialization|end)\b", line, re.IGNORECASE):
+            if re.match(
+                r"^\s*(begin|const|type|implementation|procedure|function|"
+                r"initialization|end)\b",
+                line,
+                re.IGNORECASE,
+            ):
                 in_var = False
             if in_var:
                 vm = self._VAR.match(line)
@@ -211,9 +241,14 @@ class PascalAnalyzer(RegexCodeAnalyzer):
         for name, t in enums.items():
             self._add_class(file_id, name, description="pascal enum", attr_ids=t)
         for name, t in types.items():
-            self._add_class(file_id, name, description=f"pascal {t['kind']}",
-                            parent_ids=t["parents"], method_ids=t["methods"],
-                            attr_ids=t["attrs"])
+            self._add_class(
+                file_id,
+                name,
+                description=f"pascal {t['kind']}",
+                parent_ids=t["parents"],
+                method_ids=t["methods"],
+                attr_ids=t["attrs"],
+            )
 
     def _make_method(self, file_id, mm, owner_name):
         name = mm.group(3)

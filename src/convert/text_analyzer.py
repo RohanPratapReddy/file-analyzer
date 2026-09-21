@@ -24,6 +24,7 @@ Design rules (identical in spirit to the rest of the pipeline):
   ``FormatConverter.convert_files`` and analyses every *converted* output, so the
   two components chain directly.
 """
+
 from __future__ import annotations
 
 import html.parser
@@ -33,14 +34,16 @@ import struct
 import wave
 import zlib
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional
 
 # The renderable universe TextAnalyzer understands (mirrors RENDERABLE_TARGETS).
-ANALYZABLE_TARGETS = frozenset({"png", "wav", "mp4", "pdf", "txt", "gif", "html", "htm"})
+ANALYZABLE_TARGETS = frozenset(
+    {"png", "wav", "mp4", "pdf", "txt", "gif", "html", "htm"}
+)
 
-_MAX_PIXELS = 64 * 1024 * 1024          # cap exact per-pixel statistics
-_MAX_SAMPLES = 64 * 1024 * 1024         # cap exact per-sample audio statistics
-_MAX_TEXT_BYTES = 64 * 1024 * 1024      # cap in-memory text scans
+_MAX_PIXELS = 64 * 1024 * 1024  # cap exact per-pixel statistics
+_MAX_SAMPLES = 64 * 1024 * 1024  # cap exact per-sample audio statistics
+_MAX_TEXT_BYTES = 64 * 1024 * 1024  # cap in-memory text scans
 
 
 class AnalysisError(Exception):
@@ -50,8 +53,13 @@ class AnalysisError(Exception):
 # =====================================================================
 # PNG  (real chunk walk + zlib inflate + de-filter + pixel statistics)
 # =====================================================================
-_PNG_COLOR = {0: ("grayscale", 1), 2: ("truecolor", 3), 3: ("indexed", 1),
-              4: ("grayscale_alpha", 2), 6: ("truecolor_alpha", 4)}
+_PNG_COLOR = {
+    0: ("grayscale", 1),
+    2: ("truecolor", 3),
+    3: ("indexed", 1),
+    4: ("grayscale_alpha", 2),
+    6: ("truecolor_alpha", 4),
+}
 
 
 def _paeth(a: int, b: int, c: int) -> int:
@@ -62,36 +70,40 @@ def _paeth(a: int, b: int, c: int) -> int:
     return b if pb <= pc else c
 
 
-def _png_unfilter(raw: bytes, width: int, height: int, bpp_bytes: int, stride: int) -> bytearray:
+def _png_unfilter(
+    raw: bytes, width: int, height: int, bpp_bytes: int, stride: int
+) -> bytearray:
     """Reverse PNG scanline filters (types 0-4) -> raw samples, one filter byte per row."""
     out = bytearray(stride * height)
     prev = bytearray(stride)
     pos = 0
     for y in range(height):
-        ft = raw[pos]; pos += 1
-        line = bytearray(raw[pos:pos + stride]); pos += stride
+        ft = raw[pos]
+        pos += 1
+        line = bytearray(raw[pos : pos + stride])
+        pos += stride
         if len(line) < stride:
             raise AnalysisError("truncated PNG scanline")
         if ft == 0:
             pass
-        elif ft == 1:                                          # Sub
+        elif ft == 1:  # Sub
             for i in range(bpp_bytes, stride):
                 line[i] = (line[i] + line[i - bpp_bytes]) & 0xFF
-        elif ft == 2:                                          # Up
+        elif ft == 2:  # Up
             for i in range(stride):
                 line[i] = (line[i] + prev[i]) & 0xFF
-        elif ft == 3:                                          # Average
+        elif ft == 3:  # Average
             for i in range(stride):
                 a = line[i - bpp_bytes] if i >= bpp_bytes else 0
                 line[i] = (line[i] + ((a + prev[i]) >> 1)) & 0xFF
-        elif ft == 4:                                          # Paeth
+        elif ft == 4:  # Paeth
             for i in range(stride):
                 a = line[i - bpp_bytes] if i >= bpp_bytes else 0
                 c = prev[i - bpp_bytes] if i >= bpp_bytes else 0
                 line[i] = (line[i] + _paeth(a, prev[i], c)) & 0xFF
         else:
             raise AnalysisError(f"unknown PNG filter type {ft}")
-        out[y * stride:(y + 1) * stride] = line
+        out[y * stride : (y + 1) * stride] = line
         prev = line
     return out
 
@@ -109,15 +121,17 @@ def _analyze_png(data: bytes) -> Dict[str, Any]:
     n = len(data)
     while pos + 8 <= n:
         length = struct.unpack_from(">I", data, pos)[0]
-        ctype = data[pos + 4:pos + 8].decode("latin-1")
-        body = data[pos + 8:pos + 8 + length]
+        ctype = data[pos + 4 : pos + 8].decode("latin-1")
+        body = data[pos + 8 : pos + 8 + length]
         crc_stored = struct.unpack_from(">I", data, pos + 8 + length)[0]
-        crc_calc = zlib.crc32(data[pos + 4:pos + 8 + length]) & 0xFFFFFFFF
+        crc_calc = zlib.crc32(data[pos + 4 : pos + 8 + length]) & 0xFFFFFFFF
         if crc_stored != crc_calc:
             raise AnalysisError(f"PNG chunk {ctype} CRC mismatch")
         chunks.append(ctype)
         if ctype == "IHDR":
-            width, height, bit_depth, color_type, _comp, _filt, interlace = struct.unpack_from(">IIBBBBB", body, 0)
+            width, height, bit_depth, color_type, _comp, _filt, interlace = (
+                struct.unpack_from(">IIBBBBB", body, 0)
+            )
         elif ctype == "PLTE":
             palette_entries = length // 3
         elif ctype == "tRNS":
@@ -126,7 +140,7 @@ def _analyze_png(data: bytes) -> Dict[str, Any]:
             metrics["gamma"] = struct.unpack_from(">I", body, 0)[0] / 100000.0
         elif ctype == "pHYs":
             ppux, ppuy, unit = struct.unpack_from(">IIB", body, 0)
-            if unit == 1:                                      # pixels per metre -> DPI
+            if unit == 1:  # pixels per metre -> DPI
                 metrics["dpi"] = round(ppux * 0.0254, 1)
         elif ctype == "sRGB":
             metrics["srgb"] = True
@@ -138,25 +152,37 @@ def _analyze_png(data: bytes) -> Dict[str, Any]:
         elif ctype == "zTXt":
             k, _, rest = body.partition(b"\x00")
             try:
-                text_meta[k.decode("latin-1", "replace")] = zlib.decompress(rest[1:]).decode("latin-1", "replace")
+                text_meta[k.decode("latin-1", "replace")] = zlib.decompress(
+                    rest[1:]
+                ).decode("latin-1", "replace")
             except Exception:
                 pass
         elif ctype == "iTXt":
             parts = body.split(b"\x00", 5)
             if len(parts) == 6:
-                text_meta[parts[0].decode("utf-8", "replace")] = parts[5].decode("utf-8", "replace")
+                text_meta[parts[0].decode("utf-8", "replace")] = parts[5].decode(
+                    "utf-8", "replace"
+                )
         pos += 12 + length
         if ctype == "IEND":
             break
     if not width:
         raise AnalysisError("PNG missing IHDR")
     cname, channels = _PNG_COLOR.get(color_type, (f"unknown({color_type})", 0))
-    metrics.update({
-        "width": width, "height": height, "bit_depth": bit_depth,
-        "color_type": cname, "channels": channels, "interlaced": bool(interlace),
-        "palette_entries": palette_entries, "chunk_types": sorted(set(chunks)),
-        "idat_bytes": len(idat), "megapixels": round(width * height / 1e6, 3),
-    })
+    metrics.update(
+        {
+            "width": width,
+            "height": height,
+            "bit_depth": bit_depth,
+            "color_type": cname,
+            "channels": channels,
+            "interlaced": bool(interlace),
+            "palette_entries": palette_entries,
+            "chunk_types": sorted(set(chunks)),
+            "idat_bytes": len(idat),
+            "megapixels": round(width * height / 1e6, 3),
+        }
+    )
     if text_meta:
         metrics["text_metadata"] = text_meta
 
@@ -168,15 +194,18 @@ def _analyze_png(data: bytes) -> Dict[str, Any]:
     else:
         try:
             raw = zlib.decompress(bytes(idat))
-            stats = _png_pixel_stats(raw, width, height, bit_depth, color_type, channels)
+            stats = _png_pixel_stats(
+                raw, width, height, bit_depth, color_type, channels
+            )
             metrics.update(stats)
-        except Exception as err:                              # never let stats sink the whole analysis
+        except Exception as err:  # never let stats sink the whole analysis
             metrics["pixel_stats"] = f"unavailable ({type(err).__name__})"
     return metrics
 
 
-def _png_pixel_stats(raw: bytes, width: int, height: int, bit_depth: int,
-                     color_type: int, channels: int) -> Dict[str, Any]:
+def _png_pixel_stats(
+    raw: bytes, width: int, height: int, bit_depth: int, color_type: int, channels: int
+) -> Dict[str, Any]:
     """Compute per-channel min/max/mean, alpha usage and (capped) unique-colour count."""
     if bit_depth == 16:
         bpp_bytes = channels * 2
@@ -190,13 +219,13 @@ def _png_pixel_stats(raw: bytes, width: int, height: int, bit_depth: int,
         stride = width * bpp_bytes
         px = bytes(_png_unfilter(raw, width, height, bpp_bytes, stride))
         eff_channels = channels
-    else:                                                     # 1/2/4-bit (grayscale or indexed)
+    else:  # 1/2/4-bit (grayscale or indexed)
         stride = (width * bit_depth + 7) // 8
         packed = _png_unfilter(raw, width, height, 1, stride)
         maxv = (1 << bit_depth) - 1
         px = bytearray(width * height)
         for y in range(height):
-            row = packed[y * stride:(y + 1) * stride]
+            row = packed[y * stride : (y + 1) * stride]
             for x in range(width):
                 bitpos = x * bit_depth
                 byte = row[bitpos >> 3]
@@ -223,21 +252,23 @@ def _png_pixel_stats(raw: bytes, width: int, height: int, bit_depth: int,
         "channel_max": maxs,
         "channel_mean": [round(s / npx, 2) for s in sums],
     }
-    if eff_channels in (2, 4):                                # alpha is the last channel
+    if eff_channels in (2, 4):  # alpha is the last channel
         a = eff_channels - 1
         fully_opaque = mins[a] == 255
         out["alpha_fully_opaque"] = fully_opaque
         out["alpha_min"] = mins[a]
     if eff_channels >= 3:
         # grayscale if R==G==B for every pixel
-        gray = all(px[i * eff_channels] == px[i * eff_channels + 1] == px[i * eff_channels + 2]
-                   for i in range(0, npx, max(1, npx // 4096)))  # sampled probe first
+        gray = all(
+            px[i * eff_channels] == px[i * eff_channels + 1] == px[i * eff_channels + 2]
+            for i in range(0, npx, max(1, npx // 4096))
+        )  # sampled probe first
         out["effectively_grayscale"] = gray
     # unique colours (capped)
     uniq = set()
     capped = False
     for i in range(npx):
-        uniq.add(px[i * eff_channels:i * eff_channels + eff_channels])
+        uniq.add(px[i * eff_channels : i * eff_channels + eff_channels])
         if len(uniq) > 65536:
             capped = True
             break
@@ -256,42 +287,58 @@ def _analyze_wav(path: Path) -> Dict[str, Any]:
         nframes = w.getnframes()
         frames = w.readframes(min(nframes, _MAX_SAMPLES // max(1, nch)))
     metrics: Dict[str, Any] = {
-        "format": "wav", "channels": nch, "sample_rate_hz": fr,
-        "bit_depth": sw * 8, "frames": nframes,
+        "format": "wav",
+        "channels": nch,
+        "sample_rate_hz": fr,
+        "bit_depth": sw * 8,
+        "frames": nframes,
         "duration_seconds": round(nframes / fr, 4) if fr else None,
         "pcm_data_bytes": nframes * nch * sw,
     }
     peak, sq, dc, clip, count = 0, 0.0, 0, 0, 0
-    full = (1 << (sw * 8 - 1))
-    if sw == 1:                                               # unsigned 8-bit
+    full = 1 << (sw * 8 - 1)
+    if sw == 1:  # unsigned 8-bit
         for b in frames:
             v = b - 128
-            peak = max(peak, abs(v)); sq += v * v; dc += v; count += 1
+            peak = max(peak, abs(v))
+            sq += v * v
+            dc += v
+            count += 1
             if b in (0, 255):
                 clip += 1
         full = 128
     elif sw in (2, 4):
         fmt = "<%d%s" % (len(frames) // sw, "h" if sw == 2 else "i")
-        vals = struct.unpack(fmt, frames[:(len(frames) // sw) * sw])
+        vals = struct.unpack(fmt, frames[: (len(frames) // sw) * sw])
         for v in vals:
             av = abs(v)
-            peak = max(peak, av); sq += float(v) * v; dc += v; count += 1
+            peak = max(peak, av)
+            sq += float(v) * v
+            dc += v
+            count += 1
             if av >= full - 1:
                 clip += 1
-    elif sw == 3:                                             # packed 24-bit little-endian signed
+    elif sw == 3:  # packed 24-bit little-endian signed
         for i in range(0, len(frames) - 2, 3):
             v = frames[i] | (frames[i + 1] << 8) | (frames[i + 2] << 16)
             if v & 0x800000:
                 v -= 1 << 24
             av = abs(v)
-            peak = max(peak, av); sq += float(v) * v; dc += v; count += 1
+            peak = max(peak, av)
+            sq += float(v) * v
+            dc += v
+            count += 1
             if av >= full - 1:
                 clip += 1
     if count:
         rms = math.sqrt(sq / count)
         metrics["peak_amplitude"] = peak
-        metrics["peak_dbfs"] = round(20 * math.log10(peak / full), 2) if peak else -math.inf
-        metrics["rms_dbfs"] = round(20 * math.log10(rms / full), 2) if rms else -math.inf
+        metrics["peak_dbfs"] = (
+            round(20 * math.log10(peak / full), 2) if peak else -math.inf
+        )
+        metrics["rms_dbfs"] = (
+            round(20 * math.log10(rms / full), 2) if rms else -math.inf
+        )
         metrics["dc_offset"] = round(dc / count, 2)
         metrics["clipped_samples"] = clip
         metrics["silent"] = peak == 0
@@ -301,29 +348,42 @@ def _analyze_wav(path: Path) -> Dict[str, Any]:
 # =====================================================================
 # MP4 / ISO-BMFF  (real box-tree walk)
 # =====================================================================
-_MP4_CONTAINERS = {b"moov", b"trak", b"mdia", b"minf", b"stbl", b"edts", b"udta", b"mvex"}
+_MP4_CONTAINERS = {
+    b"moov",
+    b"trak",
+    b"mdia",
+    b"minf",
+    b"stbl",
+    b"edts",
+    b"udta",
+    b"mvex",
+}
 
 
-def _mp4_walk(data: bytes, start: int, end: int, out: Dict[str, Any], depth: int = 0) -> None:
+def _mp4_walk(
+    data: bytes, start: int, end: int, out: Dict[str, Any], depth: int = 0
+) -> None:
     pos = start
     while pos + 8 <= end and depth < 8:
         size = struct.unpack_from(">I", data, pos)[0]
-        box = data[pos + 4:pos + 8]
+        box = data[pos + 4 : pos + 8]
         header = 8
-        if size == 1:                                         # 64-bit largesize
+        if size == 1:  # 64-bit largesize
             size = struct.unpack_from(">Q", data, pos + 8)[0]
             header = 16
-        elif size == 0:                                       # extends to end of file
+        elif size == 0:  # extends to end of file
             size = end - pos
         if size < header or pos + size > end:
             break
         body_start = pos + header
         if box == b"ftyp":
-            out["major_brand"] = data[body_start:body_start + 4].decode("latin-1", "replace").strip()
+            out["major_brand"] = (
+                data[body_start : body_start + 4].decode("latin-1", "replace").strip()
+            )
             brands = []
             b = body_start + 8
             while b + 4 <= pos + size:
-                brands.append(data[b:b + 4].decode("latin-1", "replace").strip())
+                brands.append(data[b : b + 4].decode("latin-1", "replace").strip())
                 b += 4
             out["compatible_brands"] = [x for x in brands if x]
         elif box == b"mvhd":
@@ -337,14 +397,19 @@ def _mp4_walk(data: bytes, start: int, end: int, out: Dict[str, Any], depth: int
             if timescale:
                 out["duration_seconds"] = round(duration / timescale, 3)
         elif box == b"hdlr":
-            htype = data[body_start + 8:body_start + 12].decode("latin-1", "replace").strip()
+            htype = (
+                data[body_start + 8 : body_start + 12]
+                .decode("latin-1", "replace")
+                .strip()
+            )
             out.setdefault("_handlers", []).append(htype)
         elif box == b"stsd":
             # first sample entry fourcc = codec
             entry = body_start + 8
             if entry + 8 <= pos + size:
                 out.setdefault("_codecs", []).append(
-                    data[entry + 4:entry + 8].decode("latin-1", "replace").strip())
+                    data[entry + 4 : entry + 8].decode("latin-1", "replace").strip()
+                )
         if box in _MP4_CONTAINERS:
             _mp4_walk(data, body_start, pos + size, out, depth + 1)
         pos += size
@@ -359,8 +424,13 @@ def _analyze_mp4(data: bytes) -> Dict[str, Any]:
     codecs = metrics.pop("_codecs", [])
     tracks = []
     for i, h in enumerate(handlers):
-        kind = {"vide": "video", "soun": "audio", "sbtl": "subtitle",
-                "text": "text", "hint": "hint"}.get(h, h)
+        kind = {
+            "vide": "video",
+            "soun": "audio",
+            "sbtl": "subtitle",
+            "text": "text",
+            "hint": "hint",
+        }.get(h, h)
         tracks.append({"type": kind, "codec": codecs[i] if i < len(codecs) else None})
     metrics["track_count"] = len(handlers)
     metrics["tracks"] = tracks
@@ -378,7 +448,13 @@ def _pdf_string(raw: bytes) -> str:
         if len(hexs) % 2:
             hexs += b"0"
         try:
-            return bytes.fromhex(hexs.decode("ascii")).decode("utf-16-be" if hexs[:4].upper() == b"FEFF" else "latin-1", "replace").strip()
+            return (
+                bytes.fromhex(hexs.decode("ascii"))
+                .decode(
+                    "utf-16-be" if hexs[:4].upper() == b"FEFF" else "latin-1", "replace"
+                )
+                .strip()
+            )
         except Exception:
             return ""
     txt = raw.strip()
@@ -391,13 +467,18 @@ def _analyze_pdf(data: bytes) -> Dict[str, Any]:
     m = re.match(rb"%PDF-(\d+\.\d+)", data)
     if not m:
         raise AnalysisError("not a PDF file (missing %PDF header)")
-    metrics: Dict[str, Any] = {"format": "pdf", "pdf_version": m.group(1).decode("ascii")}
+    metrics: Dict[str, Any] = {
+        "format": "pdf",
+        "pdf_version": m.group(1).decode("ascii"),
+    }
     metrics["object_count"] = len(re.findall(rb"\b\d+\s+\d+\s+obj\b", data))
     metrics["stream_count"] = len(re.findall(rb"\bstream\b", data))
     metrics["encrypted"] = b"/Encrypt" in data
     metrics["linearized"] = b"/Linearized" in data
     # page count: prefer explicit /Count on the /Pages tree, else count /Type/Page objects
-    counts = [int(x) for x in re.findall(rb"/Type\s*/Pages\b.*?/Count\s+(\d+)", data, re.S)]
+    counts = [
+        int(x) for x in re.findall(rb"/Type\s*/Pages\b.*?/Count\s+(\d+)", data, re.S)
+    ]
     if not counts:
         counts = [int(x) for x in re.findall(rb"/Count\s+(\d+)", data)]
     page_objs = len(re.findall(rb"/Type\s*/Page\b(?!s)", data))
@@ -405,8 +486,16 @@ def _analyze_pdf(data: bytes) -> Dict[str, Any]:
     metrics["page_objects_found"] = page_objs
     # info-dictionary metadata (best-effort, from raw bytes)
     info: Dict[str, str] = {}
-    for key in ("Title", "Author", "Subject", "Keywords", "Creator", "Producer",
-                "CreationDate", "ModDate"):
+    for key in (
+        "Title",
+        "Author",
+        "Subject",
+        "Keywords",
+        "Creator",
+        "Producer",
+        "CreationDate",
+        "ModDate",
+    ):
         km = re.search(rb"/" + key.encode() + rb"\s*(\([^)]*\)|<[0-9A-Fa-f\s]*>)", data)
         if km:
             val = _pdf_string(km.group(1))
@@ -444,10 +533,19 @@ def _analyze_txt(data: bytes) -> Dict[str, Any]:
     crlf = text.count("\r\n")
     lf = text.count("\n") - crlf
     cr = text.count("\r") - crlf
-    metrics["line_ending"] = ("crlf" if crlf and not (lf or cr) else
-                              "lf" if lf and not (crlf or cr) else
-                              "cr" if cr and not (crlf or lf) else
-                              "mixed" if (crlf + lf + cr) else "none")
+    metrics["line_ending"] = (
+        "crlf"
+        if crlf and not (lf or cr)
+        else (
+            "lf"
+            if lf and not (crlf or cr)
+            else (
+                "cr"
+                if cr and not (crlf or lf)
+                else "mixed" if (crlf + lf + cr) else "none"
+            )
+        )
+    )
     lines = text.splitlines()
     metrics["line_count"] = len(lines)
     metrics["char_count"] = len(text)
@@ -472,7 +570,9 @@ def _analyze_gif(data: bytes) -> Dict[str, Any]:
     width, height, packed, _bg, _ar = struct.unpack_from("<HHBBB", data, 6)
     gct = bool(packed & 0x80)
     gct_size = 2 ** ((packed & 0x07) + 1) if gct else 0
-    frames = len(re.findall(rb"\x2c", data))                  # image separators (upper bound; refined below)
+    frames = len(
+        re.findall(rb"\x2c", data)
+    )  # image separators (upper bound; refined below)
     # precise frame count: walk blocks
     pos = 13 + (gct_size * 3 if gct else 0)
     fcount = 0
@@ -481,21 +581,25 @@ def _analyze_gif(data: bytes) -> Dict[str, Any]:
     try:
         while pos < n:
             b = data[pos]
-            if b == 0x3B:                                      # trailer
+            if b == 0x3B:  # trailer
                 break
-            if b == 0x2C:                                      # image descriptor
+            if b == 0x2C:  # image descriptor
                 fcount += 1
                 lct = data[pos + 9]
                 pos += 10
                 if lct & 0x80:
                     pos += 3 * (2 ** ((lct & 0x07) + 1))
-                pos += 1                                       # LZW min code size
-                while pos < n and data[pos] != 0:              # data sub-blocks
+                pos += 1  # LZW min code size
+                while pos < n and data[pos] != 0:  # data sub-blocks
                     pos += data[pos] + 1
                 pos += 1
-            elif b == 0x21:                                    # extension
+            elif b == 0x21:  # extension
                 label = data[pos + 1]
-                if label == 0xFF and data[pos + 2] == 11 and data[pos + 3:pos + 14] == b"NETSCAPE2.0":
+                if (
+                    label == 0xFF
+                    and data[pos + 2] == 11
+                    and data[pos + 3 : pos + 14] == b"NETSCAPE2.0"
+                ):
                     loop = struct.unpack_from("<H", data, pos + 16)[0]
                 pos += 2
                 while pos < n and data[pos] != 0:
@@ -506,10 +610,14 @@ def _analyze_gif(data: bytes) -> Dict[str, Any]:
     except IndexError:
         pass
     return {
-        "format": "gif", "version": data[:6].decode("ascii"),
-        "width": width, "height": height,
-        "global_color_table_size": gct_size, "frame_count": fcount or frames,
-        "animated": (fcount or frames) > 1, "loop_count": loop,
+        "format": "gif",
+        "version": data[:6].decode("ascii"),
+        "width": width,
+        "height": height,
+        "global_color_table_size": gct_size,
+        "frame_count": fcount or frames,
+        "animated": (fcount or frames) > 1,
+        "loop_count": loop,
     }
 
 
@@ -542,7 +650,9 @@ class _HTMLStats(html.parser.HTMLParser):
         elif tag == "meta":
             if a.get("charset"):
                 self.charset = a["charset"]
-            elif a.get("http-equiv", "").lower() == "content-type" and "charset=" in a.get("content", ""):
+            elif a.get(
+                "http-equiv", ""
+            ).lower() == "content-type" and "charset=" in a.get("content", ""):
                 self.charset = a["content"].split("charset=")[-1].strip()
 
     def handle_endtag(self, tag: str) -> None:
@@ -560,11 +670,16 @@ def _analyze_html(data: bytes) -> Dict[str, Any]:
     parser = _HTMLStats()
     parser.feed(data.decode("utf-8", "replace"))
     return {
-        "format": "html", "title": parser.title or None,
-        "tag_count": sum(parser.tags.values()), "distinct_tags": len(parser.tags),
+        "format": "html",
+        "title": parser.title or None,
+        "tag_count": sum(parser.tags.values()),
+        "distinct_tags": len(parser.tags),
         "top_tags": dict(sorted(parser.tags.items(), key=lambda kv: -kv[1])[:10]),
-        "links": parser.links, "images": parser.images, "scripts": parser.scripts,
-        "visible_text_chars": parser.text_len, "declared_charset": parser.charset,
+        "links": parser.links,
+        "images": parser.images,
+        "scripts": parser.scripts,
+        "visible_text_chars": parser.text_len,
+        "declared_charset": parser.charset,
     }
 
 
@@ -599,14 +714,20 @@ def _summary(kind: str, m: Dict[str, Any]) -> str:
             s += f", title={m['info']['Title']!r}"
         return s
     if kind == "txt":
-        return (f"TXT {m['encoding']} {m['line_count']} lines / {m['word_count']} words "
-                f"/ {m['char_count']} chars ({m['line_ending']})")
+        return (
+            f"TXT {m['encoding']} {m['line_count']} lines / {m['word_count']} words "
+            f"/ {m['char_count']} chars ({m['line_ending']})"
+        )
     if kind == "gif":
-        return (f"GIF{m['version'][3:]} {m['width']}x{m['height']}, "
-                f"{m['frame_count']} frame(s)" + (" animated" if m['animated'] else ""))
+        return (
+            f"GIF{m['version'][3:]} {m['width']}x{m['height']}, "
+            f"{m['frame_count']} frame(s)" + (" animated" if m["animated"] else "")
+        )
     if kind == "html":
-        return (f"HTML title={m.get('title')!r}, {m['tag_count']} tags, "
-                f"{m['links']} links, {m['visible_text_chars']} text chars")
+        return (
+            f"HTML title={m.get('title')!r}, {m['tag_count']} tags, "
+            f"{m['links']} links, {m['visible_text_chars']} text chars"
+        )
     return kind
 
 
@@ -623,13 +744,20 @@ class TextAnalyzer:
 
     # target extension -> (needs_path?, analyser)
     _BYTES_ANALYSERS: Dict[str, Callable[[bytes], Dict[str, Any]]] = {
-        "png": _analyze_png, "mp4": _analyze_mp4, "pdf": _analyze_pdf,
-        "txt": _analyze_txt, "gif": _analyze_gif, "html": _analyze_html, "htm": _analyze_html,
+        "png": _analyze_png,
+        "mp4": _analyze_mp4,
+        "pdf": _analyze_pdf,
+        "txt": _analyze_txt,
+        "gif": _analyze_gif,
+        "html": _analyze_html,
+        "htm": _analyze_html,
     }
 
     def target_kind(self, name_or_ext: str) -> Optional[str]:
         """The analysable kind for this artifact name/extension, or None."""
-        e = Path(str(name_or_ext)).suffix.lower().lstrip(".") or str(name_or_ext).lower().lstrip(".")
+        e = Path(str(name_or_ext)).suffix.lower().lstrip(".") or str(
+            name_or_ext
+        ).lower().lstrip(".")
         return e if e in ANALYZABLE_TARGETS else None
 
     # ------------------------------------------------------------------
@@ -641,8 +769,13 @@ class TextAnalyzer:
         p = Path(path)
         kind = self.target_kind(p.name)
         res: Dict[str, Any] = {
-            "artifact_file": p.name, "artifact_path": str(p), "kind": kind,
-            "status": None, "summary": None, "metrics": None, "detail": None,
+            "artifact_file": p.name,
+            "artifact_path": str(p),
+            "kind": kind,
+            "status": None,
+            "summary": None,
+            "metrics": None,
+            "detail": None,
         }
         if kind is None:
             res["status"] = "unsupported"
@@ -667,7 +800,7 @@ class TextAnalyzer:
             res["status"] = "error"
             res["detail"] = str(err)
             return res
-        except Exception as err:                              # noqa: BLE001 - never sink a batch
+        except Exception as err:  # noqa: BLE001 - never sink a batch
             res["status"] = "error"
             res["detail"] = f"{type(err).__name__}: {err}"
             return res
@@ -677,8 +810,9 @@ class TextAnalyzer:
         return res
 
     # ------------------------------------------------------------------
-    def analyze_conversions(self, conversion_result: Any,
-                            *, include_unconverted: bool = True) -> Dict[str, List[Dict[str, Any]]]:
+    def analyze_conversions(
+        self, conversion_result: Any, *, include_unconverted: bool = True
+    ) -> Dict[str, List[Dict[str, Any]]]:
         """
         Consume the exact output of ``FormatConverter.convert_files`` -- either the
         wrapper ``{"format_conversions": [...]}`` or the bare row list -- and analyse
@@ -689,38 +823,51 @@ class TextAnalyzer:
         recorded with ``status="not_analyzed"`` when ``include_unconverted`` so the
         analysis table is a faithful 1:1 companion to the conversions table.
         """
-        rows = (conversion_result.get("format_conversions", [])
-                if isinstance(conversion_result, dict) else list(conversion_result))
+        rows = (
+            conversion_result.get("format_conversions", [])
+            if isinstance(conversion_result, dict)
+            else list(conversion_result)
+        )
         out: List[Dict[str, Any]] = []
         aid = 0
         for row in rows:
             out_file = row.get("output_file")
-            converted = row.get("status") == "converted" and out_file and Path(out_file).is_file()
+            converted = (
+                row.get("status") == "converted"
+                and out_file
+                and Path(out_file).is_file()
+            )
             if not converted:
                 if include_unconverted:
                     aid += 1
-                    out.append({
-                        "analysis_id": aid,
-                        "conversion_id": row.get("conversion_id"),
-                        "file_id": row.get("file_id"),
-                        "source_file": row.get("source_file"),
-                        "source_ext": row.get("source_ext"),
-                        "artifact_file": Path(out_file).name if out_file else None,
-                        "kind": None, "status": "not_analyzed",
-                        "summary": None, "metrics": None,
-                        "detail": f"conversion status={row.get('status')}",
-                    })
+                    out.append(
+                        {
+                            "analysis_id": aid,
+                            "conversion_id": row.get("conversion_id"),
+                            "file_id": row.get("file_id"),
+                            "source_file": row.get("source_file"),
+                            "source_ext": row.get("source_ext"),
+                            "artifact_file": Path(out_file).name if out_file else None,
+                            "kind": None,
+                            "status": "not_analyzed",
+                            "summary": None,
+                            "metrics": None,
+                            "detail": f"conversion status={row.get('status')}",
+                        }
+                    )
                 continue
             aid += 1
             analysis = self.analyze(out_file)
-            out.append({
-                "analysis_id": aid,
-                "conversion_id": row.get("conversion_id"),
-                "file_id": row.get("file_id"),
-                "source_file": row.get("source_file"),
-                "source_ext": row.get("source_ext"),
-                **analysis,
-            })
+            out.append(
+                {
+                    "analysis_id": aid,
+                    "conversion_id": row.get("conversion_id"),
+                    "file_id": row.get("file_id"),
+                    "source_file": row.get("source_file"),
+                    "source_ext": row.get("source_ext"),
+                    **analysis,
+                }
+            )
         return {"conversion_analysis": out}
 
     # ------------------------------------------------------------------

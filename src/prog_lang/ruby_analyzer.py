@@ -1,17 +1,6 @@
 # Auto-extracted from code_analyzer.py (verbatim class body).
-import os
-import csv
-import json
-import re
-import ast
-import dis
-import inspect
-import traceback
-import subprocess
-import sqlite3
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
 from .tree_sitter_base import BaseTreeSitterAnalyzer
+
 
 class RubyAnalyzer(BaseTreeSitterAnalyzer):
     """
@@ -28,7 +17,7 @@ class RubyAnalyzer(BaseTreeSitterAnalyzer):
             lang_key="ruby",
             extensions=[".rb", ".rake"],
             introspection_source="Method#parameters + TracePoint + caller_locations",
-            **kwargs
+            **kwargs,
         )
 
     def _rb_body(self, node):
@@ -69,7 +58,7 @@ class RubyAnalyzer(BaseTreeSitterAnalyzer):
         sc = self._child_of(node, "string_content")
         if sc is not None:
             return self._node_text(sc, source)
-        return self._node_text(node, source).strip('"\'')
+        return self._node_text(node, source).strip("\"'")
 
     def _rb_call(self, file_id, node, source: bytes):
         m = node.child_by_field_name("method")
@@ -92,12 +81,19 @@ class RubyAnalyzer(BaseTreeSitterAnalyzer):
         right = node.child_by_field_name("right")
         if left is None:
             return
-        if left.type in ("constant", "identifier", "global_variable", "instance_variable",
-                         "class_variable"):
+        if left.type in (
+            "constant",
+            "identifier",
+            "global_variable",
+            "instance_variable",
+            "class_variable",
+        ):
             self._ts_add_variable(
-                file_id, self._node_text(left, source),
+                file_id,
+                self._node_text(left, source),
                 self._node_text(right, source) if right else None,
-                scope="module" if class_id is None else "class")
+                scope="module" if class_id is None else "class",
+            )
 
     def _rb_param(self, p, source: bytes):
         if p.type == "identifier":
@@ -109,7 +105,9 @@ class RubyAnalyzer(BaseTreeSitterAnalyzer):
             default = self._node_text(v, source) if v else None
         return self._ts_add_arg(
             self._node_text(nn, source) if nn else self._node_text(p, source),
-            p.type, default)
+            p.type,
+            default,
+        )
 
     def _rb_method(self, file_id, node, source: bytes, class_id=None):
         name_node = node.child_by_field_name("name")
@@ -142,16 +140,28 @@ class RubyAnalyzer(BaseTreeSitterAnalyzer):
                     method_ids.append(self._rb_method(file_id, m, source, cls_id))
                 elif m.type == "call":
                     mm = m.child_by_field_name("method")
-                    if mm is not None and self._node_text(mm, source).startswith("attr_"):
+                    if mm is not None and self._node_text(mm, source).startswith(
+                        "attr_"
+                    ):
                         args = m.child_by_field_name("arguments")
                         if args is not None:
                             for a in args.named_children:
                                 if a.type in ("simple_symbol", "symbol"):
-                                    attr_ids.append(self._ts_add_arg(
-                                        self._node_text(a, source).lstrip(":"), "attribute"))
+                                    attr_ids.append(
+                                        self._ts_add_arg(
+                                            self._node_text(a, source).lstrip(":"),
+                                            "attribute",
+                                        )
+                                    )
                     else:
                         self._rb_call(file_id, m, source)
                 elif m.type in ("class", "module"):
                     self._rb_class(file_id, m, source)
-        self._ts_add_class(file_id, name, description=f"ruby {node.type}",
-                           parent_ids=parent_ids, method_ids=method_ids, attr_ids=attr_ids)
+        self._ts_add_class(
+            file_id,
+            name,
+            description=f"ruby {node.type}",
+            parent_ids=parent_ids,
+            method_ids=method_ids,
+            attr_ids=attr_ids,
+        )

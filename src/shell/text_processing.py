@@ -12,6 +12,7 @@ class AwkAnalyzer(ShellScriptBase):
     ``@include "file"`` (gawk)        -> import
     top-level ``name = value`` assignments -> variable
     """
+
     LANG_KEY = "awk"
     EXTENSIONS = (".awk",)
     LINE_COMMENTS = ("#",)
@@ -33,8 +34,9 @@ class AwkAnalyzer(ShellScriptBase):
                 continue
             seen_fn.add(name)
             params = self._split_top_level(m.group(2) or "")
-            self._add_shell_function(file_id, name, params=params,
-                                     description="awk function")
+            self._add_shell_function(
+                file_id, name, params=params, description="awk function"
+            )
         specials = self._uniq(self._SPECIAL.findall(clean))
         for name in specials:
             if name not in seen_fn:
@@ -47,8 +49,9 @@ class AwkAnalyzer(ShellScriptBase):
             if name in seen_var or name in ("if", "while", "for", "print", "printf"):
                 continue
             seen_var.add(name)
-            self._add_variable(file_id, name, m.group(2).strip()[:120] or None,
-                               scope="awk")
+            self._add_variable(
+                file_id, name, m.group(2).strip()[:120] or None, scope="awk"
+            )
 
         seen_imp = set()
         for m in self._INCLUDE.finditer(clean):
@@ -57,8 +60,12 @@ class AwkAnalyzer(ShellScriptBase):
                 seen_imp.add(tgt)
                 self._add_sourced(file_id, tgt, keyword="@include")
 
-        self._record_module_meta(file_id, functions=len(seen_fn),
-                                 blocks=specials or None, variables=len(seen_var))
+        self._record_module_meta(
+            file_id,
+            functions=len(seen_fn),
+            blocks=specials or None,
+            variables=len(seen_var),
+        )
 
 
 class SedAnalyzer(ShellScriptBase):
@@ -68,6 +75,7 @@ class SedAnalyzer(ShellScriptBase):
     ``:label``               -> function (a branch target)
     top-level ``s/…/…/`` etc. counted as module metadata (command profile).
     """
+
     LANG_KEY = "sed"
     EXTENSIONS = (".sed",)
     LINE_COMMENTS = ("#",)
@@ -92,6 +100,8 @@ class SedAnalyzer(ShellScriptBase):
         subst = len(self._SUBST.findall(clean))
         branches = self._uniq(b for b in self._BRANCH.findall(clean) if b)
         self._record_module_meta(
-            file_id, labels=sorted(seen_lbl) or None,
-            substitutions=subst, branch_targets=branches or None,
+            file_id,
+            labels=sorted(seen_lbl) or None,
+            substitutions=subst,
+            branch_targets=branches or None,
         )

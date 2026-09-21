@@ -10,7 +10,7 @@
 # Nix has no classes; attribute sets are captured as variables and lambda-valued
 # bindings as functions, which is the honest structural model for the language.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -25,7 +25,8 @@ class NixAnalyzer(RegexCodeAnalyzer):
     _FORMALS = re.compile(r"^\s*\{\s*([\w,\s?.]*?)\}\s*:", re.MULTILINE)
     # binding whose RHS is a lambda:  name = arg: ...   or  name = {a,b}: ...
     _LAMBDA = re.compile(
-        r"^\s*([\w.\"-]+)\s*=\s*(?:\{[^}]*\}\s*:|[\w]+\s*:)", re.MULTILINE)
+        r"^\s*([\w.\"-]+)\s*=\s*(?:\{[^}]*\}\s*:|[\w]+\s*:)", re.MULTILINE
+    )
     _BIND = re.compile(r"^\s*([\w.\"-]+)\s*=\s*(?!=)([^\n;]*)", re.MULTILINE)
 
     def _register_types(self, file_id, text, path):
@@ -58,8 +59,9 @@ class NixAnalyzer(RegexCodeAnalyzer):
         for m in self._LAMBDA.finditer(t):
             name = m.group(1).strip('"')
             lambda_names.add(name)
-            self._add_function(file_id, name.split(".")[-1],
-                               description="nix lambda binding")
+            self._add_function(
+                file_id, name.split(".")[-1], description="nix lambda binding"
+            )
 
         for m in self._BIND.finditer(t):
             name = m.group(1).strip('"')

@@ -11,7 +11,7 @@
 #   (defmacro unless [c & body] ...)                -> function (macro)
 #   (defn tbl/method [self a] ...)                   -> function
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _SYM = r"[A-Za-z_][A-Za-z0-9_%?!*/<>=+.-]*"
@@ -27,12 +27,12 @@ class JanetAnalyzer(RegexCodeAnalyzer):
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ('"',)
 
-    _FUNC = re.compile(
-        r"\(\s*(defn-|defn|defmacro-|defmacro|varfn)\s+(" + _NAME + r")")
+    _FUNC = re.compile(r"\(\s*(defn-|defn|defmacro-|defmacro|varfn)\s+(" + _NAME + r")")
     _VAR = re.compile(r"\(\s*(def|def-|var|var-)\s+(" + _NAME + r")")
     _IMPORT = re.compile(
         r"\(\s*(?:import|import\*)\s+['\"]?([\w./-]+)(?:.*?:as\s+(" + _SYM + r"))?",
-        re.DOTALL)
+        re.DOTALL,
+    )
     _USE = re.compile(r"\(\s*use\s+([\w./-]+)")
 
     def _register_types(self, file_id, text, path):
@@ -43,8 +43,9 @@ class JanetAnalyzer(RegexCodeAnalyzer):
 
         for m in self._IMPORT.finditer(text):
             mod = m.group(1).strip("'\"")
-            self._add_import(file_id, (m.group(2) or mod).split("/")[-1], mod,
-                             m.group(2))
+            self._add_import(
+                file_id, (m.group(2) or mod).split("/")[-1], mod, m.group(2)
+            )
         for m in self._USE.finditer(text):
             self._add_import(file_id, m.group(1).split("/")[-1], m.group(1))
 
@@ -78,7 +79,7 @@ class JanetAnalyzer(RegexCodeAnalyzer):
             rest_i = end
         lb = text.find("[", rest_i)
         # bail if a form opens before the param vector
-        for ch in text[rest_i:lb if lb != -1 else len(text)]:
+        for ch in text[rest_i : lb if lb != -1 else len(text)]:
             if ch in "({":
                 return []
             if not ch.isspace() and ch != '"':
@@ -87,7 +88,7 @@ class JanetAnalyzer(RegexCodeAnalyzer):
             return []
         rb = self._find_matching(text, lb, "[", "]")
         params = []
-        for tok in re.findall(_SYM, text[lb + 1:rb - 1]):
+        for tok in re.findall(_SYM, text[lb + 1 : rb - 1]):
             if tok in ("&", "&opt", "&keys", "&named"):
                 continue
             params.append(tok)

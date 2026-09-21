@@ -12,7 +12,7 @@
 # Predicates are grouped under the module (if declared) as its methods; a file
 # with no :- module/2 emits its predicates as free functions.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ATOM = r"[a-z]\w*"
@@ -27,16 +27,21 @@ class PrologAnalyzer(RegexCodeAnalyzer):
 
     _MODULE = re.compile(
         r":-\s*module\(\s*(" + _ATOM + r")\s*,\s*\[(.*?)\]\s*\)\.",
-        re.IGNORECASE | re.DOTALL)
+        re.IGNORECASE | re.DOTALL,
+    )
     _USE = re.compile(
         r":-\s*(?:use_module|ensure_loaded|consult|reexport)\("
-        r"\s*(?:library\(\s*)?(" + _ATOM + r")", re.IGNORECASE)
+        r"\s*(?:library\(\s*)?(" + _ATOM + r")",
+        re.IGNORECASE,
+    )
     _DECL = re.compile(
         r":-\s*(?:dynamic|discontiguous|multifile|meta_predicate)\s+(.+?)\.",
-        re.IGNORECASE | re.DOTALL)
+        re.IGNORECASE | re.DOTALL,
+    )
     # clause head at column 0:  name(args) :-  |  name(args).  |  name.  |  name :-
-    _CLAUSE = re.compile(r"^(" + _ATOM + r")\s*(?:\((.*?)\))?\s*(?::-|-->|\.)",
-                         re.MULTILINE | re.DOTALL)
+    _CLAUSE = re.compile(
+        r"^(" + _ATOM + r")\s*(?:\((.*?)\))?\s*(?::-|-->|\.)", re.MULTILINE | re.DOTALL
+    )
 
     def _register_types(self, file_id, text, path):
         text = self._strip_comments(text)
@@ -62,7 +67,7 @@ class PrologAnalyzer(RegexCodeAnalyzer):
                     exported.append((nm.group(1), int(nm.group(2))))
 
         # collect every defined clause head (dedup by name/arity), preserving order
-        preds = {}   # (name, arity) -> arg count
+        preds = {}  # (name, arity) -> arg count
         order = []
         for m in self._CLAUSE.finditer(text):
             name = m.group(1)
@@ -78,8 +83,9 @@ class PrologAnalyzer(RegexCodeAnalyzer):
         method_ids = []
         for name, arity in order:
             arg_ids = [self._add_arg(f"arg{i+1}") for i in range(arity)]
-            fid = self._add_function(file_id, name, arg_ids, [], class_id=cid,
-                                     description="prolog predicate")
+            fid = self._add_function(
+                file_id, name, arg_ids, [], class_id=cid, description="prolog predicate"
+            )
             method_ids.append(fid)
 
         # also register any exported predicate that has no in-file clause
@@ -87,10 +93,18 @@ class PrologAnalyzer(RegexCodeAnalyzer):
         for name, arity in exported:
             if name not in defined_names:
                 arg_ids = [self._add_arg(f"arg{i+1}") for i in range(arity)]
-                method_ids.append(self._add_function(
-                    file_id, name, arg_ids, [], class_id=cid,
-                    description="prolog exported predicate"))
+                method_ids.append(
+                    self._add_function(
+                        file_id,
+                        name,
+                        arg_ids,
+                        [],
+                        class_id=cid,
+                        description="prolog exported predicate",
+                    )
+                )
 
         if mod_name:
-            self._add_class(file_id, mod_name, description="prolog module",
-                            method_ids=method_ids)
+            self._add_class(
+                file_id, mod_name, description="prolog module", method_ids=method_ids
+            )

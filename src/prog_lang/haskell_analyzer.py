@@ -14,7 +14,7 @@
 # Literate Haskell (.lhs): only bird-track lines (starting with "> ") and
 # \begin{code}..\end{code} blocks are source; everything else is prose.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -26,26 +26,46 @@ class HaskellAnalyzer(RegexCodeAnalyzer):
 
     _MODULE = re.compile(r"^\s*module\s+([\w.]+)", re.MULTILINE)
     _IMPORT = re.compile(
-        r"^\s*import\s+(?:qualified\s+)?([\w.]+)"
-        r"(?:\s+as\s+([\w.]+))?", re.MULTILINE)
+        r"^\s*import\s+(?:qualified\s+)?([\w.]+)" r"(?:\s+as\s+([\w.]+))?", re.MULTILINE
+    )
     _DATA = re.compile(
         r"^\s*(data|newtype)\s+(\w+)([^\n=]*)(?:=(.*?))?(?=^\s*\S|\Z)",
-        re.MULTILINE | re.DOTALL)
+        re.MULTILINE | re.DOTALL,
+    )
     _TYPE = re.compile(r"^\s*type\s+(\w+)", re.MULTILINE)
     _CLASS = re.compile(r"^\s*class\s+(?:.*?=>\s*)?(\w+)", re.MULTILINE)
     _INSTANCE = re.compile(r"^\s*instance\s+(?:.*?=>\s*)?([\w.]+)", re.MULTILINE)
     # Signatures may be indented (type-class methods); bindings are top-level.
     _SIG = re.compile(r"^\s*([a-z_][\w']*)\s*::", re.MULTILINE)
     # A function binding has >=1 argument token between the name and '='.
-    _BIND = re.compile(r"^([a-z_][\w']*)[ \t]+[^\n=]*[^\s=][ \t]*=(?!=)",
-                       re.MULTILINE)
+    _BIND = re.compile(r"^([a-z_][\w']*)[ \t]+[^\n=]*[^\s=][ \t]*=(?!=)", re.MULTILINE)
     # A value binding has only whitespace between the name and '='.
     _VAL = re.compile(r"^([a-z_][\w']*)[ \t]*=(?!=)", re.MULTILINE)
 
-    _KEYWORDS = {"module", "import", "data", "newtype", "type", "class",
-                 "instance", "where", "deriving", "infixl", "infixr", "infix",
-                 "foreign", "default", "let", "in", "do", "if", "then",
-                 "else", "case", "of"}
+    _KEYWORDS = {
+        "module",
+        "import",
+        "data",
+        "newtype",
+        "type",
+        "class",
+        "instance",
+        "where",
+        "deriving",
+        "infixl",
+        "infixr",
+        "infix",
+        "foreign",
+        "default",
+        "let",
+        "in",
+        "do",
+        "if",
+        "then",
+        "else",
+        "case",
+        "of",
+    }
 
     def _delit(self, text, path):
         if path.suffix.lower() != ".lhs":
@@ -85,12 +105,14 @@ class HaskellAnalyzer(RegexCodeAnalyzer):
         t = self._strip_comments(self._delit(text, path))
 
         for m in self._IMPORT.finditer(t):
-            self._add_import(file_id, m.group(1).split(".")[-1], m.group(1),
-                             alias=m.group(2))
+            self._add_import(
+                file_id, m.group(1).split(".")[-1], m.group(1), alias=m.group(2)
+            )
 
         for m in self._MODULE.finditer(t):
-            self._add_class(file_id, m.group(1).split(".")[-1],
-                            description="haskell module")
+            self._add_class(
+                file_id, m.group(1).split(".")[-1], description="haskell module"
+            )
 
         for m in self._DATA.finditer(t):
             kind, name, rhs = m.group(1), m.group(2), m.group(4) or ""
@@ -99,15 +121,15 @@ class HaskellAnalyzer(RegexCodeAnalyzer):
                 cm = re.match(r"\s*([A-Z]\w*)", ctor)
                 if cm:
                     attr_ids.append(self._add_arg(cm.group(1), "constructor"))
-            self._add_class(file_id, name, description=f"haskell {kind}",
-                            attr_ids=attr_ids)
+            self._add_class(
+                file_id, name, description=f"haskell {kind}", attr_ids=attr_ids
+            )
 
         for m in self._TYPE.finditer(t):
             self._add_class(file_id, m.group(1), description="haskell type alias")
 
         for m in self._CLASS.finditer(t):
-            cid = self._add_class(file_id, m.group(1),
-                                  description="haskell type class")
+            cid = self._add_class(file_id, m.group(1), description="haskell type class")
 
         # Function signatures declare the callable; bindings realise it.
         declared = set()

@@ -20,7 +20,7 @@
 # `set`/`param`/`var` bind named symbols; `maximize`/`minimize`/`subto` and the
 # `def*` families are named callable definitions.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -38,13 +38,15 @@ class ZIMPLAnalyzer(RegexCodeAnalyzer):
     _VAR = re.compile(r"(?m)^\s*var\s+(" + _ID + r")\b")
     _OBJ = re.compile(r"(?im)^\s*(maximize|minimize)\s+(" + _ID + r")\s*:")
     _SUBTO = re.compile(r"(?im)^\s*subto\s+(" + _ID + r")\s*:")
-    _DEF = re.compile(r"(?im)^\s*(defnumb|defstrg|defset|defbool)\s+(" + _ID +
-                      r")\s*(\([^)]*\))?\s*:=")
-    _READ = re.compile(r'(?im)^\s*(?:param|set)\s+' + _ID +
-                       r'[^;]*?\bread\s+"([^"]+)"')
+    _DEF = re.compile(
+        r"(?im)^\s*(defnumb|defstrg|defset|defbool)\s+("
+        + _ID
+        + r")\s*(\([^)]*\))?\s*:="
+    )
+    _READ = re.compile(r"(?im)^\s*(?:param|set)\s+" + _ID + r'[^;]*?\bread\s+"([^"]+)"')
 
     def _register_types(self, file_id, text, path):
-        return          # ZIMPL has no user-defined aggregate/record types
+        return  # ZIMPL has no user-defined aggregate/record types
 
     def _extract_entities(self, file_id, text, path):
         clean = self._strip_comments(text)
@@ -61,18 +63,33 @@ class ZIMPLAnalyzer(RegexCodeAnalyzer):
             self._add_variable(file_id, m.group(1), scope="var")
 
         for m in self._OBJ.finditer(clean):
-            self._add_function(file_id, m.group(2), [], [self._add_output("objective")],
-                               description="zimpl " + m.group(1).lower())
+            self._add_function(
+                file_id,
+                m.group(2),
+                [],
+                [self._add_output("objective")],
+                description="zimpl " + m.group(1).lower(),
+            )
         for m in self._SUBTO.finditer(clean):
-            self._add_function(file_id, m.group(1), [], [],
-                               description="zimpl constraint")
+            self._add_function(
+                file_id, m.group(1), [], [], description="zimpl constraint"
+            )
         for m in self._DEF.finditer(clean):
             kind, name, params = m.group(1), m.group(2), m.group(3)
             arg_ids = self._parse_params(params)
-            ret = {"defnumb": "number", "defstrg": "string",
-                   "defset": "set", "defbool": "bool"}[kind.lower()]
-            self._add_function(file_id, name, arg_ids, [self._add_output(ret)],
-                               description="zimpl " + kind.lower())
+            ret = {
+                "defnumb": "number",
+                "defstrg": "string",
+                "defset": "set",
+                "defbool": "bool",
+            }[kind.lower()]
+            self._add_function(
+                file_id,
+                name,
+                arg_ids,
+                [self._add_output(ret)],
+                description="zimpl " + kind.lower(),
+            )
 
     def _parse_params(self, group):
         if not group:

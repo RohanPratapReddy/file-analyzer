@@ -1,17 +1,6 @@
 # Auto-extracted from code_analyzer.py (verbatim class body).
-import os
-import csv
-import json
-import re
-import ast
-import dis
-import inspect
-import traceback
-import subprocess
-import sqlite3
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
 from .tree_sitter_base import BaseTreeSitterAnalyzer
+
 
 class RAnalyzer(BaseTreeSitterAnalyzer):
     """
@@ -24,16 +13,27 @@ class RAnalyzer(BaseTreeSitterAnalyzer):
     is available (<=3.13).
     """
 
-    _IMPORT_FUNCS = ("library", "require", "requireNamespace", "source", "loadNamespace")
-    _ASSIGN_NODES = ("binary_operator", "left_assignment", "equals_assignment",
-                     "super_assignment", "right_assignment")
+    _IMPORT_FUNCS = (
+        "library",
+        "require",
+        "requireNamespace",
+        "source",
+        "loadNamespace",
+    )
+    _ASSIGN_NODES = (
+        "binary_operator",
+        "left_assignment",
+        "equals_assignment",
+        "super_assignment",
+        "right_assignment",
+    )
 
     def __init__(self, **kwargs):
         super().__init__(
             lang_key="r",
             extensions=[".r", ".R"],
             introspection_source="attributes() + environment() + sys.calls()",
-            **kwargs
+            **kwargs,
         )
 
     def _extract_entities(self, file_id: int, root_node, source: bytes):
@@ -51,7 +51,8 @@ class RAnalyzer(BaseTreeSitterAnalyzer):
 
     def _r_call(self, file_id, node, source: bytes):
         fn = node.child_by_field_name("function") or (
-            node.named_children[0] if node.named_children else None)
+            node.named_children[0] if node.named_children else None
+        )
         if fn is None:
             return
         fname = self._node_text(fn, source)
@@ -60,9 +61,9 @@ class RAnalyzer(BaseTreeSitterAnalyzer):
             target = None
             if args is not None:
                 for a in args.named_children:
-                    txt = self._node_text(a, source).strip().strip('"\'')
+                    txt = self._node_text(a, source).strip().strip("\"'")
                     if txt:
-                        target = txt.split("=")[-1].strip().strip('"\'')
+                        target = txt.split("=")[-1].strip().strip("\"'")
                         break
             if target:
                 self._ts_add_import(file_id, target, target)
@@ -85,12 +86,23 @@ class RAnalyzer(BaseTreeSitterAnalyzer):
                 for p in params.named_children:
                     if p.type in ("parameter", "default_parameter"):
                         pn = p.child_by_field_name("name") or (
-                            p.named_children[0] if p.named_children else None)
-                        dv = p.child_by_field_name("default") or p.child_by_field_name("value")
-                        arg_ids.append(self._ts_add_arg(
-                            self._node_text(pn, source) if pn else "arg", None,
-                            self._node_text(dv, source) if dv else None))
+                            p.named_children[0] if p.named_children else None
+                        )
+                        dv = p.child_by_field_name("default") or p.child_by_field_name(
+                            "value"
+                        )
+                        arg_ids.append(
+                            self._ts_add_arg(
+                                self._node_text(pn, source) if pn else "arg",
+                                None,
+                                self._node_text(dv, source) if dv else None,
+                            )
+                        )
             self._ts_add_function(file_id, name, arg_ids, [])
         else:
-            self._ts_add_variable(file_id, name,
-                                  self._node_text(rhs, source) if rhs else None, scope="module")
+            self._ts_add_variable(
+                file_id,
+                name,
+                self._node_text(rhs, source) if rhs else None,
+                scope="module",
+            )

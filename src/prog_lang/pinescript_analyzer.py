@@ -17,7 +17,7 @@
 #
 # Comments are '//' only.  Strings use ' or ".
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -29,21 +29,21 @@ class PineScriptAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"', "'")
 
     _IMPORT = re.compile(
-        r"^[ \t]*import\s+([\w./]+)(?:\s+as\s+([A-Za-z_]\w*))?", re.MULTILINE)
-    _DECL = re.compile(
-        r"^[ \t]*(indicator|strategy|library)\s*\(", re.MULTILINE)
-    _TYPE = re.compile(r"^[ \t]*(?:export\s+)?type\s+([A-Za-z_]\w*)",
-                       re.MULTILINE)
-    _ENUM = re.compile(r"^[ \t]*(?:export\s+)?enum\s+([A-Za-z_]\w*)",
-                       re.MULTILINE)
+        r"^[ \t]*import\s+([\w./]+)(?:\s+as\s+([A-Za-z_]\w*))?", re.MULTILINE
+    )
+    _DECL = re.compile(r"^[ \t]*(indicator|strategy|library)\s*\(", re.MULTILINE)
+    _TYPE = re.compile(r"^[ \t]*(?:export\s+)?type\s+([A-Za-z_]\w*)", re.MULTILINE)
+    _ENUM = re.compile(r"^[ \t]*(?:export\s+)?enum\s+([A-Za-z_]\w*)", re.MULTILINE)
     _METHOD = re.compile(
-        r"^[ \t]*(?:export\s+)?method\s+([A-Za-z_]\w*)\s*\(([^)]*)\)\s*=>",
-        re.MULTILINE)
+        r"^[ \t]*(?:export\s+)?method\s+([A-Za-z_]\w*)\s*\(([^)]*)\)\s*=>", re.MULTILINE
+    )
     _FUNC = re.compile(
-        r"^[ \t]*(?:export\s+)?([A-Za-z_]\w*)\s*\(([^)]*)\)\s*=>", re.MULTILINE)
+        r"^[ \t]*(?:export\s+)?([A-Za-z_]\w*)\s*\(([^)]*)\)\s*=>", re.MULTILINE
+    )
     _VAR = re.compile(
         r"^(?:var\s+|varip\s+)(?:[A-Za-z_][\w.\[\]<>]*\s+)?([A-Za-z_]\w*)\s*=",
-        re.MULTILINE)
+        re.MULTILINE,
+    )
     _ASSIGN = re.compile(r"^([A-Za-z_]\w*)\s*=(?![=>])", re.MULTILINE)
 
     def _args(self, blob):
@@ -78,15 +78,25 @@ class PineScriptAnalyzer(RegexCodeAnalyzer):
 
         seen_fn = set()
         for m in self._METHOD.finditer(clean):
-            self._add_function(file_id, m.group(1), self._args(m.group(2)), [],
-                               description="pine method")
+            self._add_function(
+                file_id,
+                m.group(1),
+                self._args(m.group(2)),
+                [],
+                description="pine method",
+            )
             seen_fn.add((m.group(1), m.start()))
         for m in self._FUNC.finditer(clean):
             # skip the `method` keyword itself being read as a function name
             if m.group(1) in ("method", "if", "for", "while", "switch"):
                 continue
-            self._add_function(file_id, m.group(1), self._args(m.group(2)), [],
-                               description="pine function")
+            self._add_function(
+                file_id,
+                m.group(1),
+                self._args(m.group(2)),
+                [],
+                description="pine function",
+            )
 
         emitted = set()
         for m in self._VAR.finditer(clean):

@@ -10,6 +10,7 @@ the router derives the ``misc`` route set from it after subtracting every
 higher-priority plane. ``misc`` is the terminal plane -- it runs last, after
 ``document``.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -35,9 +36,9 @@ def analyze(path: str, ext: str) -> Dict[str, Any]:
     e = ext.lower()
     parser = _REGISTRY.get(e)
     p = Path(path)
-    fam, label = (parser.meta(e) if parser else ("misc", e.lstrip(".")))
+    fam, label = parser.meta(e) if parser else ("misc", e.lstrip("."))
     kind = parser.KIND if parser else "misc"
-    if parser is None:               # never routed here, but stay honest
+    if parser is None:  # never routed here, but stay honest
         return tf._empty(kind, fam, label, 0)
 
     data, truncated = tf._read_bytes(p)
@@ -48,14 +49,20 @@ def analyze(path: str, ext: str) -> Dict[str, Any]:
     line_count = text.count("\n") + (1 if text and not text.endswith("\n") else 0)
     try:
         profile = parser.parse(p, data, text, e, encoding, line_count)
-    except Exception as exc:         # honest partial, never a fabricated table
+    except Exception as exc:  # honest partial, never a fabricated table
         profile = tf._forensic(
-            kind, fam, label, data, len(data),
-            f"{label}: parser raised {type(exc).__name__}: {exc}")
+            kind,
+            fam,
+            label,
+            data,
+            len(data),
+            f"{label}: parser raised {type(exc).__name__}: {exc}",
+        )
     if truncated:
         profile.setdefault("notes", "")
         profile["properties"] = list(profile.get("properties", [])) + [
-            ("file", "truncated", "payload exceeded read budget")]
+            ("file", "truncated", "payload exceeded read budget")
+        ]
     return profile
 
 

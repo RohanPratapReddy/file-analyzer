@@ -18,11 +18,14 @@
 # Comments: '//' and '/* */' (script), '<!--- --->' (tag); strings '"' and '\''.
 import re
 from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
-_TYPE = r"(?:any|array|binary|boolean|component|date|guid|numeric|query|string|" \
-        r"struct|uuid|void|xml|" + _ID + r")"
+_TYPE = (
+    r"(?:any|array|binary|boolean|component|date|guid|numeric|query|string|"
+    r"struct|uuid|void|xml|" + _ID + r")"
+)
 
 
 class ColdFusionAnalyzer(RegexCodeAnalyzer):
@@ -35,21 +38,29 @@ class ColdFusionAnalyzer(RegexCodeAnalyzer):
     _IMPORT = re.compile(r"(?im)^\s*import\s+([\w.]+)\s*;?")
     _CFIMPORT = re.compile(r'(?i)<cfimport\b[^>]*\btaglib\s*=\s*["\']([^"\']+)["\']')
 
-    _COMPONENT = re.compile(r"(?im)^\s*(?:(?:public|private|final|abstract|"
-                            r"remote)\s+)*component\b([^\{]*)\{")
+    _COMPONENT = re.compile(
+        r"(?im)^\s*(?:(?:public|private|final|abstract|"
+        r"remote)\s+)*component\b([^\{]*)\{"
+    )
     _CFCOMPONENT = re.compile(r"(?i)<cfcomponent\b([^>]*)>")
 
-    _FUNC = re.compile(r"(?im)^\s*(?:(?:public|private|package|remote|static|"
-                       r"final|abstract)\s+)*(?:(" + _TYPE + r")\s+)?function\s+("
-                       + _ID + r")\s*\(([^)]*)\)")
+    _FUNC = re.compile(
+        r"(?im)^\s*(?:(?:public|private|package|remote|static|"
+        r"final|abstract)\s+)*(?:("
+        + _TYPE
+        + r")\s+)?function\s+("
+        + _ID
+        + r")\s*\(([^)]*)\)"
+    )
     _CFFUNCTION = re.compile(r"(?i)<cffunction\b([^>]*)>")
     _CFARGUMENT = re.compile(r"(?i)<cfargument\b([^>]*)>")
 
     _PROPERTY = re.compile(r"(?im)^\s*property\b([^;>\{]*);")
     _CFPROPERTY = re.compile(r"(?i)<cfproperty\b([^>]*)>")
 
-    _ATTR = re.compile(r'(?i)\b(name|type|extends|returntype|default)\s*=\s*'
-                       r'["\']([^"\']*)["\']')
+    _ATTR = re.compile(
+        r"(?i)\b(name|type|extends|returntype|default)\s*=\s*" r'["\']([^"\']*)["\']'
+    )
 
     def _register_types(self, file_id, text, path):
         clean = self._strip_comments(text)
@@ -84,34 +95,49 @@ class ColdFusionAnalyzer(RegexCodeAnalyzer):
             if parent:
                 pids = [self._register_class(parent.split(".")[-1])]
             cls_id = self._register_class(stem)
-            self._add_class(file_id, stem, description="cfc component",
-                            parent_ids=pids)
+            self._add_class(file_id, stem, description="cfc component", parent_ids=pids)
 
         # script-syntax functions
         for m in self._FUNC.finditer(clean):
             args = self._script_args(m.group(3))
             outs = [self._add_output(m.group(1))] if m.group(1) else []
-            self._add_function(file_id, m.group(2), args, outs, class_id=cls_id,
-                               description="cfc function")
+            self._add_function(
+                file_id,
+                m.group(2),
+                args,
+                outs,
+                class_id=cls_id,
+                description="cfc function",
+            )
         # tag-syntax functions (with their nested <cfargument> tags)
         for m in self._CFFUNCTION.finditer(text):
             fattrs = dict(a.lower() for a in ()) or dict(
-                (k.lower(), v) for k, v in self._ATTR.findall(m.group(1)))
+                (k.lower(), v) for k, v in self._ATTR.findall(m.group(1))
+            )
             fname = fattrs.get("name")
             if not fname:
                 continue
             end = self._tag_block_end(text, m.end(), "cffunction")
             arg_ids = []
-            for am in self._CFARGUMENT.finditer(text[m.end():end]):
-                aattrs = dict((k.lower(), v) for k, v in
-                              self._ATTR.findall(am.group(1)))
+            for am in self._CFARGUMENT.finditer(text[m.end() : end]):
+                aattrs = dict(
+                    (k.lower(), v) for k, v in self._ATTR.findall(am.group(1))
+                )
                 if aattrs.get("name"):
-                    arg_ids.append(self._add_arg(aattrs["name"],
-                                                 aattrs.get("type")))
-            outs = ([self._add_output(fattrs["returntype"])]
-                    if fattrs.get("returntype") else [])
-            self._add_function(file_id, fname, arg_ids, outs, class_id=cls_id,
-                               description="cfc function")
+                    arg_ids.append(self._add_arg(aattrs["name"], aattrs.get("type")))
+            outs = (
+                [self._add_output(fattrs["returntype"])]
+                if fattrs.get("returntype")
+                else []
+            )
+            self._add_function(
+                file_id,
+                fname,
+                arg_ids,
+                outs,
+                class_id=cls_id,
+                description="cfc function",
+            )
 
         # properties
         seen = set()
@@ -121,8 +147,7 @@ class ColdFusionAnalyzer(RegexCodeAnalyzer):
                 seen.add(name)
                 self._add_variable(file_id, name, scope="property")
         for m in self._CFPROPERTY.finditer(text):
-            attrs = dict((k.lower(), v) for k, v in
-                         self._ATTR.findall(m.group(1)))
+            attrs = dict((k.lower(), v) for k, v in self._ATTR.findall(m.group(1)))
             name = attrs.get("name")
             if name and name not in seen:
                 seen.add(name)

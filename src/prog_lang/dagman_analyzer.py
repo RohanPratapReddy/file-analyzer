@@ -22,7 +22,7 @@
 #
 # `#` starts a comment; PARENT/CHILD edges carry no new symbol and are skipped.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _NM = r"[A-Za-z0-9_.\-+]+"
@@ -40,10 +40,12 @@ class DagmanAnalyzer(RegexCodeAnalyzer):
     _SUBDAG = re.compile(r"(?mi)^\s*SUBDAG\s+EXTERNAL\s+(" + _NM + r")\s+(\S+)")
     # SPLICE name dagfile  (splices another DAG's nodes in-line)
     _SPLICE = re.compile(r"(?mi)^\s*SPLICE\s+(" + _NM + r")\s+(\S+)")
-    _SCRIPT = re.compile(r"(?mi)^\s*SCRIPT\s+(?:DEFER\s+\d+\s+\d+\s+)?"
-                         r"(?:PRE|POST|HOLD)\s+(" + _NM + r")\s+(\S+)")
+    _SCRIPT = re.compile(
+        r"(?mi)^\s*SCRIPT\s+(?:DEFER\s+\d+\s+\d+\s+)?"
+        r"(?:PRE|POST|HOLD)\s+(" + _NM + r")\s+(\S+)"
+    )
     _VARS = re.compile(r"(?mi)^\s*VARS\s+(" + _NM + r")\s+(.+)$")
-    _VARKV = re.compile(r'(' + _NM + r')\s*=\s*"([^"]*)"')
+    _VARKV = re.compile(r"(" + _NM + r')\s*=\s*"([^"]*)"')
     _INCLUDE = re.compile(r"(?mi)^\s*INCLUDE\s+(\S+)")
 
     def _extract_entities(self, file_id, text, path):
@@ -79,5 +81,6 @@ class DagmanAnalyzer(RegexCodeAnalyzer):
         for m in self._VARS.finditer(clean):
             node = m.group(1)
             for kv in self._VARKV.finditer(m.group(2)):
-                self._add_variable(file_id, f"{node}.{kv.group(1)}", kv.group(2),
-                                   scope="node")
+                self._add_variable(
+                    file_id, f"{node}.{kv.group(1)}", kv.group(2), scope="node"
+                )

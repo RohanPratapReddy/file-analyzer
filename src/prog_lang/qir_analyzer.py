@@ -19,7 +19,7 @@
 # `define`/`declare @name` -> functions, `@name =` globals -> variables and
 # `%name = type ...` -> classes.  Line comments are ';'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -31,8 +31,9 @@ class QIRAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"',)
 
     # define/declare [attrs] <ret> @name(
-    _FUNC = re.compile(r"^[ \t]*(define|declare)\b[^@\n]*@([A-Za-z_$.][\w$.]*)\s*\(",
-                       re.MULTILINE)
+    _FUNC = re.compile(
+        r"^[ \t]*(define|declare)\b[^@\n]*@([A-Za-z_$.][\w$.]*)\s*\(", re.MULTILINE
+    )
     # @name = [linkage] global/constant ...
     _GLOBAL = re.compile(r"^[ \t]*@([A-Za-z_$.][\w$.]*)\s*=", re.MULTILINE)
     # %name = type { ... }  |  %name = type opaque
@@ -55,7 +56,7 @@ class QIRAnalyzer(RegexCodeAnalyzer):
         for m in self._FUNC.finditer(clean):
             lp = clean.find("(", m.end() - 1)
             rp = self._find_matching(clean, lp, "(", ")")
-            args = clean[lp + 1:rp - 1]
+            args = clean[lp + 1 : rp - 1]
             arg_ids = []
             for part in self._split_top_level(args):
                 part = part.strip()
@@ -64,5 +65,6 @@ class QIRAnalyzer(RegexCodeAnalyzer):
                 if nm:
                     ty = part.rsplit("%", 1)[0].strip() or None
                     arg_ids.append(self._add_arg(nm.group(1), ty))
-            self._add_function(file_id, m.group(2), arg_ids, [],
-                               description=f"qir {m.group(1)}")
+            self._add_function(
+                file_id, m.group(2), arg_ids, [], description=f"qir {m.group(1)}"
+            )

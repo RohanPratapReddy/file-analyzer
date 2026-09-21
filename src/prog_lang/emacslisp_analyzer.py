@@ -11,7 +11,7 @@
 #   (cl-defmethod area ((c circle)) ...)             -> method
 #   (define-minor-mode foo-mode ...)                 -> function (mode)
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _SYM = r"[A-Za-z0-9+\-*/<>=!?._%&:~^@]+"
@@ -26,15 +26,19 @@ class EmacsLispAnalyzer(RegexCodeAnalyzer):
 
     _FUNC = re.compile(
         r"\(\s*(cl-defun|cl-defmacro|cl-defgeneric|cl-defsubst|defun|defmacro|"
-        r"defsubst|defadvice|define-inline)\s+(" + _SYM + r")")
+        r"defsubst|defadvice|define-inline)\s+(" + _SYM + r")"
+    )
     _MODE = re.compile(
         r"\(\s*(define-minor-mode|define-derived-mode|define-globalized-minor-mode)"
-        r"\s+(" + _SYM + r")")
+        r"\s+(" + _SYM + r")"
+    )
     _VAR = re.compile(
         r"\(\s*(defvar-local|defvar|defconst|defcustom|defface|defvar-keymap)"
-        r"\s+(" + _SYM + r")(?:\s+([^\s)]+))?")
+        r"\s+(" + _SYM + r")(?:\s+([^\s)]+))?"
+    )
     _STRUCT = re.compile(
-        r"\(\s*cl-defstruct\s+(?:\(\s*(" + _SYM + r")|(" + _SYM + r"))")
+        r"\(\s*cl-defstruct\s+(?:\(\s*(" + _SYM + r")|(" + _SYM + r"))"
+    )
     _METHOD = re.compile(r"\(\s*cl-defmethod\s+(" + _SYM + r")")
     _REQUIRE = re.compile(r"\(\s*require\s+'(" + _SYM + r")")
     _AUTOLOAD = re.compile(r"\(\s*autoload\s+'(" + _SYM + r")\s+\"([^\"]+)\"")
@@ -53,8 +57,9 @@ class EmacsLispAnalyzer(RegexCodeAnalyzer):
             self._add_import(file_id, m.group(1), m.group(2))
 
         for m in self._VAR.finditer(text):
-            self._add_variable(file_id, m.group(2),
-                               m.group(3).strip() if m.group(3) else None)
+            self._add_variable(
+                file_id, m.group(2), m.group(3).strip() if m.group(3) else None
+            )
 
         for m in self._FUNC.finditer(text):
             name = m.group(2)
@@ -79,26 +84,27 @@ class EmacsLispAnalyzer(RegexCodeAnalyzer):
             owner, params = self._method_sig(text, m.end())
             arg_ids = [self._add_arg(p) for p in params]
             cid = self._class_registry.get(owner) if owner else None
-            self._add_function(file_id, name, arg_ids, [], class_id=cid,
-                               description="elisp method")
+            self._add_function(
+                file_id, name, arg_ids, [], class_id=cid, description="elisp method"
+            )
 
     # ------------------------------------------------------------------
     def _form_at(self, text, open_pos):
         start = text.find("(", open_pos)
         if start == -1:
             return ""
-        return text[start:self._find_matching(text, start, "(", ")")]
+        return text[start : self._find_matching(text, start, "(", ")")]
 
     def _arg_list(self, text, pos):
         lp = text.find("(", pos)
-        for ch in text[pos:lp if lp != -1 else len(text)]:
+        for ch in text[pos : lp if lp != -1 else len(text)]:
             if not ch.isspace():
                 break
         if lp == -1:
             return []
         rp = self._find_matching(text, lp, "(", ")")
         params = []
-        for tok in re.findall(_SYM, text[lp + 1:rp - 1]):
+        for tok in re.findall(_SYM, text[lp + 1 : rp - 1]):
             if tok.startswith("&"):
                 continue
             params.append(tok)
@@ -110,10 +116,11 @@ class EmacsLispAnalyzer(RegexCodeAnalyzer):
         if lp == -1:
             return None, []
         rp = self._find_matching(text, lp, "(", ")")
-        inner = text[lp + 1:rp - 1]
+        inner = text[lp + 1 : rp - 1]
         owner, params = None, []
-        for spec in re.finditer(r"\(\s*(" + _SYM + r")\s+(" + _SYM + r")\s*\)"
-                                r"|(" + _SYM + r")", inner):
+        for spec in re.finditer(
+            r"\(\s*(" + _SYM + r")\s+(" + _SYM + r")\s*\)" r"|(" + _SYM + r")", inner
+        ):
             if spec.group(1):
                 params.append(spec.group(1))
                 if owner is None and spec.group(2) in self._class_registry:
@@ -128,7 +135,7 @@ class EmacsLispAnalyzer(RegexCodeAnalyzer):
         attrs = []
         if not m:
             return attrs
-        rest = form[m.end():-1] if form.endswith(")") else form[m.end():]
+        rest = form[m.end() : -1] if form.endswith(")") else form[m.end() :]
         i = 0
         while i < len(rest):
             ch = rest[i]

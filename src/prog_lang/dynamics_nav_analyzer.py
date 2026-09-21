@@ -30,7 +30,7 @@
 #   * table `FIELDS { { n ; ; Name ; Type } }`           -> variable (a field)
 # `//` starts a comment; `{ }` are structural braces (NOT comments in C/AL).
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -44,10 +44,12 @@ class DynamicsNAVAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"',)
 
     _OBJECT = re.compile(r"(?mi)^[ \t]*OBJECT\s+(" + _ID + r")\s+(\d+)\s+(.+?)\s*$")
-    _PROC = re.compile(r"(?mi)^[ \t]*(?:LOCAL\s+)?PROCEDURE\s+([A-Za-z_][\w]*)"
-                       r"(?:@\d+)?\s*\(")
-    _TRIGGER = re.compile(r"(?mi)^[ \t]*(?:LOCAL\s+)?TRIGGER\s+([A-Za-z_][\w]*)"
-                          r"(?:@\d+)?\s*\(")
+    _PROC = re.compile(
+        r"(?mi)^[ \t]*(?:LOCAL\s+)?PROCEDURE\s+([A-Za-z_][\w]*)" r"(?:@\d+)?\s*\("
+    )
+    _TRIGGER = re.compile(
+        r"(?mi)^[ \t]*(?:LOCAL\s+)?TRIGGER\s+([A-Za-z_][\w]*)" r"(?:@\d+)?\s*\("
+    )
     # a C/AL variable declaration inside a VAR block:  Name@1001 : Record 18;
     _VARDECL = re.compile(r"(?m)^[ \t]*(" + _ID + r")@\d+\s*:\s*([^;]+);")
     # a table field line:  { 2 ; ; Name ; Text50 ; ... }
@@ -58,12 +60,13 @@ class DynamicsNAVAnalyzer(RegexCodeAnalyzer):
 
         for m in self._OBJECT.finditer(clean):
             otype, oid, name = m.group(1), m.group(2), m.group(3).strip()
-            self._add_class(file_id, name,
-                            description=f"NAV {otype} {oid}")
+            self._add_class(file_id, name, description=f"NAV {otype} {oid}")
 
         seen_fn = set()
-        for rx, desc in ((self._PROC, "C/AL procedure"),
-                         (self._TRIGGER, "C/AL trigger")):
+        for rx, desc in (
+            (self._PROC, "C/AL procedure"),
+            (self._TRIGGER, "C/AL trigger"),
+        ):
             for m in rx.finditer(clean):
                 name = m.group(1)
                 if name in seen_fn:

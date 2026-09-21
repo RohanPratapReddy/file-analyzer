@@ -14,7 +14,7 @@
 #
 # Comments inside <script> are '//' and '/* */'; strings use '"', '\'', '`'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_$][A-Za-z0-9_$]*"
@@ -30,17 +30,71 @@ class RiotAnalyzer(RegexCodeAnalyzer):
     # root custom tag:  <my-tag ...>   (kebab or camel, first tag in the file)
     _ROOT_TAG = re.compile(r"<([A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*)\b")
     _SCRIPT = re.compile(r"<script[^>]*>(.*?)</script>", re.S | re.I)
-    _IMPORT = re.compile(r'(?m)^\s*import\s+(?:(' + _ID + r')\s*,?\s*)?'
-                         r'(?:\{([^}]*)\})?\s*(?:from\s+)?["\']([^"\']+)["\']')
+    _IMPORT = re.compile(
+        r"(?m)^\s*import\s+(?:(" + _ID + r")\s*,?\s*)?"
+        r'(?:\{([^}]*)\})?\s*(?:from\s+)?["\']([^"\']+)["\']'
+    )
 
-    _HTML_TAGS = {"div", "span", "p", "a", "ul", "li", "ol", "h1", "h2", "h3",
-                  "h4", "h5", "h6", "button", "input", "form", "label", "img",
-                  "table", "tr", "td", "th", "thead", "tbody", "select",
-                  "option", "textarea", "br", "hr", "nav", "header", "footer",
-                  "section", "article", "main", "aside", "style", "script",
-                  "template", "slot", "pre", "code", "strong", "em", "b", "i",
-                  "small", "svg", "path", "g", "figure", "figcaption", "video",
-                  "audio", "canvas", "iframe", "fieldset", "legend"}
+    _HTML_TAGS = {
+        "div",
+        "span",
+        "p",
+        "a",
+        "ul",
+        "li",
+        "ol",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "button",
+        "input",
+        "form",
+        "label",
+        "img",
+        "table",
+        "tr",
+        "td",
+        "th",
+        "thead",
+        "tbody",
+        "select",
+        "option",
+        "textarea",
+        "br",
+        "hr",
+        "nav",
+        "header",
+        "footer",
+        "section",
+        "article",
+        "main",
+        "aside",
+        "style",
+        "script",
+        "template",
+        "slot",
+        "pre",
+        "code",
+        "strong",
+        "em",
+        "b",
+        "i",
+        "small",
+        "svg",
+        "path",
+        "g",
+        "figure",
+        "figcaption",
+        "video",
+        "audio",
+        "canvas",
+        "iframe",
+        "fieldset",
+        "legend",
+    }
 
     def _register_types(self, file_id, text, path):
         name = self._root_tag_name(text)
@@ -82,18 +136,24 @@ class RiotAnalyzer(RegexCodeAnalyzer):
 
     def _extract_methods(self, file_id, script, cls_id):
         # object-literal method shorthand:  name(args) {   at low indent
-        meth = re.compile(r"(?m)^\s{0,8}(?:async\s+|get\s+|set\s+|\*\s*)*(" +
-                          _ID + r")\s*\(([^)]*)\)\s*\{")
+        meth = re.compile(
+            r"(?m)^\s{0,8}(?:async\s+|get\s+|set\s+|\*\s*)*("
+            + _ID
+            + r")\s*\(([^)]*)\)\s*\{"
+        )
         seen = set()
         for m in meth.finditer(script):
             name = m.group(1)
-            if name in ("if", "for", "while", "switch", "catch", "return",
-                        "function") or name in seen:
+            if (
+                name in ("if", "for", "while", "switch", "catch", "return", "function")
+                or name in seen
+            ):
                 continue
             seen.add(name)
             args = self._simple_args(m.group(2))
-            self._add_function(file_id, name, args, [], class_id=cls_id,
-                               description="riot method")
+            self._add_function(
+                file_id, name, args, [], class_id=cls_id, description="riot method"
+            )
 
     def _simple_args(self, group):
         if not group or not group.strip():

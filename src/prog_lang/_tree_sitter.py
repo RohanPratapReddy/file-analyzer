@@ -10,7 +10,9 @@ except ImportError:
     # whose package is not installed, so callers degrade gracefully.
     try:
         import importlib as _importlib
-        from tree_sitter import Language as _TSLanguage, Parser as _TSParser
+
+        from tree_sitter import Language as _TSLanguage
+        from tree_sitter import Parser as _TSParser
 
         # tree_sitter_languages accepts a few aliases; map them to PyPI names.
         _TS_LANG_MODULES = {
@@ -36,7 +38,9 @@ except ImportError:
         def get_parser(lang):  # type: ignore[misc]
             mod_name = _TS_LANG_MODULES.get(lang)
             if mod_name is None:
-                raise LookupError(f"No tree-sitter module mapping for language {lang!r}")
+                raise LookupError(
+                    f"No tree-sitter module mapping for language {lang!r}"
+                )
             mod = _importlib.import_module(mod_name)
             # typescript/php expose language_<variant>() rather than language().
             if lang in ("typescript", "tsx") and hasattr(mod, "language_" + lang):
@@ -46,5 +50,6 @@ except ImportError:
             else:
                 lang_capsule = mod.language()
             return _TSParser(_TSLanguage(lang_capsule))
+
     except ImportError:
         get_parser = None

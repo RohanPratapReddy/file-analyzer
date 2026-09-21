@@ -14,7 +14,7 @@
 # Ada is not brace-delimited; package/subprogram membership is resolved by the
 # nearest enclosing ``package [body] Name is`` seen before a declaration.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -24,21 +24,24 @@ class AdaAnalyzer(RegexCodeAnalyzer):
     LINE_COMMENTS = ("--",)
     BLOCK_COMMENTS = ()
 
-    _WITH = re.compile(r"^\s*with\s+([\w.]+(?:\s*,\s*[\w.]+)*)\s*;",
-                       re.IGNORECASE | re.MULTILINE)
-    _PACKAGE = re.compile(r"\bpackage\s+(?:body\s+)?([\w.]+)\s+is\b",
-                          re.IGNORECASE)
+    _WITH = re.compile(
+        r"^\s*with\s+([\w.]+(?:\s*,\s*[\w.]+)*)\s*;", re.IGNORECASE | re.MULTILINE
+    )
+    _PACKAGE = re.compile(r"\bpackage\s+(?:body\s+)?([\w.]+)\s+is\b", re.IGNORECASE)
     _TYPE_REC = re.compile(
         r"\btype\s+(\w+)\b[^;]*?\bis\b[^;]*?\brecord\b(.*?)\bend\s+record\b",
-        re.IGNORECASE | re.DOTALL)
-    _TYPE_ENUM = re.compile(
-        r"\btype\s+(\w+)\s+is\s*\(([^)]*)\)\s*;", re.IGNORECASE)
+        re.IGNORECASE | re.DOTALL,
+    )
+    _TYPE_ENUM = re.compile(r"\btype\s+(\w+)\s+is\s*\(([^)]*)\)\s*;", re.IGNORECASE)
     _SUBPROG = re.compile(
         r"\b(procedure|function)\s+(\w+)\s*(?:\(([^)]*)\))?"
-        r"(?:\s*return\s+([\w.]+))?", re.IGNORECASE)
+        r"(?:\s*return\s+([\w.]+))?",
+        re.IGNORECASE,
+    )
     _FIELD = re.compile(
         r"(\w+(?:\s*,\s*\w+)*)\s*:\s*(?:aliased\s+)?([\w.][\w.\s]*?)"
-        r"(?:\s*:=\s*([^;]+))?\s*;")
+        r"(?:\s*:=\s*([^;]+))?\s*;"
+    )
 
     def _register_types(self, file_id, text, path):
         t = self._strip_comments(text)
@@ -59,8 +62,9 @@ class AdaAnalyzer(RegexCodeAnalyzer):
                     self._add_import(file_id, unit.split(".")[-1], unit)
 
         # Package declarations: (start_pos, name) so we can find the enclosing one.
-        packages = [(m.start(), m.group(1).split(".")[-1])
-                    for m in self._PACKAGE.finditer(text)]
+        packages = [
+            (m.start(), m.group(1).split(".")[-1]) for m in self._PACKAGE.finditer(text)
+        ]
 
         def enclosing_pkg(pos):
             owner = None
@@ -82,16 +86,22 @@ class AdaAnalyzer(RegexCodeAnalyzer):
                 for nm in names.split(","):
                     nm = nm.strip()
                     if nm:
-                        attr_ids.append(self._add_arg(nm, ftype,
-                                        fm.group(3).strip() if fm.group(3) else None))
-            self._add_class(file_id, name, description="ada record",
-                            attr_ids=attr_ids)
+                        attr_ids.append(
+                            self._add_arg(
+                                nm, ftype, fm.group(3).strip() if fm.group(3) else None
+                            )
+                        )
+            self._add_class(file_id, name, description="ada record", attr_ids=attr_ids)
 
         for m in self._TYPE_ENUM.finditer(text):
-            attr_ids = [self._add_arg(v.strip(), "enum")
-                        for v in m.group(2).split(",") if v.strip()]
-            self._add_class(file_id, m.group(1), description="ada enum",
-                            attr_ids=attr_ids)
+            attr_ids = [
+                self._add_arg(v.strip(), "enum")
+                for v in m.group(2).split(",")
+                if v.strip()
+            ]
+            self._add_class(
+                file_id, m.group(1), description="ada enum", attr_ids=attr_ids
+            )
 
         def in_record(pos):
             return any(a <= pos < b for a, b in rec_spans)
@@ -123,15 +133,18 @@ class AdaAnalyzer(RegexCodeAnalyzer):
             if in_record(m.start()):
                 continue
             names, vtype = m.group(1), m.group(2).strip()
-            if re.match(r"(?i)(procedure|function|type|package|with|use|"
-                        r"return|record|end|is|begin|for|while|loop|if|case)$",
-                        vtype.split()[0] if vtype.split() else ""):
+            if re.match(
+                r"(?i)(procedure|function|type|package|with|use|"
+                r"return|record|end|is|begin|for|while|loop|if|case)$",
+                vtype.split()[0] if vtype.split() else "",
+            ):
                 continue
             for nm in names.split(","):
                 nm = nm.strip()
                 if nm:
-                    self._add_variable(file_id, nm,
-                                       m.group(3).strip() if m.group(3) else None)
+                    self._add_variable(
+                        file_id, nm, m.group(3).strip() if m.group(3) else None
+                    )
 
     def _params(self, params):
         arg_ids = []
@@ -145,8 +158,9 @@ class AdaAnalyzer(RegexCodeAnalyzer):
             if ":=" in rest:
                 rest, default = rest.split(":=", 1)
                 default = default.strip()
-            rest = re.sub(r"(?i)^\s*(in\s+out|in|out|access|aliased)\s+", "",
-                          rest.strip())
+            rest = re.sub(
+                r"(?i)^\s*(in\s+out|in|out|access|aliased)\s+", "", rest.strip()
+            )
             atype = rest.strip()
             for nm in names.split(","):
                 nm = nm.strip()

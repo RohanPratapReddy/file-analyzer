@@ -37,7 +37,6 @@ introspected, and a mislabelled file is classified by what it actually is.
 
 from __future__ import annotations
 
-import math
 import sqlite3
 import struct
 from pathlib import Path
@@ -51,15 +50,32 @@ from ..data.catalog_binary_formats import (
     _sha256_and_entropy,
 )
 
+
 # --------------------------------------------------------------------------
 # small binary helpers
 # --------------------------------------------------------------------------
-def _u16le(b, o=0): return struct.unpack_from("<H", b, o)[0]
-def _u16be(b, o=0): return struct.unpack_from(">H", b, o)[0]
-def _u32le(b, o=0): return struct.unpack_from("<I", b, o)[0]
-def _u32be(b, o=0): return struct.unpack_from(">I", b, o)[0]
-def _u64le(b, o=0): return struct.unpack_from("<Q", b, o)[0]
-def _u64be(b, o=0): return struct.unpack_from(">Q", b, o)[0]
+def _u16le(b, o=0):
+    return struct.unpack_from("<H", b, o)[0]
+
+
+def _u16be(b, o=0):
+    return struct.unpack_from(">H", b, o)[0]
+
+
+def _u32le(b, o=0):
+    return struct.unpack_from("<I", b, o)[0]
+
+
+def _u32be(b, o=0):
+    return struct.unpack_from(">I", b, o)[0]
+
+
+def _u64le(b, o=0):
+    return struct.unpack_from("<Q", b, o)[0]
+
+
+def _u64be(b, o=0):
+    return struct.unpack_from(">Q", b, o)[0]
 
 
 def _size(path: Path) -> Optional[int]:
@@ -75,14 +91,20 @@ def _read_at(path: Path, offset: int, n: int) -> bytes:
         return f.read(n)
 
 
-def _profile(engine: str, family: str, *, structural: bool,
-             status: str = "ok", encrypted: bool = False,
-             store: Optional[Dict[str, Any]] = None,
-             tables: Optional[List[Dict[str, Any]]] = None,
-             indexes: Optional[List[Dict[str, Any]]] = None,
-             relations: Optional[List[Dict[str, Any]]] = None,
-             properties: Optional[Dict[str, Any]] = None,
-             notes: Optional[str] = None) -> Dict[str, Any]:
+def _profile(
+    engine: str,
+    family: str,
+    *,
+    structural: bool,
+    status: str = "ok",
+    encrypted: bool = False,
+    store: Optional[Dict[str, Any]] = None,
+    tables: Optional[List[Dict[str, Any]]] = None,
+    indexes: Optional[List[Dict[str, Any]]] = None,
+    relations: Optional[List[Dict[str, Any]]] = None,
+    properties: Optional[Dict[str, Any]] = None,
+    notes: Optional[str] = None,
+) -> Dict[str, Any]:
     return {
         "engine": engine,
         "engine_family": family,
@@ -98,28 +120,52 @@ def _profile(engine: str, family: str, *, structural: bool,
     }
 
 
-def _column(name: str, declared_type: Optional[str] = None, *,
-            inferred_type: Optional[str] = None, nullable: Optional[bool] = None,
-            primary_key: bool = False, unique: bool = False,
-            default: Any = None, references_table: Optional[str] = None,
-            references_column: Optional[str] = None,
-            null_count: Optional[int] = None, non_null_count: Optional[int] = None,
-            distinct_count: Optional[int] = None, minimum: Any = None,
-            maximum: Any = None, samples: Optional[List[Any]] = None,
-            extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def _column(
+    name: str,
+    declared_type: Optional[str] = None,
+    *,
+    inferred_type: Optional[str] = None,
+    nullable: Optional[bool] = None,
+    primary_key: bool = False,
+    unique: bool = False,
+    default: Any = None,
+    references_table: Optional[str] = None,
+    references_column: Optional[str] = None,
+    null_count: Optional[int] = None,
+    non_null_count: Optional[int] = None,
+    distinct_count: Optional[int] = None,
+    minimum: Any = None,
+    maximum: Any = None,
+    samples: Optional[List[Any]] = None,
+    extra: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     return {
-        "name": name, "declared_type": declared_type,
-        "inferred_type": inferred_type, "nullable": nullable,
-        "primary_key": primary_key, "unique": unique, "default": default,
-        "references_table": references_table, "references_column": references_column,
-        "null_count": null_count, "non_null_count": non_null_count,
-        "distinct_count": distinct_count, "minimum": minimum, "maximum": maximum,
-        "samples": samples or [], "extra": extra or {},
+        "name": name,
+        "declared_type": declared_type,
+        "inferred_type": inferred_type,
+        "nullable": nullable,
+        "primary_key": primary_key,
+        "unique": unique,
+        "default": default,
+        "references_table": references_table,
+        "references_column": references_column,
+        "null_count": null_count,
+        "non_null_count": non_null_count,
+        "distinct_count": distinct_count,
+        "minimum": minimum,
+        "maximum": maximum,
+        "samples": samples or [],
+        "extra": extra or {},
     }
 
 
-def _forensic(path: Path, engine: str, family: str, note: Optional[str] = None,
-              status: str = "partial") -> Dict[str, Any]:
+def _forensic(
+    path: Path,
+    engine: str,
+    family: str,
+    note: Optional[str] = None,
+    status: str = "partial",
+) -> Dict[str, Any]:
     """Honest byte-level store profile for an opaque/proprietary/encrypted DB.
 
     Emits real byte metadata only — never a fabricated schema, never payload.
@@ -140,8 +186,15 @@ def _forensic(path: Path, engine: str, family: str, note: Optional[str] = None,
     strings = _ascii_strings(head)
     if strings:
         props["sample_strings"] = strings[:16]
-    return _profile(engine, family, structural=False, status=status,
-                    encrypted=ent >= 7.5, properties=props, notes=note)
+    return _profile(
+        engine,
+        family,
+        structural=False,
+        status=status,
+        encrypted=ent >= 7.5,
+        properties=props,
+        notes=note,
+    )
 
 
 # ==========================================================================
@@ -155,8 +208,9 @@ _MAX_TABLES = 2000
 _SQLITE_TEXT_ENCODING = {1: "UTF-8", 2: "UTF-16le", 3: "UTF-16be"}
 
 
-def sqlite_profile(path: Path, engine: str = "sqlite",
-                   family: str = "relational") -> Dict[str, Any]:
+def sqlite_profile(
+    path: Path, engine: str = "sqlite", family: str = "relational"
+) -> Dict[str, Any]:
     """Full schema + bounded data profile for a SQLite-format-3 store.
 
     Merges the schema view (tables/views/columns/types/PK/FK/indexes) with a
@@ -184,9 +238,10 @@ def sqlite_profile(path: Path, engine: str = "sqlite",
 
     try:
         conn = sqlite3.connect(f"file:{path}?mode=ro&immutable=1", uri=True)
-    except Exception as err:                     # locked / corrupt header only
-        prof = _forensic(path, engine, family,
-                         note=f"SQLite header valid but connect failed: {err}")
+    except Exception as err:  # locked / corrupt header only
+        prof = _forensic(
+            path, engine, family, note=f"SQLite header valid but connect failed: {err}"
+        )
         prof["store"].update(store)
         prof["structural_parse"] = True
         prof["status"] = "partial"
@@ -198,9 +253,11 @@ def sqlite_profile(path: Path, engine: str = "sqlite",
     try:
         conn.text_factory = lambda b: b.decode("utf-8", "replace")
         cur = conn.cursor()
-        cur.execute("SELECT type, name FROM sqlite_master "
-                    "WHERE type IN ('table','view') AND name NOT LIKE 'sqlite_%' "
-                    "ORDER BY type, name")
+        cur.execute(
+            "SELECT type, name FROM sqlite_master "
+            "WHERE type IN ('table','view') AND name NOT LIKE 'sqlite_%' "
+            "ORDER BY type, name"
+        )
         objs = cur.fetchall()[:_MAX_TABLES]
         store["object_count"] = len(objs)
         for otype, tname in objs:
@@ -210,44 +267,71 @@ def sqlite_profile(path: Path, engine: str = "sqlite",
     finally:
         conn.close()
 
-    return _profile(engine, family, structural=True, store=store,
-                    tables=tables, indexes=indexes, relations=relations,
-                    properties={"driver": "sqlite3", "sqlite_lib_version": sqlite3.sqlite_version})
+    return _profile(
+        engine,
+        family,
+        structural=True,
+        store=store,
+        tables=tables,
+        indexes=indexes,
+        relations=relations,
+        properties={"driver": "sqlite3", "sqlite_lib_version": sqlite3.sqlite_version},
+    )
 
 
 def _q(ident: str) -> str:
     return '"' + ident.replace('"', '""') + '"'
 
 
-def _sqlite_table(cur, otype: str, tname: str,
-                  relations: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _sqlite_table(
+    cur, otype: str, tname: str, relations: List[Dict[str, Any]]
+) -> Dict[str, Any]:
     kind = "view" if otype == "view" else "table"
     cols: List[Dict[str, Any]] = []
     notes = None
     try:
         cur.execute(f"PRAGMA table_info({_q(tname)})")
-        info = cur.fetchall()                    # cid,name,type,notnull,dflt,pk
+        info = cur.fetchall()  # cid,name,type,notnull,dflt,pk
     except Exception as err:
-        return {"name": tname, "kind": kind, "row_count": None,
-                "estimated": False, "columns": [], "notes": f"table_info failed: {err}"}
+        return {
+            "name": tname,
+            "kind": kind,
+            "row_count": None,
+            "estimated": False,
+            "columns": [],
+            "notes": f"table_info failed: {err}",
+        }
 
     pk_names = {c[1] for c in info if c[5]}
     for cid, cname, ctype, notnull, dflt, pk in info:
-        cols.append(_column(str(cname), str(ctype) if ctype else None,
-                            nullable=not bool(notnull), primary_key=bool(pk),
-                            default=dflt, inferred_type=_sqlite_affinity(ctype)))
+        cols.append(
+            _column(
+                str(cname),
+                str(ctype) if ctype else None,
+                nullable=not bool(notnull),
+                primary_key=bool(pk),
+                default=dflt,
+                inferred_type=_sqlite_affinity(ctype),
+            )
+        )
 
     # foreign keys -> relations
     if kind == "table":
         try:
             cur.execute(f"PRAGMA foreign_key_list({_q(tname)})")
-            for fk in cur.fetchall():            # id,seq,table,from,to,on_upd,on_del,match
-                relations.append({
-                    "type": "foreign_key", "from_table": tname,
-                    "from_column": fk[3], "to_table": fk[2], "to_column": fk[4],
-                    "value": None, "method": None,
-                    "extra": {"on_update": fk[5], "on_delete": fk[6]},
-                })
+            for fk in cur.fetchall():  # id,seq,table,from,to,on_upd,on_del,match
+                relations.append(
+                    {
+                        "type": "foreign_key",
+                        "from_table": tname,
+                        "from_column": fk[3],
+                        "to_table": fk[2],
+                        "to_column": fk[4],
+                        "value": None,
+                        "method": None,
+                        "extra": {"on_update": fk[5], "on_delete": fk[6]},
+                    }
+                )
                 for c in cols:
                     if c["name"] == fk[3]:
                         c["references_table"] = fk[2]
@@ -264,12 +348,23 @@ def _sqlite_table(cur, otype: str, tname: str,
         notes = f"row count failed: {err}"
 
     # bounded per-column data profile (merges DataAnalyzer behaviour)
-    if kind == "table" and row_count is not None and 0 < row_count <= _PROFILE_ROW_CAP and cols:
+    if (
+        kind == "table"
+        and row_count is not None
+        and 0 < row_count <= _PROFILE_ROW_CAP
+        and cols
+    ):
         _sqlite_profile_columns(cur, tname, cols, row_count)
 
-    return {"name": tname, "kind": kind, "row_count": row_count,
-            "estimated": estimated, "columns": cols, "notes": notes,
-            "primary_key": sorted(pk_names) or None}
+    return {
+        "name": tname,
+        "kind": kind,
+        "row_count": row_count,
+        "estimated": estimated,
+        "columns": cols,
+        "notes": notes,
+        "primary_key": sorted(pk_names) or None,
+    }
 
 
 def _sqlite_affinity(decl: Optional[str]) -> str:
@@ -285,8 +380,9 @@ def _sqlite_affinity(decl: Optional[str]) -> str:
     return "numeric"
 
 
-def _sqlite_profile_columns(cur, tname: str, cols: List[Dict[str, Any]],
-                            row_count: int) -> None:
+def _sqlite_profile_columns(
+    cur, tname: str, cols: List[Dict[str, Any]], row_count: int
+) -> None:
     """One aggregate pass for null/non-null/distinct/min/max + a small sample."""
     for c in cols:
         col = c["name"]
@@ -294,20 +390,27 @@ def _sqlite_profile_columns(cur, tname: str, cols: List[Dict[str, Any]],
             cur.execute(
                 f"SELECT COUNT(*) - COUNT({_q(col)}), COUNT({_q(col)}), "
                 f"COUNT(DISTINCT {_q(col)}), MIN({_q(col)}), MAX({_q(col)}) "
-                f"FROM {_q(tname)}")
+                f"FROM {_q(tname)}"
+            )
             nulls, non_null, distinct, mn, mx = cur.fetchone()
             c["null_count"] = int(nulls) if nulls is not None else None
             c["non_null_count"] = int(non_null) if non_null is not None else None
             c["distinct_count"] = int(distinct) if distinct is not None else None
             c["minimum"] = _clip(mn)
             c["maximum"] = _clip(mx)
-            c["unique"] = bool(distinct is not None and non_null and distinct == non_null
-                               and non_null == row_count)
+            c["unique"] = bool(
+                distinct is not None
+                and non_null
+                and distinct == non_null
+                and non_null == row_count
+            )
         except Exception:
             continue
         try:
-            cur.execute(f"SELECT DISTINCT {_q(col)} FROM {_q(tname)} "
-                        f"WHERE {_q(col)} IS NOT NULL LIMIT {_SAMPLE_LIMIT}")
+            cur.execute(
+                f"SELECT DISTINCT {_q(col)} FROM {_q(tname)} "
+                f"WHERE {_q(col)} IS NOT NULL LIMIT {_SAMPLE_LIMIT}"
+            )
             c["samples"] = [_clip(r[0]) for r in cur.fetchall()]
         except Exception:
             pass
@@ -324,7 +427,7 @@ def _clip(v: Any) -> Any:
 def _sqlite_indexes(cur, tname: str, indexes: List[Dict[str, Any]]) -> None:
     try:
         cur.execute(f"PRAGMA index_list({_q(tname)})")
-        idx_list = cur.fetchall()                # seq,name,unique,origin,partial
+        idx_list = cur.fetchall()  # seq,name,unique,origin,partial
     except Exception:
         return
     for row in idx_list:
@@ -335,26 +438,55 @@ def _sqlite_indexes(cur, tname: str, indexes: List[Dict[str, Any]]) -> None:
             cols = [r[2] for r in cur.fetchall() if r[2] is not None]
         except Exception:
             pass
-        indexes.append({"name": iname, "table": tname, "unique": uniq,
-                        "method": (row[3] if len(row) > 3 else None), "columns": cols})
+        indexes.append(
+            {
+                "name": iname,
+                "table": tname,
+                "unique": uniq,
+                "method": (row[3] if len(row) > 3 else None),
+                "columns": cols,
+            }
+        )
 
 
 # ==========================================================================
 # dBASE / xBase family (.dbf) — fully documented header + field descriptors
 # ==========================================================================
 _DBF_VERSIONS = {
-    0x02: "FoxBASE", 0x03: "dBASE III+ (no memo)", 0x04: "dBASE IV (no memo)",
-    0x05: "dBASE V (no memo)", 0x30: "Visual FoxPro", 0x31: "Visual FoxPro (auto-incr)",
-    0x32: "Visual FoxPro (varchar)", 0x43: "dBASE IV SQL table",
-    0x7B: "dBASE IV (with memo)", 0x83: "dBASE III+ (with memo)",
-    0x8B: "dBASE IV (with memo)", 0x8E: "dBASE IV (with SQL)",
-    0xF5: "FoxPro 2.x (with memo)", 0xFB: "FoxPro (no memo)",
+    0x02: "FoxBASE",
+    0x03: "dBASE III+ (no memo)",
+    0x04: "dBASE IV (no memo)",
+    0x05: "dBASE V (no memo)",
+    0x30: "Visual FoxPro",
+    0x31: "Visual FoxPro (auto-incr)",
+    0x32: "Visual FoxPro (varchar)",
+    0x43: "dBASE IV SQL table",
+    0x7B: "dBASE IV (with memo)",
+    0x83: "dBASE III+ (with memo)",
+    0x8B: "dBASE IV (with memo)",
+    0x8E: "dBASE IV (with SQL)",
+    0xF5: "FoxPro 2.x (with memo)",
+    0xFB: "FoxPro (no memo)",
 }
 _DBF_FIELD_TYPES = {
-    "C": "character", "N": "numeric", "F": "float", "D": "date", "L": "logical",
-    "M": "memo", "T": "datetime", "I": "integer", "Y": "currency",
-    "B": "double", "G": "general", "P": "picture", "Q": "varbinary",
-    "V": "varchar", "W": "blob", "@": "timestamp", "+": "autoincrement", "O": "double",
+    "C": "character",
+    "N": "numeric",
+    "F": "float",
+    "D": "date",
+    "L": "logical",
+    "M": "memo",
+    "T": "datetime",
+    "I": "integer",
+    "Y": "currency",
+    "B": "double",
+    "G": "general",
+    "P": "picture",
+    "Q": "varbinary",
+    "V": "varchar",
+    "W": "blob",
+    "@": "timestamp",
+    "+": "autoincrement",
+    "O": "double",
     "0": "null_flags",
 }
 
@@ -379,50 +511,76 @@ def dbase_profile(path: Path) -> Dict[str, Any]:
     while off + 32 <= len(field_area):
         if field_area[off] == 0x0D:
             break
-        fd = field_area[off:off + 32]
+        fd = field_area[off : off + 32]
         raw_name = fd[0:11].split(b"\x00", 1)[0]
         fname = raw_name.decode("ascii", "replace").strip() or f"field_{len(cols) + 1}"
         ftype = chr(fd[11]) if 32 <= fd[11] < 127 else "?"
         flen = fd[16]
         fdec = fd[17]
         flags = fd[18]
-        cols.append(_column(
-            fname, ftype, inferred_type=_DBF_FIELD_TYPES.get(ftype, "unknown"),
-            nullable=bool(flags & 0x02),
-            extra={"length": flen, "decimals": fdec,
-                   "system_column": bool(flags & 0x01),
-                   "autoincrement": bool(flags & 0x0C)}))
+        cols.append(
+            _column(
+                fname,
+                ftype,
+                inferred_type=_DBF_FIELD_TYPES.get(ftype, "unknown"),
+                nullable=bool(flags & 0x02),
+                extra={
+                    "length": flen,
+                    "decimals": fdec,
+                    "system_column": bool(flags & 0x01),
+                    "autoincrement": bool(flags & 0x0C),
+                },
+            )
+        )
         off += 32
 
     store = {
         "dbase_version_byte": f"0x{version:02X}",
         "dbase_version": _DBF_VERSIONS.get(version, "xBase variant"),
-        "header_size": header_size, "record_size": record_size,
-        "has_memo": bool(version & 0x80), "last_update": last_update,
+        "header_size": header_size,
+        "record_size": record_size,
+        "has_memo": bool(version & 0x80),
+        "last_update": last_update,
         "encrypted_flag": bool(hdr[15] & 0x01),
-        "mdx_flag": bool(hdr[28]), "language_driver": hdr[29],
+        "mdx_flag": bool(hdr[28]),
+        "language_driver": hdr[29],
     }
-    table = {"name": path.stem, "kind": "table", "row_count": n_records,
-             "estimated": False, "columns": cols,
-             "notes": None if cols else "no field descriptors"}
-    return _profile("dbase", "relational", structural=True, store=store,
-                    tables=[table],
-                    properties={"field_count": len(cols)})
+    table = {
+        "name": path.stem,
+        "kind": "table",
+        "row_count": n_records,
+        "estimated": False,
+        "columns": cols,
+        "notes": None if cols else "no field descriptors",
+    }
+    return _profile(
+        "dbase",
+        "relational",
+        structural=True,
+        store=store,
+        tables=[table],
+        properties={"field_count": len(cols)},
+    )
 
 
 def dbase_memo_profile(path: Path, ext: str) -> Dict[str, Any]:
     """dBASE/FoxPro memo side-files (.dbt/.fpt/.mb): block store, header only."""
     hdr = _read_at(path, 0, 512)
     store: Dict[str, Any] = {}
-    if ext == ".fpt" and len(hdr) >= 8:          # FoxPro memo: big-endian header
+    if ext == ".fpt" and len(hdr) >= 8:  # FoxPro memo: big-endian header
         store["next_free_block"] = _u32be(hdr, 0)
         store["block_size"] = _u16be(hdr, 6)
-    elif len(hdr) >= 4:                          # dBASE .dbt / Paradox .mb
+    elif len(hdr) >= 4:  # dBASE .dbt / Paradox .mb
         store["next_free_block"] = _u32le(hdr, 0)
-    return _profile("dbase_memo", "relational", structural=True, status="partial",
-                    store=store,
-                    notes="memo/BLOB side-file for a dBASE/FoxPro/Paradox table "
-                          "(payload not stored)")
+    return _profile(
+        "dbase_memo",
+        "relational",
+        structural=True,
+        status="partial",
+        store=store,
+        notes="memo/BLOB side-file for a dBASE/FoxPro/Paradox table "
+        "(payload not stored)",
+    )
 
 
 def dbase_index_profile(path: Path, ext: str) -> Dict[str, Any]:
@@ -434,30 +592,47 @@ def dbase_index_profile(path: Path, ext: str) -> Dict[str, Any]:
             store["root_page"] = _u32le(hdr, 0)
             store["page_count"] = _u32le(hdr, 4)
             store["key_length"] = _u16le(hdr, 12)
-        elif ext == ".cdx" and len(hdr) >= 12:   # FoxPro compound index (big-endian)
+        elif ext == ".cdx" and len(hdr) >= 12:  # FoxPro compound index (big-endian)
             store["root_node"] = _u32be(hdr, 0)
             store["key_length"] = _u16be(hdr, 10)
     except struct.error:
         pass
-    return _profile("dbase_index", "relational", structural=True, status="partial",
-                    store=store,
-                    indexes=[{"name": path.stem, "table": None, "unique": None,
-                              "method": "btree", "columns": []}],
-                    notes="index side-file for a dBASE/FoxPro table")
+    return _profile(
+        "dbase_index",
+        "relational",
+        structural=True,
+        status="partial",
+        store=store,
+        indexes=[
+            {
+                "name": path.stem,
+                "table": None,
+                "unique": None,
+                "method": "btree",
+                "columns": [],
+            }
+        ],
+        notes="index side-file for a dBASE/FoxPro table",
+    )
 
 
 # ==========================================================================
 # Berkeley DB (.bdb / .db / wallet) — documented page-0 magic
 # ==========================================================================
 _BDB_MAGIC = {
-    0x00061561: "btree", 0x00061562: "btree", 0x00053162: "hash",
-    0x00042253: "queue", 0x00072162: "heap", 0x00040988: "log",
+    0x00061561: "btree",
+    0x00061562: "btree",
+    0x00053162: "hash",
+    0x00042253: "queue",
+    0x00072162: "heap",
+    0x00040988: "log",
     0x00060461: "qam",
 }
 
 
-def berkeleydb_profile(path: Path, engine: str = "berkeleydb",
-                       family: str = "key_value") -> Dict[str, Any]:
+def berkeleydb_profile(
+    path: Path, engine: str = "berkeleydb", family: str = "key_value"
+) -> Dict[str, Any]:
     page0 = _read_at(path, 0, 72)
     if len(page0) < 20:
         raise ValueError("bdb too short")
@@ -482,22 +657,41 @@ def berkeleydb_profile(path: Path, engine: str = "berkeleydb",
     page_size = rdr(page0, 20) if len(page0) >= 24 else None
     size = _size(path)
     store = {
-        "subtype": subtype, "byte_order": order, "bdb_version": version,
+        "subtype": subtype,
+        "byte_order": order,
+        "bdb_version": version,
         "page_size": page_size,
         "page_count": (size // page_size) if (page_size and size) else None,
     }
-    return _profile(engine, family, structural=True, status="partial", store=store,
-                    tables=[{"name": path.stem, "kind": "tree", "row_count": None,
-                             "estimated": False, "columns": [],
-                             "notes": f"Berkeley DB {subtype} — opaque key/value pairs"}],
-                    notes="Berkeley DB access-method store (keys/values are opaque bytes)")
+    return _profile(
+        engine,
+        family,
+        structural=True,
+        status="partial",
+        store=store,
+        tables=[
+            {
+                "name": path.stem,
+                "kind": "tree",
+                "row_count": None,
+                "estimated": False,
+                "columns": [],
+                "notes": f"Berkeley DB {subtype} — opaque key/value pairs",
+            }
+        ],
+        notes="Berkeley DB access-method store (keys/values are opaque bytes)",
+    )
 
 
 # ==========================================================================
 # GNU dbm (.gdbm) — documented magic
 # ==========================================================================
-_GDBM_MAGIC = {0x13579acd: "gdbm (std)", 0x13579ace: "gdbm (0.4)",
-               0x13579acf: "gdbm (64-bit)", 0x13579acb: "gdbm (old)"}
+_GDBM_MAGIC = {
+    0x13579ACD: "gdbm (std)",
+    0x13579ACE: "gdbm (0.4)",
+    0x13579ACF: "gdbm (64-bit)",
+    0x13579ACB: "gdbm (old)",
+}
 
 
 def gdbm_profile(path: Path) -> Dict[str, Any]:
@@ -519,13 +713,28 @@ def gdbm_profile(path: Path) -> Dict[str, Any]:
         block_size = (_u32le if order == "little" else _u32be)(head, 4)
     except struct.error:
         pass
-    return _profile("gdbm", "key_value", structural=True, status="partial",
-                    store={"variant": _GDBM_MAGIC[magic], "byte_order": order,
-                           "block_size": block_size},
-                    tables=[{"name": path.stem, "kind": "tree", "row_count": None,
-                             "estimated": False, "columns": [],
-                             "notes": "GNU dbm hash store — opaque key/value pairs"}],
-                    notes="GNU dbm key/value store")
+    return _profile(
+        "gdbm",
+        "key_value",
+        structural=True,
+        status="partial",
+        store={
+            "variant": _GDBM_MAGIC[magic],
+            "byte_order": order,
+            "block_size": block_size,
+        },
+        tables=[
+            {
+                "name": path.stem,
+                "kind": "tree",
+                "row_count": None,
+                "estimated": False,
+                "columns": [],
+                "notes": "GNU dbm hash store — opaque key/value pairs",
+            }
+        ],
+        notes="GNU dbm key/value store",
+    )
 
 
 # ==========================================================================
@@ -541,19 +750,31 @@ def tdb_profile(path: Path) -> Dict[str, Any]:
         store["hash_size"] = _u32le(head, 36)
     except struct.error:
         pass
-    return _profile("tdb", "key_value", structural=True, status="partial",
-                    store=store,
-                    tables=[{"name": path.stem, "kind": "tree", "row_count": None,
-                             "estimated": False, "columns": [],
-                             "notes": "Samba trivial DB — opaque key/value pairs"}],
-                    notes="Samba/ctdb trivial database (key/value)")
+    return _profile(
+        "tdb",
+        "key_value",
+        structural=True,
+        status="partial",
+        store=store,
+        tables=[
+            {
+                "name": path.stem,
+                "kind": "tree",
+                "row_count": None,
+                "estimated": False,
+                "columns": [],
+                "notes": "Samba trivial DB — opaque key/value pairs",
+            }
+        ],
+        notes="Samba/ctdb trivial database (key/value)",
+    )
 
 
 # ==========================================================================
 # LMDB / libmdbx (.lmdb / .mdbx) — documented meta page
 # ==========================================================================
 _LMDB_MAGIC = 0xBEEFC0DE
-_MDBX_MAGIC = 0xBEEFC0DE                          # mdbx shares/derives the constant
+_MDBX_MAGIC = 0xBEEFC0DE  # mdbx shares/derives the constant
 
 
 def lmdb_profile(path: Path, ext: str) -> Dict[str, Any]:
@@ -575,13 +796,24 @@ def lmdb_profile(path: Path, ext: str) -> Dict[str, Any]:
                 except struct.error:
                     pass
                 engine = "mdbx" if ext == ".mdbx" else "lmdb"
-                return _profile(engine, "key_value", structural=True,
-                                status="partial", store=store,
-                                tables=[{"name": "main", "kind": "tree",
-                                         "row_count": None, "estimated": False,
-                                         "columns": [],
-                                         "notes": "memory-mapped B+tree — opaque key/value pairs"}],
-                                notes="Lightning/libmdbx memory-mapped key/value store")
+                return _profile(
+                    engine,
+                    "key_value",
+                    structural=True,
+                    status="partial",
+                    store=store,
+                    tables=[
+                        {
+                            "name": "main",
+                            "kind": "tree",
+                            "row_count": None,
+                            "estimated": False,
+                            "columns": [],
+                            "notes": "memory-mapped B+tree — opaque key/value pairs",
+                        }
+                    ],
+                    notes="Lightning/libmdbx memory-mapped key/value store",
+                )
     raise ValueError("no LMDB/mdbx meta page magic found")
 
 
@@ -590,7 +822,7 @@ def lmdb_profile(path: Path, ext: str) -> Dict[str, Any]:
 # ==========================================================================
 _LEVELDB_TABLE_MAGIC = 0xDB4775248B80FB57
 _LEVELDB_FOOTER = 48
-_ROCKSDB_FOOTER = 53                              # legacy footer + format byte
+_ROCKSDB_FOOTER = 53  # legacy footer + format byte
 
 
 def leveldb_sst_profile(path: Path) -> Dict[str, Any]:
@@ -610,14 +842,28 @@ def leveldb_sst_profile(path: Path) -> Dict[str, Any]:
                 engine = "rocksdb"
     if engine is None:
         raise ValueError("no LevelDB/RocksDB table magic in footer")
-    return _profile(engine, "key_value", structural=True, status="partial",
-                    store={"table_magic": f"0x{_LEVELDB_TABLE_MAGIC:016X}",
-                           "footer_bytes": _LEVELDB_FOOTER,
-                           "file_size": size},
-                    tables=[{"name": path.stem, "kind": "tree", "row_count": None,
-                             "estimated": False, "columns": [],
-                             "notes": "sorted string table — opaque sorted key/value blocks"}],
-                    notes="LevelDB/RocksDB SSTable (immutable sorted key/value)")
+    return _profile(
+        engine,
+        "key_value",
+        structural=True,
+        status="partial",
+        store={
+            "table_magic": f"0x{_LEVELDB_TABLE_MAGIC:016X}",
+            "footer_bytes": _LEVELDB_FOOTER,
+            "file_size": size,
+        },
+        tables=[
+            {
+                "name": path.stem,
+                "kind": "tree",
+                "row_count": None,
+                "estimated": False,
+                "columns": [],
+                "notes": "sorted string table — opaque sorted key/value blocks",
+            }
+        ],
+        notes="LevelDB/RocksDB SSTable (immutable sorted key/value)",
+    )
 
 
 # ==========================================================================
@@ -646,7 +892,7 @@ def rdb_profile(path: Path) -> Dict[str, Any]:
 
     with open(path, "rb") as f:
         f.seek(9)
-        raw = f.read(1 << 20)                     # header region only: aux + RESIZEDB
+        raw = f.read(1 << 20)  # header region only: aux + RESIZEDB
     i = 0
     n = len(raw)
 
@@ -672,7 +918,7 @@ def rdb_profile(path: Path) -> Dict[str, Any]:
                     return None
                 return (struct.unpack_from(">Q", raw, pos + 1)[0], pos + 9, False)
             return None
-        return (b & 0x3F, pos + 1, True)          # special (LZF / int) encoding
+        return (b & 0x3F, pos + 1, True)  # special (LZF / int) encoding
 
     def skip_string(pos):
         r = read_len(pos)
@@ -680,9 +926,9 @@ def rdb_profile(path: Path) -> Dict[str, Any]:
             return None
         length, npos, special = r
         if special:
-            if length in (0, 1, 2):               # int8/16/32
+            if length in (0, 1, 2):  # int8/16/32
                 return npos + (1 << length)
-            return None                           # LZF-compressed: stop cleanly
+            return None  # LZF-compressed: stop cleanly
         return npos + length
 
     try:
@@ -696,11 +942,11 @@ def rdb_profile(path: Path) -> Dict[str, Any]:
                 kr = read_len(i + 1)
                 key = None
                 if kr and not kr[2]:
-                    key = raw[kr[1]:kr[1] + kr[0]].decode("ascii", "replace")
+                    key = raw[kr[1] : kr[1] + kr[0]].decode("ascii", "replace")
                 vr = read_len(kpos)
                 val = None
                 if vr and not vr[2]:
-                    val = raw[vr[1]:vr[1] + vr[0]].decode("ascii", "replace")
+                    val = raw[vr[1] : vr[1] + vr[0]].decode("ascii", "replace")
                     vpos = vr[1] + vr[0]
                 else:
                     vpos = skip_string(kpos)
@@ -738,18 +984,28 @@ def rdb_profile(path: Path) -> Dict[str, Any]:
     except (struct.error, IndexError):
         pass
 
-    tables = [{"name": f"db{d['db']}", "kind": "keyspace", "row_count": d["keys"],
-               "estimated": False, "columns": [],
-               "notes": f"{d['expires']} keys with TTL" if d.get("expires") else None}
-              for d in databases]
+    tables = [
+        {
+            "name": f"db{d['db']}",
+            "kind": "keyspace",
+            "row_count": d["keys"],
+            "estimated": False,
+            "columns": [],
+            "notes": f"{d['expires']} keys with TTL" if d.get("expires") else None,
+        }
+        for d in databases
+    ]
     total_keys = sum(d["keys"] for d in databases if d["keys"] is not None) or None
-    return _profile("redis", "key_value", structural=True,
-                    status="ok" if databases else "partial",
-                    store={"rdb_version": version, **{f"aux_{k}": v for k, v in aux.items()}},
-                    tables=tables,
-                    properties={"database_count": len(databases) or None,
-                                "total_keys": total_keys},
-                    notes="Redis RDB snapshot (keyspace metadata; values not materialised)")
+    return _profile(
+        "redis",
+        "key_value",
+        structural=True,
+        status="ok" if databases else "partial",
+        store={"rdb_version": version, **{f"aux_{k}": v for k, v in aux.items()}},
+        tables=tables,
+        properties={"database_count": len(databases) or None, "total_keys": total_keys},
+        notes="Redis RDB snapshot (keyspace metadata; values not materialised)",
+    )
 
 
 # ==========================================================================
@@ -769,7 +1025,9 @@ def cdb_profile(path: Path) -> Dict[str, Any]:
             raise ValueError("cdb hash tables out of range")
     # walk the record section counting entries (no payload retained)
     count = 0
-    end_of_data = min(slots[i] for i in range(0, 512, 2) if slots[i]) if any(slots) else 2048
+    end_of_data = (
+        min(slots[i] for i in range(0, 512, 2) if slots[i]) if any(slots) else 2048
+    )
     with open(path, "rb") as f:
         f.seek(2048)
         pos = 2048
@@ -784,12 +1042,24 @@ def cdb_profile(path: Path) -> Dict[str, Any]:
             f.seek(pos + 8 + step)
             pos += 8 + step
             count += 1
-    return _profile("cdb", "key_value", structural=True, store={"hash_slots": 256},
-                    tables=[{"name": path.stem, "kind": "tree", "row_count": count,
-                             "estimated": False, "columns": [],
-                             "notes": "constant (read-only) key/value database"}],
-                    properties={"record_count": count},
-                    notes="djb constant database (cdb)")
+    return _profile(
+        "cdb",
+        "key_value",
+        structural=True,
+        store={"hash_slots": 256},
+        tables=[
+            {
+                "name": path.stem,
+                "kind": "tree",
+                "row_count": count,
+                "estimated": False,
+                "columns": [],
+                "notes": "constant (read-only) key/value database",
+            }
+        ],
+        properties={"record_count": count},
+        notes="djb constant database (cdb)",
+    )
 
 
 # ==========================================================================
@@ -803,8 +1073,9 @@ def qvd_profile(path: Path) -> Dict[str, Any]:
     end = head.find(b"</QvdTableHeader>")
     if end == -1:
         raise ValueError("truncated QVD header")
-    xml = head[:end + len(b"</QvdTableHeader>")].decode("utf-8", "replace")
+    xml = head[: end + len(b"</QvdTableHeader>")].decode("utf-8", "replace")
     import xml.etree.ElementTree as ET
+
     try:
         root = ET.fromstring(xml)
     except ET.ParseError as err:
@@ -824,20 +1095,38 @@ def qvd_profile(path: Path) -> Dict[str, Any]:
             fname = fld.findtext("FieldName") or f"field_{len(cols) + 1}"
             uniq = fld.findtext("NoOfSymbols")
             nnull = fld.findtext("NullCount")
-            cols.append(_column(
-                fname, inferred_type="qvd_symbol",
-                distinct_count=int(uniq) if uniq and uniq.isdigit() else None,
-                null_count=int(nnull) if nnull and nnull.isdigit() else None,
-                extra={"bit_width": fld.findtext("BitWidth")}))
-    store = {"creator_doc": _text("CreatorDoc"),
-             "create_utc_time": _text("CreateUtcTime"),
-             "qv_build_no": _text("QvBuildNo")}
-    return _profile("qlikview", "columnar", structural=True, store=store,
-                    tables=[{"name": table_name, "kind": "table",
-                             "row_count": row_count, "estimated": False,
-                             "columns": cols, "notes": None}],
-                    properties={"field_count": len(cols)},
-                    notes="QlikView data file (QVD) — header/field metadata")
+            cols.append(
+                _column(
+                    fname,
+                    inferred_type="qvd_symbol",
+                    distinct_count=int(uniq) if uniq and uniq.isdigit() else None,
+                    null_count=int(nnull) if nnull and nnull.isdigit() else None,
+                    extra={"bit_width": fld.findtext("BitWidth")},
+                )
+            )
+    store = {
+        "creator_doc": _text("CreatorDoc"),
+        "create_utc_time": _text("CreateUtcTime"),
+        "qv_build_no": _text("QvBuildNo"),
+    }
+    return _profile(
+        "qlikview",
+        "columnar",
+        structural=True,
+        store=store,
+        tables=[
+            {
+                "name": table_name,
+                "kind": "table",
+                "row_count": row_count,
+                "estimated": False,
+                "columns": cols,
+                "notes": None,
+            }
+        ],
+        properties={"field_count": len(cols)},
+        notes="QlikView data file (QVD) — header/field metadata",
+    )
 
 
 # ==========================================================================
@@ -856,20 +1145,37 @@ def ese_profile(path: Path) -> Dict[str, Any]:
     state = _u32le(hdr, 52) if len(hdr) >= 56 else None
     size = _size(path)
     store = {
-        "ese_format_version": version, "file_type": file_type,
+        "ese_format_version": version,
+        "file_type": file_type,
         "page_size": page_size,
         "page_count": ((size // page_size) - 2) if (page_size and size) else None,
-        "db_state": {1: "just created", 2: "dirty shutdown",
-                     3: "clean shutdown", 4: "being converted",
-                     5: "force detach"}.get(state, state),
+        "db_state": {
+            1: "just created",
+            2: "dirty shutdown",
+            3: "clean shutdown",
+            4: "being converted",
+            5: "force detach",
+        }.get(state, state),
     }
-    return _profile("ese", "relational", structural=True, status="partial",
-                    store=store,
-                    tables=[{"name": path.stem, "kind": "tree", "row_count": None,
-                             "estimated": False, "columns": [],
-                             "notes": "ESE b-tree store (Exchange/AD/Windows.edb) — "
-                                      "table catalogue needs full ESE page decode"}],
-                    notes="Microsoft Extensible Storage Engine database")
+    return _profile(
+        "ese",
+        "relational",
+        structural=True,
+        status="partial",
+        store=store,
+        tables=[
+            {
+                "name": path.stem,
+                "kind": "tree",
+                "row_count": None,
+                "estimated": False,
+                "columns": [],
+                "notes": "ESE b-tree store (Exchange/AD/Windows.edb) — "
+                "table catalogue needs full ESE page decode",
+            }
+        ],
+        notes="Microsoft Extensible Storage Engine database",
+    )
 
 
 # ==========================================================================
@@ -889,24 +1195,43 @@ def jet_profile(path: Path) -> Dict[str, Any]:
     else:
         raise ValueError("not an Access/Jet/ACE database")
     version_byte = hdr[0x14]
-    jet_ver = {0x00: "Jet 3 (Access 97)", 0x01: "Jet 4 (Access 2000-2003)",
-               0x02: "ACE 12 (Access 2007)", 0x03: "ACE 14 (Access 2010)",
-               0x04: "ACE 15 (Access 2013)", 0x05: "ACE 16 (Access 2016+)"}
+    jet_ver = {
+        0x00: "Jet 3 (Access 97)",
+        0x01: "Jet 4 (Access 2000-2003)",
+        0x02: "ACE 12 (Access 2007)",
+        0x03: "ACE 14 (Access 2010)",
+        0x04: "ACE 15 (Access 2013)",
+        0x05: "ACE 16 (Access 2016+)",
+    }
     if version_byte in (0x01,):
         page_size = 4096
     size = _size(path)
     store = {
-        "jet_kind": kind, "version_byte": f"0x{version_byte:02X}",
-        "jet_version": jet_ver.get(version_byte, kind), "page_size": page_size,
+        "jet_kind": kind,
+        "version_byte": f"0x{version_byte:02X}",
+        "jet_version": jet_ver.get(version_byte, kind),
+        "page_size": page_size,
         "page_count": (size // page_size) if (page_size and size) else None,
     }
-    return _profile(engine, "relational", structural=True, status="partial",
-                    store=store,
-                    tables=[{"name": path.stem, "kind": "tree", "row_count": None,
-                             "estimated": False, "columns": [],
-                             "notes": "Access/Jet catalogue (MSysObjects) needs full "
-                                      "Jet page decode; header identified"}],
-                    notes="Microsoft Access / Jet / ACE database")
+    return _profile(
+        engine,
+        "relational",
+        structural=True,
+        status="partial",
+        store=store,
+        tables=[
+            {
+                "name": path.stem,
+                "kind": "tree",
+                "row_count": None,
+                "estimated": False,
+                "columns": [],
+                "notes": "Access/Jet catalogue (MSysObjects) needs full "
+                "Jet page decode; header identified",
+            }
+        ],
+        notes="Microsoft Access / Jet / ACE database",
+    )
 
 
 # ==========================================================================
@@ -918,15 +1243,26 @@ def pst_profile(path: Path) -> Dict[str, Any]:
         raise ValueError("not a PST/OST store")
     wver = _u16le(hdr, 10)
     fmt = "ANSI (Outlook 97-2002)" if wver < 0x15 else "Unicode (Outlook 2003+)"
-    store = {"ndb_format": fmt, "wVer": wver,
-             "content_type": hdr[8:10].hex()}
-    return _profile("outlook_pst", "mail_store", structural=True, status="partial",
-                    store=store,
-                    tables=[{"name": path.stem, "kind": "tree", "row_count": None,
-                             "estimated": False, "columns": [],
-                             "notes": "Outlook message store — folders/messages need "
-                                      "full NDB (BBT/NBT) decode; header identified"}],
-                    notes="Microsoft Outlook personal/offline store (PST/OST)")
+    store = {"ndb_format": fmt, "wVer": wver, "content_type": hdr[8:10].hex()}
+    return _profile(
+        "outlook_pst",
+        "mail_store",
+        structural=True,
+        status="partial",
+        store=store,
+        tables=[
+            {
+                "name": path.stem,
+                "kind": "tree",
+                "row_count": None,
+                "estimated": False,
+                "columns": [],
+                "notes": "Outlook message store — folders/messages need "
+                "full NDB (BBT/NBT) decode; header identified",
+            }
+        ],
+        notes="Microsoft Outlook personal/offline store (PST/OST)",
+    )
 
 
 # ==========================================================================
@@ -934,14 +1270,26 @@ def pst_profile(path: Path) -> Dict[str, Any]:
 # ==========================================================================
 def dbx_profile(path: Path) -> Dict[str, Any]:
     hdr = _read_at(path, 0, 16)
-    if len(hdr) < 4 or hdr[0:4] != b"\xCF\xAD\x12\xFE":
+    if len(hdr) < 4 or hdr[0:4] != b"\xcf\xad\x12\xfe":
         raise ValueError("not an Outlook Express DBX file")
-    return _profile("outlook_express", "mail_store", structural=True, status="partial",
-                    store={"file_type_byte": f"0x{hdr[4]:02X}" if len(hdr) > 4 else None},
-                    tables=[{"name": path.stem, "kind": "tree", "row_count": None,
-                             "estimated": False, "columns": [],
-                             "notes": "Outlook Express message/folder index"}],
-                    notes="Outlook Express mail database (DBX)")
+    return _profile(
+        "outlook_express",
+        "mail_store",
+        structural=True,
+        status="partial",
+        store={"file_type_byte": f"0x{hdr[4]:02X}" if len(hdr) > 4 else None},
+        tables=[
+            {
+                "name": path.stem,
+                "kind": "tree",
+                "row_count": None,
+                "estimated": False,
+                "columns": [],
+                "notes": "Outlook Express message/folder index",
+            }
+        ],
+        notes="Outlook Express mail database (DBX)",
+    )
 
 
 # ==========================================================================
@@ -954,7 +1302,7 @@ def innodb_profile(path: Path) -> Dict[str, Any]:
     # FIL header: offset 4 = page number, 24 = FIL_PAGE_TYPE, 34 = space id.
     page_type = _u16be(page, 24)
     space_id = _u32be(page, 34)
-    fsp_flags = _u32be(page, 54)                  # FSP_SPACE_FLAGS within FSP header
+    fsp_flags = _u32be(page, 54)  # FSP_SPACE_FLAGS within FSP header
     # page-size from flags (MySQL 5.7+/8.0): bits encode logical page size.
     ssize = (fsp_flags >> 6) & 0xF
     page_size = (512 << ssize) if ssize else 16384
@@ -962,17 +1310,31 @@ def innodb_profile(path: Path) -> Dict[str, Any]:
     if page_type not in (0, 8) and space_id > 0xFFFFFF:
         raise ValueError("not a plausible InnoDB page")
     store = {
-        "space_id": space_id, "fil_page_type": page_type,
-        "fsp_flags": f"0x{fsp_flags:X}", "page_size": page_size,
+        "space_id": space_id,
+        "fil_page_type": page_type,
+        "fsp_flags": f"0x{fsp_flags:X}",
+        "page_size": page_size,
         "page_count": (size // page_size) if (page_size and size) else None,
     }
-    return _profile("innodb", "relational", structural=True, status="partial",
-                    store=store,
-                    tables=[{"name": path.stem, "kind": "tree", "row_count": None,
-                             "estimated": False, "columns": [],
-                             "notes": "InnoDB tablespace — row schema in the data "
-                                      "dictionary/SDI; header identified"}],
-                    notes="MySQL/MariaDB InnoDB tablespace file")
+    return _profile(
+        "innodb",
+        "relational",
+        structural=True,
+        status="partial",
+        store=store,
+        tables=[
+            {
+                "name": path.stem,
+                "kind": "tree",
+                "row_count": None,
+                "estimated": False,
+                "columns": [],
+                "notes": "InnoDB tablespace — row schema in the data "
+                "dictionary/SDI; header identified",
+            }
+        ],
+        notes="MySQL/MariaDB InnoDB tablespace file",
+    )
 
 
 # ==========================================================================
@@ -982,11 +1344,24 @@ def myisam_index_profile(path: Path) -> Dict[str, Any]:
     hdr = _read_at(path, 0, 32)
     if len(hdr) < 8 or _u16be(hdr, 0) != 0xFEFE:
         raise ValueError("not a MyISAM index (.MYI)")
-    return _profile("myisam", "relational", structural=True, status="partial",
-                    store={"state_header": "MyISAM"},
-                    tables=[{"name": path.stem, "kind": "index", "row_count": None,
-                             "estimated": False, "columns": [], "notes": None}],
-                    notes="MySQL MyISAM index file (companion to .MYD/.frm)")
+    return _profile(
+        "myisam",
+        "relational",
+        structural=True,
+        status="partial",
+        store={"state_header": "MyISAM"},
+        tables=[
+            {
+                "name": path.stem,
+                "kind": "index",
+                "row_count": None,
+                "estimated": False,
+                "columns": [],
+                "notes": None,
+            }
+        ],
+        notes="MySQL MyISAM index file (companion to .MYD/.frm)",
+    )
 
 
 def frm_profile(path: Path) -> Dict[str, Any]:
@@ -995,15 +1370,30 @@ def frm_profile(path: Path) -> Dict[str, Any]:
         raise ValueError("not a MySQL FRM table definition")
     legacy_types = {0: "ISAM", 1: "HEAP", 6: "MyISAM", 9: "InnoDB", 12: "InnoDB"}
     db_type = hdr[3]
-    store = {"frm_version": hdr[2], "legacy_db_type": legacy_types.get(db_type, db_type),
-             "io_size": _u16le(hdr, 4) if len(hdr) >= 6 else None}
-    return _profile("mysql_frm", "relational", structural=True, status="partial",
-                    store=store,
-                    tables=[{"name": path.stem, "kind": "table", "row_count": None,
-                             "estimated": False, "columns": [],
-                             "notes": "MySQL legacy .frm table definition — full column "
-                                      "list needs the FRM packed-field decoder"}],
-                    notes="MySQL legacy table definition (.frm)")
+    store = {
+        "frm_version": hdr[2],
+        "legacy_db_type": legacy_types.get(db_type, db_type),
+        "io_size": _u16le(hdr, 4) if len(hdr) >= 6 else None,
+    }
+    return _profile(
+        "mysql_frm",
+        "relational",
+        structural=True,
+        status="partial",
+        store=store,
+        tables=[
+            {
+                "name": path.stem,
+                "kind": "table",
+                "row_count": None,
+                "estimated": False,
+                "columns": [],
+                "notes": "MySQL legacy .frm table definition — full column "
+                "list needs the FRM packed-field decoder",
+            }
+        ],
+        notes="MySQL legacy table definition (.frm)",
+    )
 
 
 # ==========================================================================
@@ -1021,15 +1411,30 @@ def firebird_profile(path: Path) -> Dict[str, Any]:
     if page_size not in (1024, 2048, 4096, 8192, 16384, 32768):
         raise ValueError("implausible Firebird page size")
     size = _size(path)
-    store = {"page_size": page_size, "ods_version": ods_version,
-             "page_count": (size // page_size) if (page_size and size) else None}
-    return _profile("firebird", "relational", structural=True, status="partial",
-                    store=store,
-                    tables=[{"name": path.stem, "kind": "tree", "row_count": None,
-                             "estimated": False, "columns": [],
-                             "notes": "Firebird/InterBase store — RDB$ system tables "
-                                      "need full page decode; header identified"}],
-                    notes="Firebird / InterBase database (.fdb/.gdb)")
+    store = {
+        "page_size": page_size,
+        "ods_version": ods_version,
+        "page_count": (size // page_size) if (page_size and size) else None,
+    }
+    return _profile(
+        "firebird",
+        "relational",
+        structural=True,
+        status="partial",
+        store=store,
+        tables=[
+            {
+                "name": path.stem,
+                "kind": "tree",
+                "row_count": None,
+                "estimated": False,
+                "columns": [],
+                "notes": "Firebird/InterBase store — RDB$ system tables "
+                "need full page decode; header identified",
+            }
+        ],
+        notes="Firebird / InterBase database (.fdb/.gdb)",
+    )
 
 
 # ==========================================================================
@@ -1040,18 +1445,29 @@ def mssql_mdf_profile(path: Path) -> Dict[str, Any]:
     if not size or size < 8192:
         raise ValueError("mdf too short")
     page0 = _read_at(path, 0, 96)
-    m_type = page0[0]                             # page header type byte
+    m_type = page0[0]  # page header type byte
     if size % 8192 != 0 or m_type not in range(0, 22):
         raise ValueError("not an 8 KiB SQL Server page file")
-    store = {"page_size": 8192, "page_count": size // 8192,
-             "page0_type": m_type}
-    return _profile("sqlserver", "relational", structural=True, status="partial",
-                    store=store,
-                    tables=[{"name": path.stem, "kind": "tree", "row_count": None,
-                             "estimated": False, "columns": [],
-                             "notes": "SQL Server data file — schema in system base "
-                                      "tables needs full page decode; layout identified"}],
-                    notes="Microsoft SQL Server data file (MDF/NDF)")
+    store = {"page_size": 8192, "page_count": size // 8192, "page0_type": m_type}
+    return _profile(
+        "sqlserver",
+        "relational",
+        structural=True,
+        status="partial",
+        store=store,
+        tables=[
+            {
+                "name": path.stem,
+                "kind": "tree",
+                "row_count": None,
+                "estimated": False,
+                "columns": [],
+                "notes": "SQL Server data file — schema in system base "
+                "tables needs full page decode; layout identified",
+            }
+        ],
+        notes="Microsoft SQL Server data file (MDF/NDF)",
+    )
 
 
 # ==========================================================================
@@ -1064,12 +1480,24 @@ def tsm_profile(path: Path, ext: str) -> Dict[str, Any]:
     head = _read_at(path, 0, 8)
     if len(head) < 5 or _u32be(head, 0) != _TSM_MAGIC:
         raise ValueError("not an InfluxDB TSM file")
-    return _profile("influxdb", "time_series", structural=True, status="partial",
-                    store={"tsm_version": head[4]},
-                    tables=[{"name": path.stem, "kind": "stream", "row_count": None,
-                             "estimated": False, "columns": [],
-                             "notes": "InfluxDB time-structured merge tree (series blocks)"}],
-                    notes="InfluxDB TSM time-series store")
+    return _profile(
+        "influxdb",
+        "time_series",
+        structural=True,
+        status="partial",
+        store={"tsm_version": head[4]},
+        tables=[
+            {
+                "name": path.stem,
+                "kind": "stream",
+                "row_count": None,
+                "estimated": False,
+                "columns": [],
+                "notes": "InfluxDB time-structured merge tree (series blocks)",
+            }
+        ],
+        notes="InfluxDB TSM time-series store",
+    )
 
 
 # ==========================================================================
@@ -1083,18 +1511,28 @@ def keepass_profile(path: Path) -> Dict[str, Any]:
     if len(hdr) < 8 or _u32le(hdr, 0) != _KDBX_SIG1:
         raise ValueError("not a KeePass database")
     sig2 = _u32le(hdr, 4)
-    variant = {0xB54BFB65: "KeePass 1.x (KDB)",
-               0xB54BFB66: "KeePass 2.x pre-release",
-               0xB54BFB67: "KeePass 2.x (KDBX)"}.get(sig2, "KeePass (unknown minor)")
+    variant = {
+        0xB54BFB65: "KeePass 1.x (KDB)",
+        0xB54BFB66: "KeePass 2.x pre-release",
+        0xB54BFB67: "KeePass 2.x (KDBX)",
+    }.get(sig2, "KeePass (unknown minor)")
     ver = None
     if len(hdr) >= 12:
         ver = f"{_u16le(hdr, 10)}.{_u16le(hdr, 8)}"
-    return _profile("keepass", "password_manager", structural=True, status="partial",
-                    encrypted=True,
-                    store={"variant": variant, "format_version": ver,
-                           "signature2": f"0x{sig2:08X}"},
-                    notes="KeePass encrypted credential database — encrypted; only the "
-                          "public format header is read (no entries, no decryption)")
+    return _profile(
+        "keepass",
+        "password_manager",
+        structural=True,
+        status="partial",
+        encrypted=True,
+        store={
+            "variant": variant,
+            "format_version": ver,
+            "signature2": f"0x{sig2:08X}",
+        },
+        notes="KeePass encrypted credential database — encrypted; only the "
+        "public format header is read (no entries, no decryption)",
+    )
 
 
 # ==========================================================================
@@ -1107,13 +1545,25 @@ def realm_profile(path: Path) -> Dict[str, Any]:
         raise ValueError("no Realm signature")
     off = head.find(b"T-DB")
     fmt = head[off + 4] if len(head) > off + 4 else None
-    return _profile("realm", "document", structural=True, status="partial",
-                    store={"realm_signature_offset": off, "file_format_version": fmt},
-                    tables=[{"name": path.stem, "kind": "tree", "row_count": None,
-                             "estimated": False, "columns": [],
-                             "notes": "Realm object store — object schema needs the "
-                                      "Realm core group decoder; header identified"}],
-                    notes="Realm mobile object database")
+    return _profile(
+        "realm",
+        "document",
+        structural=True,
+        status="partial",
+        store={"realm_signature_offset": off, "file_format_version": fmt},
+        tables=[
+            {
+                "name": path.stem,
+                "kind": "tree",
+                "row_count": None,
+                "estimated": False,
+                "columns": [],
+                "notes": "Realm object store — object schema needs the "
+                "Realm core group decoder; header identified",
+            }
+        ],
+        notes="Realm mobile object database",
+    )
 
 
 # ==========================================================================
@@ -1123,12 +1573,24 @@ def wiredtiger_profile(path: Path) -> Dict[str, Any]:
     head = _read_at(path, 0, 128)
     if b"WiredTiger" not in head:
         raise ValueError("no WiredTiger signature")
-    return _profile("wiredtiger", "document", structural=True, status="partial",
-                    store={"signature": "WiredTiger"},
-                    tables=[{"name": path.stem, "kind": "tree", "row_count": None,
-                             "estimated": False, "columns": [],
-                             "notes": "WiredTiger storage-engine file (MongoDB/standalone)"}],
-                    notes="WiredTiger key/value storage file")
+    return _profile(
+        "wiredtiger",
+        "document",
+        structural=True,
+        status="partial",
+        store={"signature": "WiredTiger"},
+        tables=[
+            {
+                "name": path.stem,
+                "kind": "tree",
+                "row_count": None,
+                "estimated": False,
+                "columns": [],
+                "notes": "WiredTiger storage-engine file (MongoDB/standalone)",
+            }
+        ],
+        notes="WiredTiger key/value storage file",
+    )
 
 
 # ==========================================================================
@@ -1138,12 +1600,24 @@ def kyotocabinet_profile(path: Path) -> Dict[str, Any]:
     head = _read_at(path, 0, 32)
     if not head.startswith(b"KC"):
         raise ValueError("not a Kyoto Cabinet database")
-    return _profile("kyotocabinet", "key_value", structural=True, status="partial",
-                    store={"library_revision": head[2] if len(head) > 2 else None},
-                    tables=[{"name": path.stem, "kind": "tree", "row_count": None,
-                             "estimated": False, "columns": [],
-                             "notes": "Kyoto Cabinet hash/tree store — opaque key/value"}],
-                    notes="Kyoto Cabinet database")
+    return _profile(
+        "kyotocabinet",
+        "key_value",
+        structural=True,
+        status="partial",
+        store={"library_revision": head[2] if len(head) > 2 else None},
+        tables=[
+            {
+                "name": path.stem,
+                "kind": "tree",
+                "row_count": None,
+                "estimated": False,
+                "columns": [],
+                "notes": "Kyoto Cabinet hash/tree store — opaque key/value",
+            }
+        ],
+        notes="Kyoto Cabinet database",
+    )
 
 
 # ==========================================================================
@@ -1158,11 +1632,24 @@ def btrieve_profile(path: Path) -> Dict[str, Any]:
     page_size = _u16le(hdr, 8)
     if page_size not in (512, 1024, 1536, 2048, 3072, 4096, 8192, 16384):
         raise ValueError("not a Btrieve FCR page size")
-    return _profile("btrieve", "legacy_isam", structural=True, status="partial",
-                    store={"page_size": page_size},
-                    tables=[{"name": path.stem, "kind": "tree", "row_count": None,
-                             "estimated": False, "columns": [], "notes": None}],
-                    notes="Btrieve / Pervasive PSQL ISAM file")
+    return _profile(
+        "btrieve",
+        "legacy_isam",
+        structural=True,
+        status="partial",
+        store={"page_size": page_size},
+        tables=[
+            {
+                "name": path.stem,
+                "kind": "tree",
+                "row_count": None,
+                "estimated": False,
+                "columns": [],
+                "notes": None,
+            }
+        ],
+        notes="Btrieve / Pervasive PSQL ISAM file",
+    )
 
 
 # ==========================================================================
@@ -1181,7 +1668,7 @@ def _sniff(path: Path, ext: str) -> Optional[Dict[str, Any]]:
         return jet_profile(path)
     if head.startswith(b"!BDN"):
         return pst_profile(path)
-    if head[0:4] == b"\xCF\xAD\x12\xFE":
+    if head[0:4] == b"\xcf\xad\x12\xfe":
         return dbx_profile(path)
     if head.startswith(b"REDIS"):
         return rdb_profile(path)
@@ -1199,7 +1686,7 @@ def _sniff(path: Path, ext: str) -> Optional[Dict[str, Any]]:
             return qvd_profile(path)
         except ValueError:
             pass
-    for reader in (_u32le, _u32be):               # GDBM / Berkeley DB magics
+    for reader in (_u32le, _u32be):  # GDBM / Berkeley DB magics
         try:
             if reader(head, 0) in _GDBM_MAGIC:
                 return gdbm_profile(path)
@@ -1209,7 +1696,9 @@ def _sniff(path: Path, ext: str) -> Optional[Dict[str, Any]]:
         for reader in (_u32le, _u32be):
             try:
                 if reader(head, 12) in _BDB_MAGIC:
-                    return berkeleydb_profile(path, *_BDB_LABEL.get(ext, ("berkeleydb", "key_value")))
+                    return berkeleydb_profile(
+                        path, *_BDB_LABEL.get(ext, ("berkeleydb", "key_value"))
+                    )
             except (struct.error, ValueError):
                 pass
     return None
@@ -1218,58 +1707,103 @@ def _sniff(path: Path, ext: str) -> Optional[Dict[str, Any]]:
 # ext-hint identity for the forensic fallback and family tagging.
 # (label, family) — mirrors database.json subdomains, corrected to true engine.
 _EXT_IDENTITY: Dict[str, tuple] = {
-    ".accdb": ("access_ace", "relational"), ".accde": ("access_ace", "relational"),
-    ".accdt": ("access_ace", "relational"), ".adabas": ("adabas", "legacy_isam"),
-    ".bdb": ("berkeleydb", "key_value"), ".bmf": ("vulcan_block_model", "geospatial"),
-    ".btr": ("btrieve", "legacy_isam"), ".cbh": ("chessbase", "document"),
-    ".cdb": ("cdb", "key_value"), ".cdx": ("foxpro_index", "relational"),
-    ".chain": ("blockchain_store", "graph"), ".chroma": ("chroma", "vector"),
-    ".clickhouse": ("clickhouse", "columnar"), ".cub": ("ssas_cube", "analytics_cube"),
-    ".dbf": ("dbase", "relational"), ".dbm": ("dbm", "key_value"),
-    ".dbt": ("dbase_memo", "relational"), ".dbx": ("outlook_express", "mail_store"),
-    ".dm": ("datamine", "geospatial"), ".duckdb": ("duckdb", "columnar"),
-    ".edb": ("ese", "relational"), ".esds": ("vsam_esds", "legacy_isam"),
-    ".essbase": ("essbase", "analytics_cube"), ".fdb": ("firebird", "relational"),
-    ".ffs_db": ("freefilesync", "key_value"), ".fpt": ("foxpro_memo", "relational"),
-    ".frm": ("mysql_frm", "relational"), ".gdb": ("interbase", "relational"),
-    ".gdbm": ("gdbm", "key_value"), ".hyper": ("tableau_hyper", "columnar"),
-    ".ibd": ("innodb", "relational"), ".index-dat": ("ie_urlcache", "key_value"),
-    ".kch": ("kyotocabinet", "key_value"), ".kdb": ("keepass", "password_manager"),
-    ".kdbx": ("keepass", "password_manager"), ".ksds": ("vsam_ksds", "legacy_isam"),
-    ".ldb": ("leveldb", "key_value"), ".leveldb": ("leveldb", "key_value"),
-    ".lmdb": ("lmdb", "key_value"), ".localstorage": ("webkit_localstorage", "key_value"),
-    ".lrcat": ("lightroom_catalog", "relational"), ".mb": ("paradox_memo", "relational"),
-    ".mdb": ("access_jet", "relational"), ".mdbx": ("mdbx", "key_value"),
-    ".mdf": ("sqlserver", "relational"), ".mny": ("ms_money", "accounting"),
-    ".myd": ("myisam", "relational"), ".myi": ("myisam", "relational"),
-    ".ndf": ("sqlserver", "relational"), ".ndx": ("dbase_index", "relational"),
-    ".neo4j": ("neo4j", "graph"), ".nsf": ("lotus_notes", "document"),
-    ".objectbox": ("objectbox", "document"), ".opvault": ("onepassword", "password_manager"),
-    ".ost": ("outlook_pst", "mail_store"), ".otl": ("essbase_outline", "analytics_cube"),
-    ".plaso": ("plaso", "forensic_timeline"), ".pst": ("outlook_pst", "mail_store"),
-    ".px": ("paradox_index", "relational"), ".qba": ("quickbooks", "accounting"),
-    ".qbm": ("quickbooks", "accounting"), ".qbw": ("quickbooks", "accounting"),
-    ".qbx": ("quickbooks", "accounting"), ".qby": ("quickbooks", "accounting"),
-    ".qdf": ("quicken", "accounting"), ".qvd": ("qlikview", "columnar"),
-    ".rdb": ("redis", "key_value"), ".realm": ("realm", "document"),
-    ".rpd": ("rapidfile", "legacy_isam"), ".rrds": ("vsam_rrds", "legacy_isam"),
-    ".sage": ("sage", "accounting"), ".sdltm": ("trados_tm", "relational"),
-    ".splay": ("kdb_plus", "columnar"), ".sqlitedb": ("sqlite", "relational"),
-    ".sst": ("leveldb", "key_value"), ".tdata": ("telegram", "key_value"),
-    ".tdb": ("tdb", "key_value"), ".tde": ("tableau_extract", "columnar"),
-    ".tsdb": ("influxdb", "time_series"), ".tsm": ("influxdb", "time_series"),
-    ".vsam": ("vsam", "legacy_isam"), ".wallet": ("crypto_wallet", "crypto_wallet"),
+    ".accdb": ("access_ace", "relational"),
+    ".accde": ("access_ace", "relational"),
+    ".accdt": ("access_ace", "relational"),
+    ".adabas": ("adabas", "legacy_isam"),
+    ".bdb": ("berkeleydb", "key_value"),
+    ".bmf": ("vulcan_block_model", "geospatial"),
+    ".btr": ("btrieve", "legacy_isam"),
+    ".cbh": ("chessbase", "document"),
+    ".cdb": ("cdb", "key_value"),
+    ".cdx": ("foxpro_index", "relational"),
+    ".chain": ("blockchain_store", "graph"),
+    ".chroma": ("chroma", "vector"),
+    ".clickhouse": ("clickhouse", "columnar"),
+    ".cub": ("ssas_cube", "analytics_cube"),
+    ".dbf": ("dbase", "relational"),
+    ".dbm": ("dbm", "key_value"),
+    ".dbt": ("dbase_memo", "relational"),
+    ".dbx": ("outlook_express", "mail_store"),
+    ".dm": ("datamine", "geospatial"),
+    ".duckdb": ("duckdb", "columnar"),
+    ".edb": ("ese", "relational"),
+    ".esds": ("vsam_esds", "legacy_isam"),
+    ".essbase": ("essbase", "analytics_cube"),
+    ".fdb": ("firebird", "relational"),
+    ".ffs_db": ("freefilesync", "key_value"),
+    ".fpt": ("foxpro_memo", "relational"),
+    ".frm": ("mysql_frm", "relational"),
+    ".gdb": ("interbase", "relational"),
+    ".gdbm": ("gdbm", "key_value"),
+    ".hyper": ("tableau_hyper", "columnar"),
+    ".ibd": ("innodb", "relational"),
+    ".index-dat": ("ie_urlcache", "key_value"),
+    ".kch": ("kyotocabinet", "key_value"),
+    ".kdb": ("keepass", "password_manager"),
+    ".kdbx": ("keepass", "password_manager"),
+    ".ksds": ("vsam_ksds", "legacy_isam"),
+    ".ldb": ("leveldb", "key_value"),
+    ".leveldb": ("leveldb", "key_value"),
+    ".lmdb": ("lmdb", "key_value"),
+    ".localstorage": ("webkit_localstorage", "key_value"),
+    ".lrcat": ("lightroom_catalog", "relational"),
+    ".mb": ("paradox_memo", "relational"),
+    ".mdb": ("access_jet", "relational"),
+    ".mdbx": ("mdbx", "key_value"),
+    ".mdf": ("sqlserver", "relational"),
+    ".mny": ("ms_money", "accounting"),
+    ".myd": ("myisam", "relational"),
+    ".myi": ("myisam", "relational"),
+    ".ndf": ("sqlserver", "relational"),
+    ".ndx": ("dbase_index", "relational"),
+    ".neo4j": ("neo4j", "graph"),
+    ".nsf": ("lotus_notes", "document"),
+    ".objectbox": ("objectbox", "document"),
+    ".opvault": ("onepassword", "password_manager"),
+    ".ost": ("outlook_pst", "mail_store"),
+    ".otl": ("essbase_outline", "analytics_cube"),
+    ".plaso": ("plaso", "forensic_timeline"),
+    ".pst": ("outlook_pst", "mail_store"),
+    ".px": ("paradox_index", "relational"),
+    ".qba": ("quickbooks", "accounting"),
+    ".qbm": ("quickbooks", "accounting"),
+    ".qbw": ("quickbooks", "accounting"),
+    ".qbx": ("quickbooks", "accounting"),
+    ".qby": ("quickbooks", "accounting"),
+    ".qdf": ("quicken", "accounting"),
+    ".qvd": ("qlikview", "columnar"),
+    ".rdb": ("redis", "key_value"),
+    ".realm": ("realm", "document"),
+    ".rpd": ("rapidfile", "legacy_isam"),
+    ".rrds": ("vsam_rrds", "legacy_isam"),
+    ".sage": ("sage", "accounting"),
+    ".sdltm": ("trados_tm", "relational"),
+    ".splay": ("kdb_plus", "columnar"),
+    ".sqlitedb": ("sqlite", "relational"),
+    ".sst": ("leveldb", "key_value"),
+    ".tdata": ("telegram", "key_value"),
+    ".tdb": ("tdb", "key_value"),
+    ".tde": ("tableau_extract", "columnar"),
+    ".tsdb": ("influxdb", "time_series"),
+    ".tsm": ("influxdb", "time_series"),
+    ".vsam": ("vsam", "legacy_isam"),
+    ".wallet": ("crypto_wallet", "crypto_wallet"),
     ".wt": ("wiredtiger", "document"),
 }
 
 _SQLITE_LABEL: Dict[str, tuple] = {
-    ".sqlitedb": ("sqlite", "relational"), ".localstorage": ("webkit_localstorage", "key_value"),
-    ".lrcat": ("lightroom_catalog", "relational"), ".sdltm": ("trados_tm", "relational"),
-    ".plaso": ("plaso", "forensic_timeline"), ".chroma": ("chroma", "vector"),
+    ".sqlitedb": ("sqlite", "relational"),
+    ".localstorage": ("webkit_localstorage", "key_value"),
+    ".lrcat": ("lightroom_catalog", "relational"),
+    ".sdltm": ("trados_tm", "relational"),
+    ".plaso": ("plaso", "forensic_timeline"),
+    ".chroma": ("chroma", "vector"),
     ".ldb": ("chainstate", "key_value"),
 }
 _BDB_LABEL: Dict[str, tuple] = {
-    ".bdb": ("berkeleydb", "key_value"), ".wallet": ("bitcoin_wallet", "crypto_wallet"),
+    ".bdb": ("berkeleydb", "key_value"),
+    ".wallet": ("bitcoin_wallet", "crypto_wallet"),
 }
 
 # ext-hinted structural parsers (no reliable leading magic) tried before forensic.
@@ -1311,13 +1845,13 @@ _ENCRYPTED_HINTS = {".kdb", ".kdbx", ".opvault", ".wallet", ".tdata"}
 # One-line honest note for the forensic fallback, per engine family.
 _FAMILY_NOTE = {
     "legacy_isam": "legacy/mainframe ISAM data set — no portable on-disk schema; "
-                   "byte metadata only",
+    "byte metadata only",
     "analytics_cube": "OLAP cube/outline — proprietary multidimensional store; byte "
-                      "metadata only",
+    "metadata only",
     "accounting": "proprietary accounting company file — often compressed/encrypted; "
-                  "byte metadata only",
+    "byte metadata only",
     "crypto_wallet": "cryptocurrency wallet — encrypted key material; never decrypted, "
-                     "byte metadata only",
+    "byte metadata only",
     "password_manager": "encrypted credential vault — never decrypted, byte metadata only",
     "geospatial": "proprietary geoscience/GIS store; byte metadata only",
     "graph": "graph-database store file — engine-internal layout; byte metadata only",
@@ -1327,10 +1861,10 @@ _FAMILY_NOTE = {
     "key_value": "key/value store — opaque keys/values; byte metadata only",
     "time_series": "time-series store — engine-internal layout; byte metadata only",
     "relational": "relational store — on-disk catalogue needs the engine's page "
-                  "decoder; byte metadata only",
+    "decoder; byte metadata only",
     "forensic_timeline": "forensic timeline store; byte metadata only",
     "mail_store": "mail store — messages need the engine's container decoder; byte "
-                  "metadata only",
+    "metadata only",
 }
 
 

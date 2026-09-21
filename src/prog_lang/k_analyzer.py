@@ -15,7 +15,7 @@
 # an identifier, so leading-'/' comment lines never produce a false symbol and
 # comment handling is left to anchoring (mirrors the q analyzer).
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _NAME = r"[A-Za-z_][A-Za-z0-9_.]*"
@@ -29,10 +29,8 @@ class KAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"',)
 
     _LOAD = re.compile(r"^[ \t]*\\l\s+(\S+)", re.MULTILINE)
-    _FUNC = re.compile(
-        r"^[ \t]*(" + _NAME + r")\s*::?\s*\{(\[[^\]]*\])?", re.MULTILINE)
-    _VAR = re.compile(
-        r"^[ \t]*(" + _NAME + r")\s*::?(?!\s*\{)", re.MULTILINE)
+    _FUNC = re.compile(r"^[ \t]*(" + _NAME + r")\s*::?\s*\{(\[[^\]]*\])?", re.MULTILINE)
+    _VAR = re.compile(r"^[ \t]*(" + _NAME + r")\s*::?(?!\s*\{)", re.MULTILINE)
 
     def _args(self, bracket):
         ids = []
@@ -55,8 +53,13 @@ class KAnalyzer(RegexCodeAnalyzer):
             self._add_import(file_id, src.replace("\\", "/").split("/")[-1], src)
 
         for m in self._FUNC.finditer(clean):
-            self._add_function(file_id, m.group(1), self._args(m.group(2)), [],
-                               description="k function")
+            self._add_function(
+                file_id,
+                m.group(1),
+                self._args(m.group(2)),
+                [],
+                description="k function",
+            )
 
         for m in self._VAR.finditer(clean):
             self._add_variable(file_id, m.group(1))

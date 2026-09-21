@@ -16,6 +16,7 @@ class BinaryTemplateAnalyzer(ShellScriptBase):
     ``#include "file"`` / ``import std.mem;``          -> import
     ``#define NAME value``                             -> variable
     """
+
     LANG_KEY = "binary-template"
     EXTENSIONS = (".bt", ".hexpat")
     LINE_COMMENTS = ("//",)
@@ -25,7 +26,9 @@ class BinaryTemplateAnalyzer(ShellScriptBase):
     _STRUCT = re.compile(r"(?m)\b(struct|union|bitfield)[ \t]+([A-Za-z_]\w*)")
     _ENUM = re.compile(r"(?m)\benum[ \t]+(?:<[^>]+>[ \t]*)?([A-Za-z_]\w*)")
     _TYPEDEF = re.compile(r"(?m)^[ \t]*typedef[ \t]+.*?\b([A-Za-z_]\w*)[ \t]*;")
-    _FUNC = re.compile(r"(?m)^[ \t]*(?:[\w<>\[\].]+)[ \t]+([A-Za-z_]\w*)[ \t]*\(([^)]*)\)[ \t]*\{")
+    _FUNC = re.compile(
+        r"(?m)^[ \t]*(?:[\w<>\[\].]+)[ \t]+([A-Za-z_]\w*)[ \t]*\(([^)]*)\)[ \t]*\{"
+    )
     _INCLUDE = re.compile(r'(?mi)^[ \t]*#include[ \t]+[<"]([^>"]+)[>"]')
     _IMPORT = re.compile(r"(?m)^[ \t]*import[ \t]+([\w.]+)")
     _DEFINE = re.compile(r"(?mi)^[ \t]*#define[ \t]+(\w+)[ \t]*(.*)")
@@ -66,10 +69,14 @@ class BinaryTemplateAnalyzer(ShellScriptBase):
             if name in self._KW or name in seen_fn or name in seen_cls:
                 continue
             seen_fn.add(name)
-            params = [p.strip().split()[-1].lstrip("&*")
-                      for p in self._split_top_level(m.group(2) or "") if p.strip()]
-            self._add_shell_function(file_id, name, params=params,
-                                     description="template function")
+            params = [
+                p.strip().split()[-1].lstrip("&*")
+                for p in self._split_top_level(m.group(2) or "")
+                if p.strip()
+            ]
+            self._add_shell_function(
+                file_id, name, params=params, description="template function"
+            )
 
         seen_imp = set()
         for m in self._INCLUDE.finditer(clean):
@@ -88,9 +95,14 @@ class BinaryTemplateAnalyzer(ShellScriptBase):
             name = m.group(1)
             if name not in seen_var:
                 seen_var.add(name)
-                self._add_variable(file_id, name, m.group(2).strip()[:120] or None,
-                                   scope="define")
+                self._add_variable(
+                    file_id, name, m.group(2).strip()[:120] or None, scope="define"
+                )
 
         self._record_module_meta(
-            file_id, kind="imhex" if path.suffix.lower() == ".hexpat" else "010-editor",
-            types=len(seen_cls), functions=len(seen_fn), includes=len(seen_imp))
+            file_id,
+            kind="imhex" if path.suffix.lower() == ".hexpat" else "010-editor",
+            types=len(seen_cls),
+            functions=len(seen_fn),
+            includes=len(seen_imp),
+        )

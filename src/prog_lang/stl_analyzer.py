@@ -16,7 +16,7 @@
 # Comments '//' line and '(* *)' block; strings use '"' and "'".
 # Names are quoted "Symbolic" or absolute FB10/FC1/DB5/OB1. Case-insensitive kw.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _NAME = r'(?:"[^"]+"|[A-Za-z_][A-Za-z0-9_]*)'
@@ -28,16 +28,20 @@ class STLAnalyzer(RegexCodeAnalyzer):
     EXTENSIONS = (".awl",)
     LINE_COMMENTS = ("//",)
     BLOCK_COMMENTS = (("(*", "*)"),)
-    STRING_DELIMS = ()          # keep quoted symbolic names intact
+    STRING_DELIMS = ()  # keep quoted symbolic names intact
 
-    _CLASS = re.compile(r"(?im)^\s*(FUNCTION_BLOCK|DATA_BLOCK|TYPE|UDT)\s+"
-                        r"(" + _NAME + r")")
-    _FUNC = re.compile(r"(?im)^\s*(FUNCTION|ORGANIZATION_BLOCK)\s+"
-                       r"(" + _NAME + r")\s*(?::\s*(" + _ID + r"))?")
+    _CLASS = re.compile(
+        r"(?im)^\s*(FUNCTION_BLOCK|DATA_BLOCK|TYPE|UDT)\s+" r"(" + _NAME + r")"
+    )
+    _FUNC = re.compile(
+        r"(?im)^\s*(FUNCTION|ORGANIZATION_BLOCK)\s+"
+        r"(" + _NAME + r")\s*(?::\s*(" + _ID + r"))?"
+    )
     # a declaration line inside a VAR_* section:  `name : TYPE ...;`
     _DECL = re.compile(r"(?im)^\s*(" + _ID + r")\s*:\s*[^;]+;")
-    _VARSECT = re.compile(r"(?im)^\s*(VAR(?:_INPUT|_OUTPUT|_IN_OUT|_TEMP|"
-                          r"_GLOBAL|_STAT)?)\b")
+    _VARSECT = re.compile(
+        r"(?im)^\s*(VAR(?:_INPUT|_OUTPUT|_IN_OUT|_TEMP|" r"_GLOBAL|_STAT)?)\b"
+    )
     _ENDVAR = re.compile(r"(?im)^\s*END_VAR\b")
 
     @staticmethod
@@ -54,16 +58,24 @@ class STLAnalyzer(RegexCodeAnalyzer):
 
         for m in self._CLASS.finditer(clean):
             kind = m.group(1).upper()
-            desc = {"FUNCTION_BLOCK": "stl fb", "DATA_BLOCK": "stl db",
-                    "TYPE": "stl udt", "UDT": "stl udt"}.get(kind, "stl block")
-            self._add_class(file_id, self._clean_name(m.group(2)),
-                            description=desc)
+            desc = {
+                "FUNCTION_BLOCK": "stl fb",
+                "DATA_BLOCK": "stl db",
+                "TYPE": "stl udt",
+                "UDT": "stl udt",
+            }.get(kind, "stl block")
+            self._add_class(file_id, self._clean_name(m.group(2)), description=desc)
         for m in self._FUNC.finditer(clean):
             outs = []
             if m.group(3) and m.group(3).upper() != "VOID":
                 outs = [self._add_output(m.group(3))]
-            self._add_function(file_id, self._clean_name(m.group(2)), [], outs,
-                               description="stl function")
+            self._add_function(
+                file_id,
+                self._clean_name(m.group(2)),
+                [],
+                outs,
+                description="stl function",
+            )
 
         # variables live only inside VAR_* .. END_VAR blocks
         seen = set()

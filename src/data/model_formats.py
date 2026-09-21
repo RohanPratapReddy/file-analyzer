@@ -12,15 +12,16 @@ only as an optional fast path where present).
 All parsing is bounded and defensive: a malformed or truncated file yields the
 partial structure decoded so far plus a note, rather than raising.
 """
+
 from __future__ import annotations
 
-import ast
 import gzip
 import json
 import struct
 import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
 
 # ============================================================================
 # Minimal FlatBuffers table reader (used by TFLite and ORT)
@@ -93,7 +94,7 @@ class FlatBufferReader:
             return None
         s = self.indirect(o)
         ln = self.u32(s)
-        return self.b[s + 4:s + 4 + ln].decode("utf-8", "replace")
+        return self.b[s + 4 : s + 4 + ln].decode("utf-8", "replace")
 
     def field_u32(self, table: int, field_id: int, default: int = 0) -> int:
         o = self.field_offset(table, field_id)
@@ -127,17 +128,31 @@ class FlatBufferReader:
     def vec_string(self, start: int, i: int) -> str:
         s = self.indirect(start + i * 4)
         ln = self.u32(s)
-        return self.b[s + 4:s + 4 + ln].decode("utf-8", "replace")
+        return self.b[s + 4 : s + 4 + ln].decode("utf-8", "replace")
 
 
 # ---------------------------------------------------------------------------
 # TFLite (.tflite) -- FlatBuffers, file identifier "TFL3"
 # ---------------------------------------------------------------------------
 _TFLITE_TYPE = {
-    0: "float32", 1: "float16", 2: "int32", 3: "uint8", 4: "int64",
-    5: "string", 6: "bool", 7: "int16", 8: "complex64", 9: "int8",
-    10: "float64", 11: "complex128", 12: "uint64", 13: "resource",
-    14: "variant", 15: "uint32", 16: "uint16", 17: "int4",
+    0: "float32",
+    1: "float16",
+    2: "int32",
+    3: "uint8",
+    4: "int64",
+    5: "string",
+    6: "bool",
+    7: "int16",
+    8: "complex64",
+    9: "int8",
+    10: "float64",
+    11: "complex128",
+    12: "uint64",
+    13: "resource",
+    14: "variant",
+    15: "uint32",
+    16: "uint16",
+    17: "int4",
 }
 
 
@@ -181,12 +196,14 @@ def read_tflite(path: Path, max_tensors: int = 5000) -> Dict[str, Any]:
                 sh_start, sh_len = fb.vector(t, 0)
                 shape = [fb.vec_i32(sh_start, k) for k in range(sh_len)]
                 type_id = fb.field_u8(t, 1)
-                out["tensors"].append({
-                    "name": fb.field_string(t, 3) or f"subgraph{si}_tensor{ti}",
-                    "dtype": _TFLITE_TYPE.get(type_id, f"type{type_id}"),
-                    "shape": shape,
-                    "subgraph": si,
-                })
+                out["tensors"].append(
+                    {
+                        "name": fb.field_string(t, 3) or f"subgraph{si}_tensor{ti}",
+                        "dtype": _TFLITE_TYPE.get(type_id, f"type{type_id}"),
+                        "shape": shape,
+                        "subgraph": si,
+                    }
+                )
                 total_tensors += 1
         out["tensor_count"] = total_tensors
     except Exception as err:  # bounded: return whatever decoded plus the reason
@@ -207,9 +224,23 @@ def read_tflite(path: Path, max_tensors: int = 5000) -> Dict[str, Any]:
 # Tensor { name:string(0); doc_string:string(1); dims:[int64](2);
 #          data_type:int32(3); raw_data:[uint8](4); string_data:[string](5); }
 _ONNX_TYPE = {
-    0: "undefined", 1: "float32", 2: "uint8", 3: "int8", 4: "uint16", 5: "int16",
-    6: "int32", 7: "int64", 8: "string", 9: "bool", 10: "float16", 11: "float64",
-    12: "uint32", 13: "uint64", 14: "complex64", 15: "complex128", 16: "bfloat16",
+    0: "undefined",
+    1: "float32",
+    2: "uint8",
+    3: "int8",
+    4: "uint16",
+    5: "int16",
+    6: "int32",
+    7: "int64",
+    8: "string",
+    9: "bool",
+    10: "float16",
+    11: "float64",
+    12: "uint32",
+    13: "uint64",
+    14: "complex64",
+    15: "complex128",
+    16: "bfloat16",
 }
 
 
@@ -255,11 +286,13 @@ def read_ort(path: Path, max_tensors: int = 5000) -> Dict[str, Any]:
             dims = [fb.vec_i64(d_start, k) for k in range(d_len)]
             dtype_id = fb.field_offset(t, 3)
             dtype_id = fb.i32(dtype_id) if dtype_id else 0
-            out["tensors"].append({
-                "name": fb.field_string(t, 0) or f"initializer{i}",
-                "dtype": _ONNX_TYPE.get(dtype_id, f"type{dtype_id}"),
-                "shape": dims,
-            })
+            out["tensors"].append(
+                {
+                    "name": fb.field_string(t, 0) or f"initializer{i}",
+                    "dtype": _ONNX_TYPE.get(dtype_id, f"type{dtype_id}"),
+                    "shape": dims,
+                }
+            )
         out["tensor_count"] = len(out["tensors"])
     except Exception as err:
         out["error"] = f"flatbuffer walk failed: {err}"
@@ -271,6 +304,7 @@ def read_ort(path: Path, max_tensors: int = 5000) -> Dict[str, Any]:
 # ============================================================================
 class NDArrayInfo:
     """A decoded flax/numpy array leaf: shape + dtype + byte length only."""
+
     __slots__ = ("shape", "dtype", "nbytes")
 
     def __init__(self, shape, dtype, nbytes):
@@ -291,66 +325,80 @@ def _decode_flax_ext(code: int, payload: bytes):
         return NDArrayInfo(shape, dtype, nbytes)
     if code == 3:  # numpy scalar: (dtype, bytes)
         if isinstance(inner, (list, tuple)) and len(inner) == 2:
-            return NDArrayInfo([], inner[0], len(inner[1]) if isinstance(inner[1], (bytes, bytearray)) else None)
+            return NDArrayInfo(
+                [],
+                inner[0],
+                len(inner[1]) if isinstance(inner[1], (bytes, bytearray)) else None,
+            )
     return inner  # native_complex / unknown -> hand back decoded payload
 
 
 def _mp_unpack(b: bytes, i: int):
     """Decode one msgpack value at ``b[i:]``; return ``(value, next_index)``."""
-    c = b[i]; i += 1
-    if c <= 0x7f:
+    c = b[i]
+    i += 1
+    if c <= 0x7F:
         return c, i
-    if c >= 0xe0:
+    if c >= 0xE0:
         return c - 0x100, i
-    if 0x80 <= c <= 0x8f:
-        return _mp_map(b, i, c & 0x0f)
-    if 0x90 <= c <= 0x9f:
-        return _mp_array(b, i, c & 0x0f)
-    if 0xa0 <= c <= 0xbf:
-        n = c & 0x1f
-        return b[i:i + n].decode("utf-8", "replace"), i + n
-    if c == 0xc0:
+    if 0x80 <= c <= 0x8F:
+        return _mp_map(b, i, c & 0x0F)
+    if 0x90 <= c <= 0x9F:
+        return _mp_array(b, i, c & 0x0F)
+    if 0xA0 <= c <= 0xBF:
+        n = c & 0x1F
+        return b[i : i + n].decode("utf-8", "replace"), i + n
+    if c == 0xC0:
         return None, i
-    if c == 0xc2:
+    if c == 0xC2:
         return False, i
-    if c == 0xc3:
+    if c == 0xC3:
         return True, i
-    if c in (0xc4, 0xc5, 0xc6):  # bin8/16/32
-        sz = {0xc4: 1, 0xc5: 2, 0xc6: 4}[c]
-        n = int.from_bytes(b[i:i + sz], "big"); i += sz
-        return bytes(b[i:i + n]), i + n
-    if c in (0xc7, 0xc8, 0xc9):  # ext8/16/32
-        sz = {0xc7: 1, 0xc8: 2, 0xc9: 4}[c]
-        n = int.from_bytes(b[i:i + sz], "big"); i += sz
-        code = struct.unpack_from("<b", b, i)[0]; i += 1
-        payload = bytes(b[i:i + n]); i += n
+    if c in (0xC4, 0xC5, 0xC6):  # bin8/16/32
+        sz = {0xC4: 1, 0xC5: 2, 0xC6: 4}[c]
+        n = int.from_bytes(b[i : i + sz], "big")
+        i += sz
+        return bytes(b[i : i + n]), i + n
+    if c in (0xC7, 0xC8, 0xC9):  # ext8/16/32
+        sz = {0xC7: 1, 0xC8: 2, 0xC9: 4}[c]
+        n = int.from_bytes(b[i : i + sz], "big")
+        i += sz
+        code = struct.unpack_from("<b", b, i)[0]
+        i += 1
+        payload = bytes(b[i : i + n])
+        i += n
         return _decode_flax_ext(code, payload), i
-    if c == 0xca:
+    if c == 0xCA:
         return struct.unpack_from(">f", b, i)[0], i + 4
-    if c == 0xcb:
+    if c == 0xCB:
         return struct.unpack_from(">d", b, i)[0], i + 8
-    if c in (0xcc, 0xcd, 0xce, 0xcf):  # uint 8/16/32/64
-        sz = {0xcc: 1, 0xcd: 2, 0xce: 4, 0xcf: 8}[c]
-        return int.from_bytes(b[i:i + sz], "big"), i + sz
-    if c in (0xd0, 0xd1, 0xd2, 0xd3):  # int 8/16/32/64
-        sz = {0xd0: 1, 0xd1: 2, 0xd2: 4, 0xd3: 8}[c]
-        return int.from_bytes(b[i:i + sz], "big", signed=True), i + sz
-    if c in (0xd4, 0xd5, 0xd6, 0xd7, 0xd8):  # fixext 1/2/4/8/16
-        n = {0xd4: 1, 0xd5: 2, 0xd6: 4, 0xd7: 8, 0xd8: 16}[c]
-        code = struct.unpack_from("<b", b, i)[0]; i += 1
-        payload = bytes(b[i:i + n]); i += n
+    if c in (0xCC, 0xCD, 0xCE, 0xCF):  # uint 8/16/32/64
+        sz = {0xCC: 1, 0xCD: 2, 0xCE: 4, 0xCF: 8}[c]
+        return int.from_bytes(b[i : i + sz], "big"), i + sz
+    if c in (0xD0, 0xD1, 0xD2, 0xD3):  # int 8/16/32/64
+        sz = {0xD0: 1, 0xD1: 2, 0xD2: 4, 0xD3: 8}[c]
+        return int.from_bytes(b[i : i + sz], "big", signed=True), i + sz
+    if c in (0xD4, 0xD5, 0xD6, 0xD7, 0xD8):  # fixext 1/2/4/8/16
+        n = {0xD4: 1, 0xD5: 2, 0xD6: 4, 0xD7: 8, 0xD8: 16}[c]
+        code = struct.unpack_from("<b", b, i)[0]
+        i += 1
+        payload = bytes(b[i : i + n])
+        i += n
         return _decode_flax_ext(code, payload), i
-    if c in (0xd9, 0xda, 0xdb):  # str8/16/32
-        sz = {0xd9: 1, 0xda: 2, 0xdb: 4}[c]
-        n = int.from_bytes(b[i:i + sz], "big"); i += sz
-        return b[i:i + n].decode("utf-8", "replace"), i + n
-    if c in (0xdc, 0xdd):  # array16/32
-        sz = {0xdc: 2, 0xdd: 4}[c]
-        n = int.from_bytes(b[i:i + sz], "big"); i += sz
+    if c in (0xD9, 0xDA, 0xDB):  # str8/16/32
+        sz = {0xD9: 1, 0xDA: 2, 0xDB: 4}[c]
+        n = int.from_bytes(b[i : i + sz], "big")
+        i += sz
+        return b[i : i + n].decode("utf-8", "replace"), i + n
+    if c in (0xDC, 0xDD):  # array16/32
+        sz = {0xDC: 2, 0xDD: 4}[c]
+        n = int.from_bytes(b[i : i + sz], "big")
+        i += sz
         return _mp_array(b, i, n)
-    if c in (0xde, 0xdf):  # map16/32
-        sz = {0xde: 2, 0xdf: 4}[c]
-        n = int.from_bytes(b[i:i + sz], "big"); i += sz
+    if c in (0xDE, 0xDF):  # map16/32
+        sz = {0xDE: 2, 0xDF: 4}[c]
+        n = int.from_bytes(b[i : i + sz], "big")
+        i += sz
         return _mp_map(b, i, n)
     raise ValueError(f"unknown msgpack byte 0x{c:02x}")
 
@@ -379,8 +427,10 @@ def read_flax(path: Path, max_tensors: int = 20000) -> Dict[str, Any]:
     tree: Any
     try:
         import msgpack  # optional fast path with flax's own ext handling
+
         try:
             from flax.serialization import msgpack_restore  # type: ignore
+
             tree = msgpack_restore(data)
             _walk_flax_native(tree, out["tensors"], max_tensors)
             out["tensor_count"] = len(out["tensors"])
@@ -403,8 +453,14 @@ def _walk_flax(node, prefix, tensors, limit):
     if len(tensors) >= limit:
         return
     if isinstance(node, NDArrayInfo):
-        tensors.append({"name": prefix or "param", "dtype": node.dtype,
-                        "shape": node.shape, "nbytes": node.nbytes})
+        tensors.append(
+            {
+                "name": prefix or "param",
+                "dtype": node.dtype,
+                "shape": node.shape,
+                "nbytes": node.nbytes,
+            }
+        )
     elif isinstance(node, dict):
         for k, v in node.items():
             key = k.decode() if isinstance(k, bytes) else str(k)
@@ -419,12 +475,14 @@ def _walk_flax_native(node, tensors, limit, prefix=""):
     if len(tensors) >= limit:
         return
     if hasattr(node, "shape") and hasattr(node, "dtype"):
-        tensors.append({
-            "name": prefix or "param",
-            "dtype": str(node.dtype),
-            "shape": list(node.shape),
-            "nbytes": int(getattr(node, "nbytes", 0)) or None,
-        })
+        tensors.append(
+            {
+                "name": prefix or "param",
+                "dtype": str(node.dtype),
+                "shape": list(node.shape),
+                "nbytes": int(getattr(node, "nbytes", 0)) or None,
+            }
+        )
     elif isinstance(node, dict):
         for k, v in node.items():
             key = k.decode() if isinstance(k, bytes) else str(k)
@@ -441,8 +499,9 @@ def _read_varint(b: bytes, i: int) -> Tuple[int, int]:
     shift = 0
     result = 0
     while True:
-        byte = b[i]; i += 1
-        result |= (byte & 0x7f) << shift
+        byte = b[i]
+        i += 1
+        result |= (byte & 0x7F) << shift
         if not byte & 0x80:
             return result, i
         shift += 7
@@ -512,7 +571,7 @@ def decode_graphdef(b: bytes, max_nodes: int = 200000) -> Optional[Dict[str, Any
                     if nwire != 2:
                         continue
                     noff, nln = nval
-                    text = b[noff:noff + nln]
+                    text = b[noff : noff + nln]
                     if nfno == 1:
                         name = text.decode("utf-8", "replace")
                     elif nfno == 2:
@@ -565,7 +624,7 @@ def decode_example_features(b: bytes, off: int, ln: int, max_features: int = 200
             for efno, ewire, eval_, _ in iter_pb_fields(b, eoff, eoff + eln):
                 if efno == 1 and ewire == 2:  # key
                     koff, kln = eval_
-                    key = b[koff:koff + kln].decode("utf-8", "replace")
+                    key = b[koff : koff + kln].decode("utf-8", "replace")
                 elif efno == 2 and ewire == 2:  # value: Feature
                     voff, vln = eval_
                     for ffno, fwire, fval, _ in iter_pb_fields(b, voff, voff + vln):
@@ -573,9 +632,7 @@ def decode_example_features(b: bytes, off: int, ln: int, max_features: int = 200
                             kind = _KIND[ffno]
                             loff, lln = fval
                             # count entries in the *_list submessage (field 1 repeated)
-                            vcount = sum(
-                                1 for _ in iter_pb_fields(b, loff, loff + lln)
-                            )
+                            vcount = sum(1 for _ in iter_pb_fields(b, loff, loff + lln))
             if key is not None:
                 features.append((key, kind or "unknown", vcount))
                 if len(features) >= max_features:
@@ -588,8 +645,9 @@ def decode_example_features(b: bytes, off: int, ln: int, max_features: int = 200
 # ---------------------------------------------------------------------------
 # TFRecord (.tfrecord / .tfrecords) -- length-prefixed record framing
 # ---------------------------------------------------------------------------
-def read_tfrecord(path: Path, max_records: int = 5_000_000,
-                  max_scan_bytes: int = 512 * 1024 * 1024) -> Dict[str, Any]:
+def read_tfrecord(
+    path: Path, max_records: int = 5_000_000, max_scan_bytes: int = 512 * 1024 * 1024
+) -> Dict[str, Any]:
     """
     Walk a TFRecord stream (``uint64 len`` | ``crc32 len`` | ``data`` | ``crc32 data``)
     to count records and decode the first record's ``tf.train.Example`` features.
@@ -627,8 +685,9 @@ def read_tfrecord(path: Path, max_records: int = 5_000_000,
     out["record_count"] = count
     if first is not None:
         feats = decode_example_features(data, first[0], first[1])
-        out["features"] = [{"name": k, "kind": kind, "value_count": vc}
-                           for (k, kind, vc) in feats]
+        out["features"] = [
+            {"name": k, "kind": kind, "value_count": vc} for (k, kind, vc) in feats
+        ]
         out["feature_count"] = len(feats)
     return out
 
@@ -662,14 +721,22 @@ def read_keras(path: Path, max_layers: int = 5000) -> Dict[str, Any]:
                     layers = inner.get("layers", []) if isinstance(inner, dict) else []
                     for ly in layers[:max_layers]:
                         lc = ly.get("config", {}) if isinstance(ly, dict) else {}
-                        out["layers"].append({
-                            "name": lc.get("name"),
-                            "class_name": ly.get("class_name") if isinstance(ly, dict) else None,
-                        })
+                        out["layers"].append(
+                            {
+                                "name": lc.get("name"),
+                                "class_name": (
+                                    ly.get("class_name")
+                                    if isinstance(ly, dict)
+                                    else None
+                                ),
+                            }
+                        )
                     out["layer_count"] = len(layers)
                 except Exception as err:
                     out["config_error"] = str(err)
-            weights = [m for m in names if m.endswith(".h5") or m.endswith(".weights.h5")]
+            weights = [
+                m for m in names if m.endswith(".h5") or m.endswith(".weights.h5")
+            ]
             out["weights_files"] = weights
             if weights:
                 try:
@@ -685,21 +752,26 @@ def read_keras(path: Path, max_layers: int = 5000) -> Dict[str, Any]:
 def _extract_keras_weights(zf, weights, out, limit):
     """List weight tensors from the bundled HDF5 file when h5py is available."""
     try:
-        import h5py  # optional: real per-weight tensor listing
         import io
+
+        import h5py  # optional: real per-weight tensor listing
     except Exception:
         return
     for member in weights:
         try:
             with h5py.File(io.BytesIO(zf.read(member)), "r") as h5:
+
                 def visit(name, obj):
                     if isinstance(obj, h5py.Dataset) and len(out["tensors"]) < limit:
-                        out["tensors"].append({
-                            "name": name,
-                            "dtype": str(obj.dtype),
-                            "shape": list(obj.shape),
-                            "nbytes": int(obj.nbytes),
-                        })
+                        out["tensors"].append(
+                            {
+                                "name": name,
+                                "dtype": str(obj.dtype),
+                                "shape": list(obj.shape),
+                                "nbytes": int(obj.nbytes),
+                            }
+                        )
+
                 h5.visititems(visit)
         except Exception:
             continue
@@ -724,30 +796,71 @@ _GGUF_T_U64, _GGUF_T_I64, _GGUF_T_F64 = 10, 11, 12
 
 # fixed-width scalar value types -> struct format
 _GGUF_SCALAR = {
-    _GGUF_T_U8: "<B", _GGUF_T_I8: "<b", _GGUF_T_U16: "<H", _GGUF_T_I16: "<h",
-    _GGUF_T_U32: "<I", _GGUF_T_I32: "<i", _GGUF_T_F32: "<f", _GGUF_T_BOOL: "<B",
-    _GGUF_T_U64: "<Q", _GGUF_T_I64: "<q", _GGUF_T_F64: "<d",
+    _GGUF_T_U8: "<B",
+    _GGUF_T_I8: "<b",
+    _GGUF_T_U16: "<H",
+    _GGUF_T_I16: "<h",
+    _GGUF_T_U32: "<I",
+    _GGUF_T_I32: "<i",
+    _GGUF_T_F32: "<f",
+    _GGUF_T_BOOL: "<B",
+    _GGUF_T_U64: "<Q",
+    _GGUF_T_I64: "<q",
+    _GGUF_T_F64: "<d",
 }
 
 # ggml tensor storage types -> readable dtype names (quantised block types kept
 # with their canonical names; unknown ids surface as ggml_type_<n>).
 _GGML_TYPE = {
-    0: "F32", 1: "F16", 2: "Q4_0", 3: "Q4_1", 6: "Q5_0", 7: "Q5_1",
-    8: "Q8_0", 9: "Q8_1", 10: "Q2_K", 11: "Q3_K", 12: "Q4_K", 13: "Q5_K",
-    14: "Q6_K", 15: "Q8_K", 16: "IQ2_XXS", 17: "IQ2_XS", 18: "IQ3_XXS",
-    19: "IQ1_S", 20: "IQ4_NL", 21: "IQ3_S", 22: "IQ2_S", 23: "IQ4_XS",
-    24: "I8", 25: "I16", 26: "I32", 27: "I64", 28: "F64", 29: "IQ1_M",
+    0: "F32",
+    1: "F16",
+    2: "Q4_0",
+    3: "Q4_1",
+    6: "Q5_0",
+    7: "Q5_1",
+    8: "Q8_0",
+    9: "Q8_1",
+    10: "Q2_K",
+    11: "Q3_K",
+    12: "Q4_K",
+    13: "Q5_K",
+    14: "Q6_K",
+    15: "Q8_K",
+    16: "IQ2_XXS",
+    17: "IQ2_XS",
+    18: "IQ3_XXS",
+    19: "IQ1_S",
+    20: "IQ4_NL",
+    21: "IQ3_S",
+    22: "IQ2_S",
+    23: "IQ4_XS",
+    24: "I8",
+    25: "I16",
+    26: "I32",
+    27: "I64",
+    28: "F64",
+    29: "IQ1_M",
     30: "BF16",
 }
 
 # metadata keys worth surfacing as scalar properties (everything else is skipped;
 # arrays are always skipped by content and only their length is noted).
 _GGUF_KEEP_KEYS = (
-    "general.architecture", "general.name", "general.quantization_version",
-    "general.file_type", "general.basename", "general.size_label",
-    ".context_length", ".embedding_length", ".block_count",
-    ".attention.head_count", ".attention.head_count_kv", ".feed_forward_length",
-    ".vocab_size", ".rope.dimension_count", "tokenizer.ggml.model",
+    "general.architecture",
+    "general.name",
+    "general.quantization_version",
+    "general.file_type",
+    "general.basename",
+    "general.size_label",
+    ".context_length",
+    ".embedding_length",
+    ".block_count",
+    ".attention.head_count",
+    ".attention.head_count_kv",
+    ".feed_forward_length",
+    ".vocab_size",
+    ".rope.dimension_count",
+    "tokenizer.ggml.model",
 )
 
 
@@ -756,7 +869,7 @@ class _GgufReader:
         self.d = data
         self.i = 0
         self.n = len(data)
-        self._slf = str_len_fmt          # "<Q" (v2/v3) or "<I" (v1)
+        self._slf = str_len_fmt  # "<Q" (v2/v3) or "<I" (v1)
         self._sls = struct.calcsize(str_len_fmt)
         self._cf = count_fmt
         self._cs = struct.calcsize(count_fmt)
@@ -766,23 +879,30 @@ class _GgufReader:
             raise ValueError("truncated GGUF")
 
     def u32(self) -> int:
-        self._need(4); v = struct.unpack_from("<I", self.d, self.i)[0]; self.i += 4
+        self._need(4)
+        v = struct.unpack_from("<I", self.d, self.i)[0]
+        self.i += 4
         return v
 
     def count(self) -> int:
         self._need(self._cs)
-        v = struct.unpack_from(self._cf, self.d, self.i)[0]; self.i += self._cs
+        v = struct.unpack_from(self._cf, self.d, self.i)[0]
+        self.i += self._cs
         return v
 
     def u64(self) -> int:
-        self._need(8); v = struct.unpack_from("<Q", self.d, self.i)[0]; self.i += 8
+        self._need(8)
+        v = struct.unpack_from("<Q", self.d, self.i)[0]
+        self.i += 8
         return v
 
     def gstr(self) -> str:
         self._need(self._sls)
-        ln = struct.unpack_from(self._slf, self.d, self.i)[0]; self.i += self._sls
+        ln = struct.unpack_from(self._slf, self.d, self.i)[0]
+        self.i += self._sls
         self._need(ln)
-        s = self.d[self.i:self.i + ln].decode("utf-8", "replace"); self.i += ln
+        s = self.d[self.i : self.i + ln].decode("utf-8", "replace")
+        self.i += ln
         return s
 
     def scalar(self, vtype: int):
@@ -791,7 +911,8 @@ class _GgufReader:
             raise ValueError(f"bad scalar type {vtype}")
         sz = struct.calcsize(fmt)
         self._need(sz)
-        v = struct.unpack_from(fmt, self.d, self.i)[0]; self.i += sz
+        v = struct.unpack_from(fmt, self.d, self.i)[0]
+        self.i += sz
         if vtype == _GGUF_T_BOOL:
             return bool(v)
         return v
@@ -869,7 +990,9 @@ def read_gguf(path: Path, max_tensors: int = 100000) -> Dict[str, Any]:
             else:
                 r.skip_value(vtype)
     except Exception as err:
-        out["error"] = f"gguf metadata parse failed after {len(out['metadata'])} keys: {err}"
+        out["error"] = (
+            f"gguf metadata parse failed after {len(out['metadata'])} keys: {err}"
+        )
         return out
     # --- tensor info table -----------------------------------------------------
     try:
@@ -882,15 +1005,19 @@ def read_gguf(path: Path, max_tensors: int = 100000) -> Dict[str, Any]:
             offset = r.u64()
             # GGUF stores dims fastest-varying-first; reverse to row-major shape.
             shape = [int(x) for x in reversed(dims)]
-            out["tensors"].append({
-                "name": name,
-                "shape": shape,
-                "dtype": _GGML_TYPE.get(ggml_type, f"ggml_type_{ggml_type}"),
-                "offset": int(offset),
-            })
+            out["tensors"].append(
+                {
+                    "name": name,
+                    "shape": shape,
+                    "dtype": _GGML_TYPE.get(ggml_type, f"ggml_type_{ggml_type}"),
+                    "offset": int(offset),
+                }
+            )
         out["tensors_listed"] = len(out["tensors"])
         if n < int(tensor_count):
             out["truncated"] = True
     except Exception as err:
-        out["error"] = f"gguf tensor table parse failed after {len(out['tensors'])} tensors: {err}"
+        out["error"] = (
+            f"gguf tensor table parse failed after {len(out['tensors'])} tensors: {err}"
+        )
     return out

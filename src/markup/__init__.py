@@ -7,7 +7,8 @@ document into ``document -> elements (+ attributes + namespaces) -> sections +
 properties`` tables describing which tags/sections are present and the metrics
 of the content within them.
 """
-from .markup_analyzer import MarkupAnalyzer
+
 from . import markup_formats
+from .markup_analyzer import MarkupAnalyzer
 
 __all__ = ["MarkupAnalyzer", "markup_formats"]

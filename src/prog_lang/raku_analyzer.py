@@ -10,7 +10,7 @@
 #   sub area($r) { ... }                                   -> function
 #   my $count = 0;   our @items;                            -> variable
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _TYPEKW = ("class", "role", "grammar", "module", "monitor")
@@ -27,22 +27,31 @@ class RakuAnalyzer(RegexCodeAnalyzer):
     _TYPE = re.compile(
         r"^\s*(?:my\s+|our\s+)?(" + "|".join(_TYPEKW) + r")\s+"
         r"([\w:]+)\s*((?:is\s+[\w:]+\s*|does\s+[\w:]+\s*)*)",
-        re.MULTILINE)
+        re.MULTILINE,
+    )
     _METHOD = re.compile(
         r"^\s*(?:multi\s+|proto\s+|only\s+)?(?:method|submethod)\s+"
-        r"([\w:!-]+|\S)\s*", re.MULTILINE)
+        r"([\w:!-]+|\S)\s*",
+        re.MULTILINE,
+    )
     _SUB = re.compile(
-        r"^\s*(?:multi\s+|proto\s+|only\s+|our\s+|my\s+)?sub\s+"
-        r"([\w:!-]+|\S)\s*", re.MULTILINE)
+        r"^\s*(?:multi\s+|proto\s+|only\s+|our\s+|my\s+)?sub\s+" r"([\w:!-]+|\S)\s*",
+        re.MULTILINE,
+    )
     _HAS = re.compile(r"^\s*has\s+(?:[\w:]+\s+)?[\$@%&][.!]?([\w-]+)", re.MULTILINE)
     _VAR = re.compile(
-        r"^\s*(?:my|our|state|constant)\s+(?:[\w:]+\s+)?"
-        r"([\$@%&][\w-]+)", re.MULTILINE)
+        r"^\s*(?:my|our|state|constant)\s+(?:[\w:]+\s+)?" r"([\$@%&][\w-]+)",
+        re.MULTILINE,
+    )
 
     def _clean(self, text):
         # remove =begin pod ... =end pod (and =begin X..=end X) POD blocks
-        text = re.sub(r"^=begin\b.*?^=end\b.*?$", lambda m: "\n" * m.group(0).count("\n"),
-                      text, flags=re.MULTILINE | re.DOTALL)
+        text = re.sub(
+            r"^=begin\b.*?^=end\b.*?$",
+            lambda m: "\n" * m.group(0).count("\n"),
+            text,
+            flags=re.MULTILINE | re.DOTALL,
+        )
         # remove =head/=para one-line pod directives
         text = re.sub(r"^=\w+.*$", "", text, flags=re.MULTILINE)
         # embedded #`( ... ) comments (single-level paren)
@@ -74,7 +83,7 @@ class RakuAnalyzer(RegexCodeAnalyzer):
             self._add_import(file_id, mod.split("::")[-1], mod)
 
         # map each type to its body span so members attach correctly
-        type_spans = []      # (start, end, name)
+        type_spans = []  # (start, end, name)
         for m in self._TYPE.finditer(text):
             name = m.group(2)
             span = self._type_body(text, m.end())
@@ -89,7 +98,7 @@ class RakuAnalyzer(RegexCodeAnalyzer):
                         best = (a, b, nm)
             return best[2] if best else None
 
-        members = {}   # class name -> (methods, attrs)
+        members = {}  # class name -> (methods, attrs)
 
         def bag(name):
             return members.setdefault(name, ([], []))
@@ -101,8 +110,9 @@ class RakuAnalyzer(RegexCodeAnalyzer):
                 continue
             owner = owner_at(m.start())
             cid = self._class_registry.get(owner) if owner else None
-            fid = self._add_function(file_id, name, [], [], class_id=cid,
-                                     description="raku method")
+            fid = self._add_function(
+                file_id, name, [], [], class_id=cid, description="raku method"
+            )
             if owner:
                 bag(owner)[0].append(fid)
 
@@ -113,8 +123,9 @@ class RakuAnalyzer(RegexCodeAnalyzer):
                 continue
             owner = owner_at(m.start())
             cid = self._class_registry.get(owner) if owner else None
-            fid = self._add_function(file_id, name, [], [], class_id=cid,
-                                     description="raku sub")
+            fid = self._add_function(
+                file_id, name, [], [], class_id=cid, description="raku sub"
+            )
             if owner:
                 bag(owner)[0].append(fid)
 
@@ -138,5 +149,11 @@ class RakuAnalyzer(RegexCodeAnalyzer):
                 if pn in self._class_registry:
                     parents.append(self._class_registry[pn])
             meth, attr = members.get(name, ([], []))
-            self._add_class(file_id, name, description=f"raku {m.group(1)}",
-                            parent_ids=parents, method_ids=meth, attr_ids=attr)
+            self._add_class(
+                file_id,
+                name,
+                description=f"raku {m.group(1)}",
+                parent_ids=parents,
+                method_ids=meth,
+                attr_ids=attr,
+            )

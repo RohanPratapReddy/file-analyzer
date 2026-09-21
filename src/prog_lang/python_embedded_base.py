@@ -16,16 +16,16 @@
 # every construct a real Cirq/Luigi/... program contains is captured for free;
 # `_dsl_enrich` only *adds* domain tags, it never replaces the base pass.
 import ast
-from pathlib import Path
 from typing import Any, Dict, List
+
 from .python_analyzer import PythonCodeAnalyzer
 
 
 class PythonEmbeddedAnalyzer(PythonCodeAnalyzer):
     LANG_KEY = "python-embedded"
-    EXTENSIONS = ()             # overridden per language
-    DSL_DECORATORS = ()         # decorator roots that mark a domain entry point
-    DSL_BASECLASSES = ()        # base-class roots that mark a domain object
+    EXTENSIONS = ()  # overridden per language
+    DSL_DECORATORS = ()  # decorator roots that mark a domain entry point
+    DSL_BASECLASSES = ()  # base-class roots that mark a domain object
 
     def __init__(self, **kwargs):
         # PythonCodeAnalyzer.__init__ pins language_name="python"; re-pin it to
@@ -134,14 +134,18 @@ class PythonEmbeddedAnalyzer(PythonCodeAnalyzer):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 for dec in node.decorator_list:
                     root = self._decorator_root(dec)
-                    if root in self.DSL_DECORATORS or \
-                            root.split(".")[-1] in self.DSL_DECORATORS:
+                    if (
+                        root in self.DSL_DECORATORS
+                        or root.split(".")[-1] in self.DSL_DECORATORS
+                    ):
                         self._dsl_tag(file_id, node.name, "decorated:" + root)
                         break
             elif isinstance(node, ast.ClassDef):
                 for base in node.bases:
                     root = self._base_root(base)
-                    if root in self.DSL_BASECLASSES or \
-                            root.split(".")[-1] in self.DSL_BASECLASSES:
+                    if (
+                        root in self.DSL_BASECLASSES
+                        or root.split(".")[-1] in self.DSL_BASECLASSES
+                    ):
                         self._dsl_tag(file_id, node.name, "subclass:" + root)
                         break

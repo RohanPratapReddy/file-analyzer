@@ -19,14 +19,16 @@ class TclAnalyzer(ShellScriptBase):
     EXTENSIONS = (".tcl", ".tk", ".expect", ".port")
     LINE_COMMENTS = ("#",)
     BLOCK_COMMENTS = ()
-    STRING_DELIMS = ('"',)     # Tcl uses {} for literal blocks, only "" quote
+    STRING_DELIMS = ('"',)  # Tcl uses {} for literal blocks, only "" quote
 
     # proc name {arg1 {arg2 default} args} {
     _PROC = re.compile(r"(?m)^[ \t]*proc[ \t]+(\S+)[ \t]+\{([^}]*)\}")
     _SET = re.compile(r"(?m)^[ \t]*set[ \t]+([A-Za-z_:][\w:()]*)[ \t]+(.*)")
     _VAR = re.compile(r"(?m)^[ \t]*(variable|global|upvar)[ \t]+(.+)$")
     _SOURCE = re.compile(r"(?m)^[ \t]*source[ \t]+(\S+)")
-    _REQUIRE = re.compile(r"(?m)^[ \t]*package[ \t]+require[ \t]+(?:-exact[ \t]+)?(\S+)")
+    _REQUIRE = re.compile(
+        r"(?m)^[ \t]*package[ \t]+require[ \t]+(?:-exact[ \t]+)?(\S+)"
+    )
     _NAMESPACE = re.compile(r"(?m)^[ \t]*namespace[ \t]+eval[ \t]+(\S+)")
     # Expect-specific commands worth surfacing.
     _SPAWN = re.compile(r"(?m)^[ \t]*spawn[ \t]+(.+)$")
@@ -42,8 +44,7 @@ class TclAnalyzer(ShellScriptBase):
 
         # Namespaces -> classes (a namespace groups procs & variables).
         for m in self._NAMESPACE.finditer(clean):
-            self._add_class(file_id, m.group(1).strip(":"),
-                            description="tcl namespace")
+            self._add_class(file_id, m.group(1).strip(":"), description="tcl namespace")
 
         seen_fn = set()
         for m in self._PROC.finditer(clean):
@@ -54,8 +55,9 @@ class TclAnalyzer(ShellScriptBase):
             params = []
             for tok in self._tcl_arglist(m.group(2)):
                 params.append(tok)
-            self._add_shell_function(file_id, name, params=params,
-                                     description="tcl proc")
+            self._add_shell_function(
+                file_id, name, params=params, description="tcl proc"
+            )
 
         seen_var = set()
         for m in self._SET.finditer(clean):
@@ -63,24 +65,28 @@ class TclAnalyzer(ShellScriptBase):
             if name in seen_var:
                 continue
             seen_var.add(name)
-            self._add_variable(file_id, name, m.group(2).strip()[:120] or None,
-                               scope="tcl")
+            self._add_variable(
+                file_id, name, m.group(2).strip()[:120] or None, scope="tcl"
+            )
         for m in self._VAR.finditer(clean):
             kw = m.group(1)
             toks = m.group(2).split()
             # `variable n v n v ...` declares name/value PAIRS; `global`/`upvar`
             # take a plain list of names (no values).
             if kw == "variable":
-                pairs = [(toks[i], toks[i + 1] if i + 1 < len(toks) else None)
-                         for i in range(0, len(toks), 2)]
+                pairs = [
+                    (toks[i], toks[i + 1] if i + 1 < len(toks) else None)
+                    for i in range(0, len(toks), 2)
+                ]
             else:
                 pairs = [(t, None) for t in toks]
             for name, value in pairs:
                 name = name.strip("{}$")
                 if name and name not in seen_var and not name.startswith("-"):
                     seen_var.add(name)
-                    self._add_variable(file_id, name,
-                                       (value or "").strip("{}\"") or None, scope=kw)
+                    self._add_variable(
+                        file_id, name, (value or "").strip('{}"') or None, scope=kw
+                    )
 
         seen_imp = set()
         for m in self._SOURCE.finditer(clean):
@@ -104,8 +110,11 @@ class TclAnalyzer(ShellScriptBase):
             dialect = "macports-portfile"
         spawns = self._uniq(x.strip() for x in self._SPAWN.findall(clean))
         self._record_module_meta(
-            file_id, dialect=dialect, procs=len(seen_fn),
-            variables=len(seen_var), spawns=spawns or None,
+            file_id,
+            dialect=dialect,
+            procs=len(seen_fn),
+            variables=len(seen_var),
+            spawns=spawns or None,
         )
 
     @staticmethod
@@ -126,7 +135,7 @@ class TclAnalyzer(ShellScriptBase):
                     elif block[j] == "}":
                         depth -= 1
                     j += 1
-                inner = block[i + 1:j - 1].strip()
+                inner = block[i + 1 : j - 1].strip()
                 out.append(inner.split()[0] if inner.split() else inner)
                 i = j
             else:

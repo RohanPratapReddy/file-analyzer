@@ -21,6 +21,7 @@
 # `<!-- -->` are comments; `"` / `<param>` are step arguments (kept inline in
 # the step text).  Step / heading names may contain spaces.
 import re
+
 from .regex_base import RegexCodeAnalyzer
 
 _ATX_H1 = re.compile(r"^[ \t]*#(?!#)\s*(.+?)\s*#*\s*$")
@@ -54,8 +55,7 @@ class GaugeSpecAnalyzer(RegexCodeAnalyzer):
             name = name.strip()
             if name and name not in seen_fn:
                 seen_fn.add(name)
-                self._add_function(file_id, name, [], [],
-                                   description="Gauge scenario")
+                self._add_function(file_id, name, [], [], description="Gauge scenario")
 
         def add_var(name, scope):
             name = name.strip()

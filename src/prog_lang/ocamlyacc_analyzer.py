@@ -18,7 +18,7 @@
 #     %%
 #     (* OCaml trailer *)
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -49,8 +49,7 @@ class OCamlyaccAnalyzer(RegexCodeAnalyzer):
 
         # imports from OCaml header `%{ ... %}` and trailer
         header_code = "\n".join(re.findall(r"%\{(.*?)%\}", defs, re.DOTALL))
-        for blob in (self._strip_comments(header_code),
-                     self._strip_comments(trailer)):
+        for blob in (self._strip_comments(header_code), self._strip_comments(trailer)):
             for om in self._OPEN.finditer(blob):
                 mod = om.group(1)
                 self._add_import(file_id, mod.split(".")[-1], mod)
@@ -85,5 +84,6 @@ class OCamlyaccAnalyzer(RegexCodeAnalyzer):
                     pm = re.match(r"([A-Za-z_]\w*)", p.strip())
                     if pm:
                         arg_ids.append(self._add_arg(pm.group(1)))
-            self._add_function(file_id, name, arg_ids, [],
-                               description="menhir nonterminal")
+            self._add_function(
+                file_id, name, arg_ids, [], description="menhir nonterminal"
+            )

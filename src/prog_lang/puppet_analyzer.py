@@ -14,7 +14,7 @@
 #
 # Comments are '#'; strings use "'" and '"'.  Params live in '( ... )'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[a-z_][a-zA-Z0-9_]*(?:::[a-z_][a-zA-Z0-9_]*)*"
@@ -30,15 +30,17 @@ class PuppetAnalyzer(RegexCodeAnalyzer):
 
     _CLASS = re.compile(
         r"(?m)^\s*class\s+(" + _ID + r")\s*(\([^{]*?\))?"
-        r"\s*(?:inherits\s+(" + _ID + r"))?\s*\{")
-    _DEFINE = re.compile(
-        r"(?m)^\s*define\s+(" + _ID + r")\s*(\([^{]*?\))?\s*\{")
+        r"\s*(?:inherits\s+(" + _ID + r"))?\s*\{"
+    )
+    _DEFINE = re.compile(r"(?m)^\s*define\s+(" + _ID + r")\s*(\([^{]*?\))?\s*\{")
     _FUNCTION = re.compile(
         r"(?m)^\s*function\s+(" + _ID + r")\s*(\([^)]*\))?"
-        r"(?:\s*>>\s*([A-Za-z:\[\], ]+))?\s*\{")
+        r"(?:\s*>>\s*([A-Za-z:\[\], ]+))?\s*\{"
+    )
     _NODE = re.compile(r"(?m)^\s*node\s+([^\{]+?)\s*\{")
     _INCLUDE = re.compile(
-        r"(?m)^\s*(?:include|require|contain)\s+(?:::)?(" + _ID + r")")
+        r"(?m)^\s*(?:include|require|contain)\s+(?:::)?(" + _ID + r")"
+    )
     _ASSIGN = re.compile(r"(?m)^\s*(" + _VAR + r")\s*=")
 
     def _params(self, paren):
@@ -53,11 +55,10 @@ class PuppetAnalyzer(RegexCodeAnalyzer):
             vm = re.search(r"\$([a-zA-Z_]\w*)", grp)
             if not vm:
                 continue
-            typ = grp[:grp.index("$")].strip() or None
+            typ = grp[: grp.index("$")].strip() or None
             dm = grp.split("=", 1)
             default = dm[1].strip() if len(dm) > 1 else None
-            ids.append(self._add_arg(vm.group(1), arg_type=typ,
-                                     default_value=default))
+            ids.append(self._add_arg(vm.group(1), arg_type=typ, default_value=default))
         return ids
 
     def _register_types(self, file_id, text, path):
@@ -76,23 +77,38 @@ class PuppetAnalyzer(RegexCodeAnalyzer):
         for m in self._CLASS.finditer(clean):
             parent = m.group(3)
             parent_ids = [self._register_class(parent)] if parent else None
-            self._add_class(file_id, m.group(1),
-                            description="puppet class",
-                            parent_ids=parent_ids,
-                            method_ids=self._class_methods(file_id, m))
+            self._add_class(
+                file_id,
+                m.group(1),
+                description="puppet class",
+                parent_ids=parent_ids,
+                method_ids=self._class_methods(file_id, m),
+            )
 
         for m in self._NODE.finditer(clean):
-            self._add_class(file_id,
-                            "node:" + m.group(1).strip().strip("'\""),
-                            description="puppet node")
+            self._add_class(
+                file_id,
+                "node:" + m.group(1).strip().strip("'\""),
+                description="puppet node",
+            )
 
         for m in self._DEFINE.finditer(clean):
-            self._add_function(file_id, m.group(1), self._params(m.group(2)),
-                               [], description="puppet defined type")
+            self._add_function(
+                file_id,
+                m.group(1),
+                self._params(m.group(2)),
+                [],
+                description="puppet defined type",
+            )
         for m in self._FUNCTION.finditer(clean):
             out = [self._add_output(m.group(3).strip())] if m.group(3) else []
-            self._add_function(file_id, m.group(1), self._params(m.group(2)),
-                               out, description="puppet function")
+            self._add_function(
+                file_id,
+                m.group(1),
+                self._params(m.group(2)),
+                out,
+                description="puppet function",
+            )
 
         for m in self._ASSIGN.finditer(clean):
             self._add_variable(file_id, m.group(1)[1:], scope="module")
@@ -103,6 +119,11 @@ class PuppetAnalyzer(RegexCodeAnalyzer):
         arg_ids = self._params(class_match.group(2))
         if not arg_ids:
             return None
-        fid = self._add_function(file_id, class_match.group(1) + "::params",
-                                 arg_ids, [], description="puppet class params")
+        fid = self._add_function(
+            file_id,
+            class_match.group(1) + "::params",
+            arg_ids,
+            [],
+            description="puppet class params",
+        )
         return [fid]

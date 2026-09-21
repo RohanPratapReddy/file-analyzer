@@ -14,18 +14,23 @@ class AppleScriptAnalyzer(ShellScriptBase):
     ``tell application "Finder"``                                -> command dep
     ``use framework "Foundation"`` / ``use scripting additions`` -> import
     """
+
     LANG_KEY = "applescript"
     EXTENSIONS = (".applescript",)
     LINE_COMMENTS = ("--", "#")
     BLOCK_COMMENTS = (("(*", "*)"),)
     STRING_DELIMS = ('"',)
 
-    _HANDLER = re.compile(r"(?m)^[ \t]*(?:on|to)[ \t]+([A-Za-z_]\w*)"
-                          r"[ \t]*(?:\(([^)]*)\)|[ \t]+(?:above|below|from|for|"
-                          r"given|into|of|through|thru|under|with|without)\b)?")
+    _HANDLER = re.compile(
+        r"(?m)^[ \t]*(?:on|to)[ \t]+([A-Za-z_]\w*)"
+        r"[ \t]*(?:\(([^)]*)\)|[ \t]+(?:above|below|from|for|"
+        r"given|into|of|through|thru|under|with|without)\b)?"
+    )
     _SCRIPT = re.compile(r"(?m)^[ \t]*script[ \t]+([A-Za-z_]\w*)")
-    _PROPERTY = re.compile(r"(?m)^[ \t]*(?:property|global|local)[ \t]+"
-                           r"([A-Za-z_]\w*)[ \t]*:?[ \t]*(.*)")
+    _PROPERTY = re.compile(
+        r"(?m)^[ \t]*(?:property|global|local)[ \t]+"
+        r"([A-Za-z_]\w*)[ \t]*:?[ \t]*(.*)"
+    )
     _SET = re.compile(r"(?m)^[ \t]*set[ \t]+([A-Za-z_]\w*)[ \t]+to[ \t]+(.*)")
     _TELL = re.compile(r'(?mi)^[ \t]*tell[ \t]+application[ \t]+"([^"]+)"')
     _USE = re.compile(r'(?mi)^[ \t]*use[ \t]+(?:framework[ \t]+)?"?([^"\n]+?)"?[ \t]*$')
@@ -55,8 +60,9 @@ class AppleScriptAnalyzer(ShellScriptBase):
                 continue
             seen_fn.add(name)
             params = self._split_top_level(m.group(2) or "")
-            self._add_shell_function(file_id, name, params=params,
-                                     description="applescript handler")
+            self._add_shell_function(
+                file_id, name, params=params, description="applescript handler"
+            )
 
         seen_var = set()
         for rx, scope in ((self._PROPERTY, "property"), (self._SET, "local")):
@@ -65,8 +71,9 @@ class AppleScriptAnalyzer(ShellScriptBase):
                 if name in seen_var:
                     continue
                 seen_var.add(name)
-                self._add_variable(file_id, name, m.group(2).strip()[:120] or None,
-                                   scope=scope)
+                self._add_variable(
+                    file_id, name, m.group(2).strip()[:120] or None, scope=scope
+                )
 
         seen_imp = set()
         for m in self._TELL.finditer(clean):
@@ -80,6 +87,9 @@ class AppleScriptAnalyzer(ShellScriptBase):
                 seen_imp.add(mod)
                 self._add_import(file_id, mod.split()[-1], mod, alias="use")
 
-        self._record_module_meta(file_id, script_objects=len(seen_cls),
-                                 handlers=len(seen_fn),
-                                 tells=sorted(a for a in seen_imp) or None)
+        self._record_module_meta(
+            file_id,
+            script_objects=len(seen_cls),
+            handlers=len(seen_fn),
+            tells=sorted(a for a in seen_imp) or None,
+        )

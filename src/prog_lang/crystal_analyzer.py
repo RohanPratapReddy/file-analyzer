@@ -12,12 +12,21 @@
 #   @ivar / @@cvar / CONST = value        -> variable / attribute
 #   getter/setter/property name           -> attribute
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _TYPE_KINDS = ("class", "module", "struct", "enum", "lib", "annotation", "union")
-_OPENERS = _TYPE_KINDS + ("def", "macro", "if", "unless", "while", "until",
-                          "case", "begin", "select")
+_OPENERS = _TYPE_KINDS + (
+    "def",
+    "macro",
+    "if",
+    "unless",
+    "while",
+    "until",
+    "case",
+    "begin",
+    "select",
+)
 
 
 class CrystalAnalyzer(RegexCodeAnalyzer):
@@ -31,18 +40,22 @@ class CrystalAnalyzer(RegexCodeAnalyzer):
         r"^(?:abstract\s+|private\s+)*"
         r"(class|module|struct|enum|lib|annotation)\s+"
         r"([A-Z][\w:]*)"
-        r"(?:\s*<\s*([\w:]+))?")
+        r"(?:\s*<\s*([\w:]+))?"
+    )
     _DEF = re.compile(
         r"^(?:abstract\s+|private\s+|protected\s+)*"
         r"def\s+(?:(self)\.)?([A-Za-z_]\w*[?!=]?)\s*(?:\(([^)]*)\))?"
-        r"(?:\s*:\s*([\w:()\[\], ]+))?")
+        r"(?:\s*:\s*([\w:()\[\], ]+))?"
+    )
     # C-binding `fun` inside a lib: `fun name = c_name(args) : Ret` or
     # `fun name(args) : Ret`. Single-line, no body/end.
     _FUN = re.compile(
         r"^fun\s+([A-Za-z_]\w*[?!]?)\s*(?:=\s*[\w.]+)?"
-        r"\s*(?:\(([^)]*)\))?\s*(?::\s*([\w:()\[\], *]+))?\s*$")
+        r"\s*(?:\(([^)]*)\))?\s*(?::\s*([\w:()\[\], *]+))?\s*$"
+    )
     _MACRO_ATTR = re.compile(
-        r"^\s*(getter|setter|property|class_getter|class_property)[!?]?\s+(.+)$")
+        r"^\s*(getter|setter|property|class_getter|class_property)[!?]?\s+(.+)$"
+    )
     _CONST = re.compile(r"^([A-Z][A-Z0-9_]*)\s*=\s*(.+)$")
     _IVAR = re.compile(r"^(@@?[a-z_]\w*)\s*=\s*(.+)$")
 
@@ -57,7 +70,7 @@ class CrystalAnalyzer(RegexCodeAnalyzer):
 
     def _extract_entities(self, file_id, text, path):
         text = self._strip_comments(text)
-        stack = []        # dicts for types; {"type_entry": False} sentinels for others
+        stack = []  # dicts for types; {"type_entry": False} sentinels for others
         emitted = []
 
         def enclosing_type():
@@ -89,8 +102,14 @@ class CrystalAnalyzer(RegexCodeAnalyzer):
                         p = tm.group(3).split("::")[-1]
                         if p in self._class_registry:
                             parents.append(self._class_registry[p])
-                    entry = {"is_type": True, "name": name, "kind": tm.group(1),
-                             "parents": parents, "methods": [], "attrs": []}
+                    entry = {
+                        "is_type": True,
+                        "name": name,
+                        "kind": tm.group(1),
+                        "parents": parents,
+                        "methods": [],
+                        "attrs": [],
+                    }
                     stack.append(entry)
                     emitted.append(entry)
                     continue
@@ -99,10 +118,14 @@ class CrystalAnalyzer(RegexCodeAnalyzer):
                 if dm:
                     name = dm.group(2)
                     arg_ids = self._params(dm.group(3) or "")
-                    out_ids = [self._add_output(dm.group(4).strip())] if dm.group(4) else []
+                    out_ids = (
+                        [self._add_output(dm.group(4).strip())] if dm.group(4) else []
+                    )
                     owner = enclosing_type()
                     cid = self._class_registry.get(owner["name"]) if owner else None
-                    fid = self._add_function(file_id, name, arg_ids, out_ids, class_id=cid)
+                    fid = self._add_function(
+                        file_id, name, arg_ids, out_ids, class_id=cid
+                    )
                     if owner is not None:
                         owner["methods"].append(fid)
                     # `abstract def` has no body/end; a one-line `def f; …; end`
@@ -114,11 +137,14 @@ class CrystalAnalyzer(RegexCodeAnalyzer):
                 fm = self._FUN.match(stmt)
                 if fm:
                     arg_ids = self._params(fm.group(2) or "")
-                    out_ids = [self._add_output(fm.group(3).strip())] if fm.group(3) else []
+                    out_ids = (
+                        [self._add_output(fm.group(3).strip())] if fm.group(3) else []
+                    )
                     owner = enclosing_type()
                     cid = self._class_registry.get(owner["name"]) if owner else None
-                    fid = self._add_function(file_id, fm.group(1), arg_ids, out_ids,
-                                             class_id=cid)
+                    fid = self._add_function(
+                        file_id, fm.group(1), arg_ids, out_ids, class_id=cid
+                    )
                     if owner is not None:
                         owner["methods"].append(fid)
                     continue
@@ -141,16 +167,18 @@ class CrystalAnalyzer(RegexCodeAnalyzer):
                     if owner is None:
                         self._add_variable(file_id, cm.group(1), cm.group(2).strip())
                     else:
-                        owner["attrs"].append(self._add_arg(cm.group(1), "const",
-                                                            cm.group(2).strip()))
+                        owner["attrs"].append(
+                            self._add_arg(cm.group(1), "const", cm.group(2).strip())
+                        )
                     continue
 
                 im = self._IVAR.match(stmt)
                 if im:
                     owner = enclosing_type()
                     if owner is not None:
-                        owner["attrs"].append(self._add_arg(im.group(1), "ivar",
-                                                            im.group(2).strip()))
+                        owner["attrs"].append(
+                            self._add_arg(im.group(1), "ivar", im.group(2).strip())
+                        )
                     else:
                         self._add_variable(file_id, im.group(1), im.group(2).strip())
                     continue
@@ -160,15 +188,25 @@ class CrystalAnalyzer(RegexCodeAnalyzer):
                     stack.append({"is_type": False})
                 elif re.search(r"(^|\s)do(\s*\|[^|]*\|)?\s*$", stmt):
                     stack.append({"is_type": False})
-                if stmt == "end" or stmt.startswith("end ") or stmt.endswith(" end") or stmt == "}":
+                if (
+                    stmt == "end"
+                    or stmt.startswith("end ")
+                    or stmt.endswith(" end")
+                    or stmt == "}"
+                ):
                     for _ in range(stmt.count("end")):
                         if stack:
                             stack.pop()
 
         for t in emitted:
-            self._add_class(file_id, t["name"], description=f"crystal {t['kind']}",
-                            parent_ids=t["parents"], method_ids=t["methods"],
-                            attr_ids=t["attrs"])
+            self._add_class(
+                file_id,
+                t["name"],
+                description=f"crystal {t['kind']}",
+                parent_ids=t["parents"],
+                method_ids=t["methods"],
+                attr_ids=t["attrs"],
+            )
 
     def _params(self, params):
         arg_ids = []

@@ -13,7 +13,7 @@
 #     def add(int a, int b) -> int { ... }    -> function (with return)
 #     opaque cx a, b;                         -> function (declaration only)
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -25,23 +25,44 @@ class OpenQASMAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"',)
 
     _INCLUDE = re.compile(r'^[ \t]*include\s+"([^"]+)"', re.MULTILINE)
-    _GATE = re.compile(r"^[ \t]*(?:opaque|gate)\s+([A-Za-z_]\w*)\s*"
-                       r"(?:\(([^)]*)\))?\s*([^\{;\n]*)", re.MULTILINE)
-    _DEF = re.compile(r"^[ \t]*def\s+([A-Za-z_]\w*)\s*\(([^)]*)\)"
-                      r"(?:\s*->\s*([^\{\n]+?))?\s*\{", re.MULTILINE)
+    _GATE = re.compile(
+        r"^[ \t]*(?:opaque|gate)\s+([A-Za-z_]\w*)\s*" r"(?:\(([^)]*)\))?\s*([^\{;\n]*)",
+        re.MULTILINE,
+    )
+    _DEF = re.compile(
+        r"^[ \t]*def\s+([A-Za-z_]\w*)\s*\(([^)]*)\)" r"(?:\s*->\s*([^\{\n]+?))?\s*\{",
+        re.MULTILINE,
+    )
     # declarations: qubit[..] name; / bit c; / qreg q[2]; / const int n = 5; ...
     _DECL = re.compile(
         r"^[ \t]*(?:const\s+)?"
         r"(qubit|bit|qreg|creg|int|uint|float|angle|bool|complex|duration|stretch)"
-        r"(?:\[[^\]]*\])?\s+([A-Za-z_]\w*)", re.MULTILINE)
+        r"(?:\[[^\]]*\])?\s+([A-Za-z_]\w*)",
+        re.MULTILINE,
+    )
     # OpenQASM 3 I/O modifiers:  input int[8] x;  output qreg q[4];  input x;
     _IO = re.compile(
         r"^[ \t]*(input|output)\s+"
         r"(?:(?:qubit|bit|qreg|creg|int|uint|float|angle|bool|complex|duration|"
         r"stretch|array)(?:\[[^\]]*\])?\s+)?"
-        r"([A-Za-z_]\w*)", re.MULTILINE)
-    _TYPE_KW = {"qubit", "bit", "qreg", "creg", "int", "uint", "float", "angle",
-                "bool", "complex", "duration", "stretch", "array"}
+        r"([A-Za-z_]\w*)",
+        re.MULTILINE,
+    )
+    _TYPE_KW = {
+        "qubit",
+        "bit",
+        "qreg",
+        "creg",
+        "int",
+        "uint",
+        "float",
+        "angle",
+        "bool",
+        "complex",
+        "duration",
+        "stretch",
+        "array",
+    }
 
     def _register_types(self, file_id, text, path):
         pass
@@ -64,8 +85,7 @@ class OpenQASMAnalyzer(RegexCodeAnalyzer):
                 if re.match(r"^[A-Za-z_]\w*$", q):
                     arg_ids.append(self._add_arg(q, "qubit"))
             gate_spans.append((m.start(), m.end()))
-            self._add_function(file_id, name, arg_ids, [],
-                               description="openqasm gate")
+            self._add_function(file_id, name, arg_ids, [], description="openqasm gate")
 
         # subroutine definitions:  def NAME(params) -> ret { ... }
         for m in self._DEF.finditer(text):
@@ -78,8 +98,9 @@ class OpenQASMAnalyzer(RegexCodeAnalyzer):
             out_ids = []
             if m.group(3):
                 out_ids.append(self._add_output(m.group(3).strip()))
-            self._add_function(file_id, name, arg_ids, out_ids,
-                               description="openqasm def")
+            self._add_function(
+                file_id, name, arg_ids, out_ids, description="openqasm def"
+            )
 
         # top-level declarations -> variables (skip parameter names inside gates)
         for m in self._DECL.finditer(text):

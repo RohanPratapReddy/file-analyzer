@@ -18,16 +18,16 @@ Typical use (also wired into ``AnalysisEngine.run``):
     read_all_views("repository.db")
 """
 
-from .catalog import VIEW_CATALOG, VIEW_PREFIX, ViewDef, catalog_by_name
 from .builder import (
-    views_ddl,
-    install_views_sqlite,
     append_views_to_sql_dump,
     export_catalog_json,
-    write_sql_artifacts,
+    install_views_sqlite,
     sqlite_present_tables,
+    views_ddl,
+    write_sql_artifacts,
 )
-from .reader import list_views, read_view, read_all_views
+from .catalog import VIEW_CATALOG, VIEW_PREFIX, ViewDef, catalog_by_name
+from .reader import list_views, read_all_views, read_view
 
 __all__ = [
     "VIEW_CATALOG",

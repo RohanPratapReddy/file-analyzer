@@ -15,14 +15,20 @@
 # records nothing, because the language names nothing.  An "empty" Ook! file is
 # the CORRECT result.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _OOK = re.compile(r"Ook([.?!])")
 # token-pair -> brainfuck command
 _PAIRS = {
-    (".", "?"): ">", ("?", "."): "<", (".", "."): "+", ("!", "!"): "-",
-    ("!", "."): ".", (".", "!"): ",", ("!", "?"): "[", ("?", "!"): "]",
+    (".", "?"): ">",
+    ("?", "."): "<",
+    (".", "."): "+",
+    ("!", "!"): "-",
+    ("!", "."): ".",
+    (".", "!"): ",",
+    ("!", "?"): "[",
+    ("?", "!"): "]",
 }
 
 

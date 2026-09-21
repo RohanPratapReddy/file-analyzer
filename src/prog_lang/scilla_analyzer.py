@@ -17,7 +17,7 @@
 #
 # Comments are '(* *)' only.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -30,14 +30,18 @@ class ScillaAnalyzer(RegexCodeAnalyzer):
 
     _IMPORT = re.compile(r"^[ \t]*import\s+(.+)$", re.MULTILINE)
     _LIBRARY = re.compile(r"^[ \t]*library\s+([A-Za-z_]\w*)", re.MULTILINE)
-    _CONTRACT = re.compile(r"^[ \t]*contract\s+([A-Za-z_]\w*)\s*\(([^)]*)\)",
-                           re.MULTILINE)
+    _CONTRACT = re.compile(
+        r"^[ \t]*contract\s+([A-Za-z_]\w*)\s*\(([^)]*)\)", re.MULTILINE
+    )
     _TYPE = re.compile(r"^[ \t]*type\s+([A-Za-z_]\w*)", re.MULTILINE)
     _FIELD = re.compile(r"^[ \t]*field\s+([A-Za-z_]\w*)\s*:", re.MULTILINE)
-    _TRANS = re.compile(r"^[ \t]*(transition|procedure)\s+([A-Za-z_]\w*)\s*"
-                        r"\(([^)]*)\)", re.MULTILINE)
-    _LET = re.compile(r"^[ \t]*let\s+([A-Za-z_]\w*)\s*(?::[^=]*)?=\s*(.*)$",
-                      re.MULTILINE)
+    _TRANS = re.compile(
+        r"^[ \t]*(transition|procedure)\s+([A-Za-z_]\w*)\s*" r"\(([^)]*)\)",
+        re.MULTILINE,
+    )
+    _LET = re.compile(
+        r"^[ \t]*let\s+([A-Za-z_]\w*)\s*(?::[^=]*)?=\s*(.*)$", re.MULTILINE
+    )
 
     def _register_types(self, file_id, text, path):
         clean = self._strip_comments(text)
@@ -66,8 +70,9 @@ class ScillaAnalyzer(RegexCodeAnalyzer):
                 pm = re.search(r"([A-Za-z_]\w*)\s*:", part)
                 if pm:
                     arg_ids.append(self._add_arg(pm.group(1)))
-            self._add_class(file_id, m.group(1), description="scilla contract",
-                            attr_ids=arg_ids)
+            self._add_class(
+                file_id, m.group(1), description="scilla contract", attr_ids=arg_ids
+            )
 
         for m in self._FIELD.finditer(clean):
             self._add_variable(file_id, m.group(1), "field")
@@ -75,8 +80,9 @@ class ScillaAnalyzer(RegexCodeAnalyzer):
         for m in self._LET.finditer(clean):
             name, val = m.group(1), m.group(2).lstrip()
             if val.startswith(("fun ", "fun(", "tfun ", "tfun(")):
-                self._add_function(file_id, name, [], [],
-                                   description="scilla let-function")
+                self._add_function(
+                    file_id, name, [], [], description="scilla let-function"
+                )
             else:
                 self._add_variable(file_id, name, "let")
 
@@ -86,5 +92,6 @@ class ScillaAnalyzer(RegexCodeAnalyzer):
                 pm = re.search(r"([A-Za-z_]\w*)\s*:", part)
                 if pm:
                     arg_ids.append(self._add_arg(pm.group(1)))
-            self._add_function(file_id, m.group(2), arg_ids, [],
-                               description=f"scilla {m.group(1)}")
+            self._add_function(
+                file_id, m.group(2), arg_ids, [], description=f"scilla {m.group(1)}"
+            )

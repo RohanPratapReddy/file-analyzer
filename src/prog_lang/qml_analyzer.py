@@ -16,6 +16,7 @@
 # Comments are '//' and '/* */'; strings use '"' and "'".
 import re
 from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -30,12 +31,16 @@ class QMLAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"', "'")
 
     _IMPORT_MOD = re.compile(
-        r"(?m)^\s*import\s+(" + _QUAL + r")\s*([0-9.]+)?\s*(?:as\s+(" + _ID + r"))?\s*$")
-    _IMPORT_STR = re.compile(r'(?m)^\s*import\s+"([^"]+)"\s*(?:as\s+(' + _ID + r'))?')
-    _COMPONENT = re.compile(r"(?m)^\s*component\s+(" + _ID + r")\s*:\s*(" + _QUAL + r")\s*\{")
+        r"(?m)^\s*import\s+(" + _QUAL + r")\s*([0-9.]+)?\s*(?:as\s+(" + _ID + r"))?\s*$"
+    )
+    _IMPORT_STR = re.compile(r'(?m)^\s*import\s+"([^"]+)"\s*(?:as\s+(' + _ID + r"))?")
+    _COMPONENT = re.compile(
+        r"(?m)^\s*component\s+(" + _ID + r")\s*:\s*(" + _QUAL + r")\s*\{"
+    )
     _PROPERTY = re.compile(
         r"(?m)^\s*(?:default\s+|readonly\s+|required\s+)*property\s+"
-        r"(alias\s+)?(list\s*<\s*" + _QUAL + r"\s*>|" + _QUAL + r")\s+(" + _ID + r")")
+        r"(alias\s+)?(list\s*<\s*" + _QUAL + r"\s*>|" + _QUAL + r")\s+(" + _ID + r")"
+    )
     _SIGNAL = re.compile(r"(?m)^\s*signal\s+(" + _ID + r")\s*(?:\(([^)]*)\))?")
     _FUNCTION = re.compile(r"(?m)^\s*function\s+(" + _ID + r")\s*\(([^)]*)\)")
     _ROOT = re.compile(r"(?m)^\s*(" + _QUAL + r")\s*\{")
@@ -84,8 +89,12 @@ class QMLAnalyzer(RegexCodeAnalyzer):
 
         # inline components (QML 6)
         for m in self._COMPONENT.finditer(clean):
-            self._add_class(file_id, m.group(1), description="qml component",
-                            parent_ids=[self._register_class(m.group(2))])
+            self._add_class(
+                file_id,
+                m.group(1),
+                description="qml component",
+                parent_ids=[self._register_class(m.group(2))],
+            )
 
         # the file itself is a component -> one class, base = root object type
         stem = Path(path).stem
@@ -95,17 +104,34 @@ class QMLAnalyzer(RegexCodeAnalyzer):
             prop_ids.append(self._add_arg(nm, arg_type=(m.group(2) or "").strip()))
             self._add_variable(file_id, nm, scope="property")
         for m in self._SIGNAL.finditer(clean):
-            method_ids.append(self._add_function(
-                file_id, m.group(1), self._params(m.group(2) or ""), [],
-                description="qml signal"))
+            method_ids.append(
+                self._add_function(
+                    file_id,
+                    m.group(1),
+                    self._params(m.group(2) or ""),
+                    [],
+                    description="qml signal",
+                )
+            )
         for m in self._FUNCTION.finditer(clean):
-            method_ids.append(self._add_function(
-                file_id, m.group(1), self._params(m.group(2)), [],
-                description="qml function"))
+            method_ids.append(
+                self._add_function(
+                    file_id,
+                    m.group(1),
+                    self._params(m.group(2)),
+                    [],
+                    description="qml function",
+                )
+            )
 
         if stem and stem[0:1].isalpha():
             base = self._root_type(clean)
             parents = [self._register_class(base)] if base else None
-            self._add_class(file_id, stem, description="qml component (file)",
-                            parent_ids=parents, method_ids=method_ids or None,
-                            attr_ids=prop_ids or None)
+            self._add_class(
+                file_id,
+                stem,
+                description="qml component (file)",
+                parent_ids=parents,
+                method_ids=method_ids or None,
+                attr_ids=prop_ids or None,
+            )

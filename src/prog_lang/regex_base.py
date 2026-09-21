@@ -6,9 +6,9 @@
 # hooks ``_register_types`` and ``_extract_entities`` with the *real* syntax of
 # its own language. It deliberately contains NO per-language / per-paradigm
 # parsing logic -- that lives, fully independent, in each ``<lang>_analyzer.py``.
-import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
+
 from .base_code_analyzer import BaseCodeAnalyzer
 
 
@@ -27,11 +27,19 @@ class RegexCodeAnalyzer(BaseCodeAnalyzer):
     BLOCK_COMMENTS: Tuple[Tuple[str, str], ...] = (("/*", "*/"),)
     STRING_DELIMS: Tuple[str, ...] = ('"', "'")
 
-    def __init__(self, file_paths: Optional[List[Union[str, Path]]] = None,
-                 dump_file_path: str = "code_analysis.json",
-                 dump_file_type: str = "json", **kwargs):
-        super().__init__(file_paths=file_paths, dump_file_path=dump_file_path,
-                         dump_file_type=dump_file_type, language_name=self.LANG_KEY)
+    def __init__(
+        self,
+        file_paths: Optional[List[Union[str, Path]]] = None,
+        dump_file_path: str = "code_analysis.json",
+        dump_file_type: str = "json",
+        **kwargs,
+    ):
+        super().__init__(
+            file_paths=file_paths,
+            dump_file_path=dump_file_path,
+            dump_file_type=dump_file_type,
+            language_name=self.LANG_KEY,
+        )
         self.extensions = list(self.EXTENSIONS)
         self.introspection_source = f"regex:{self.LANG_KEY}"
         self._emitted_class_rows: Dict[int, Dict[str, Any]] = {}
@@ -42,58 +50,105 @@ class RegexCodeAnalyzer(BaseCodeAnalyzer):
     def _add_import(self, file_id, import_name, import_source, alias=None):
         imp_id = self._import_counter
         self._import_counter += 1
-        self.imports_table.append({
-            "import_id": imp_id, "import_name": import_name,
-            "import_source": import_source, "alias": alias,
-        })
+        self.imports_table.append(
+            {
+                "import_id": imp_id,
+                "import_name": import_name,
+                "import_source": import_source,
+                "alias": alias,
+            }
+        )
         self._record_symbol(file_id, "import", imp_id)
         return imp_id
 
-    def _add_variable(self, file_id, name, value=None, scope="module",
-                      is_imported=False, source_import_id=None):
+    def _add_variable(
+        self,
+        file_id,
+        name,
+        value=None,
+        scope="module",
+        is_imported=False,
+        source_import_id=None,
+    ):
         vid = self._var_counter
         self._var_counter += 1
-        self.variables_table.append({
-            "variable_id": vid, "variable_name": name, "variable_value": value,
-            "scope": scope, "is_imported": is_imported,
-            "source_import_id": source_import_id,
-        })
+        self.variables_table.append(
+            {
+                "variable_id": vid,
+                "variable_name": name,
+                "variable_value": value,
+                "scope": scope,
+                "is_imported": is_imported,
+                "source_import_id": source_import_id,
+            }
+        )
         self._record_symbol(file_id, "variable", vid)
         return vid
 
     def _add_arg(self, name, arg_type=None, default_value=None):
         aid = self._arg_counter
         self._arg_counter += 1
-        self.args_table.append({
-            "args_id": aid, "args_name": name, "args_type": arg_type,
-            "default_value": default_value, "permitted_values": None,
-        })
+        self.args_table.append(
+            {
+                "args_id": aid,
+                "args_name": name,
+                "args_type": arg_type,
+                "default_value": default_value,
+                "permitted_values": None,
+            }
+        )
         return aid
 
     def _add_output(self, output_type, description=None):
         oid = self._output_counter
         self._output_counter += 1
-        self.outputs_table.append({
-            "output_id": oid, "output_type": output_type, "description": description,
-        })
+        self.outputs_table.append(
+            {
+                "output_id": oid,
+                "output_type": output_type,
+                "description": description,
+            }
+        )
         return oid
 
-    def _add_function(self, file_id, name, arg_ids=None, output_ids=None,
-                      class_id=None, description=None, forward=None,
-                      backward=None, is_imported=False, source_import_id=None):
+    def _add_function(
+        self,
+        file_id,
+        name,
+        arg_ids=None,
+        output_ids=None,
+        class_id=None,
+        description=None,
+        forward=None,
+        backward=None,
+        is_imported=False,
+        source_import_id=None,
+    ):
         fn_id = self._func_counter
         self._func_counter += 1
         lang = self.LANG_KEY
-        self.functions_table.append({
-            "function_id": fn_id, "function_name": name,
-            "args_ids": arg_ids or [], "function_outputs_ids": output_ids or [],
-            "class_id": class_id, "function_description": description,
-            "function_forward_pass": forward if forward is not None else
-                f"```pseudocode\n// {lang} forward pass: {name}\nRESULT = {name}(ARGS...)\nRETURN RESULT\n```",
-            "function_backward_pass": backward if backward is not None else
-                f"```pseudocode\n// {lang} backward pass: {name}\nPROPAGATE_GRADIENTS()\n```",
-            "is_imported": is_imported, "source_import_id": source_import_id,
-        })
+        self.functions_table.append(
+            {
+                "function_id": fn_id,
+                "function_name": name,
+                "args_ids": arg_ids or [],
+                "function_outputs_ids": output_ids or [],
+                "class_id": class_id,
+                "function_description": description,
+                "function_forward_pass": (
+                    forward
+                    if forward is not None
+                    else f"```pseudocode\n// {lang} forward pass: {name}\nRESULT = {name}(ARGS...)\nRETURN RESULT\n```"
+                ),
+                "function_backward_pass": (
+                    backward
+                    if backward is not None
+                    else f"```pseudocode\n// {lang} backward pass: {name}\nPROPAGATE_GRADIENTS()\n```"
+                ),
+                "is_imported": is_imported,
+                "source_import_id": source_import_id,
+            }
+        )
         self._record_symbol(file_id, "function", fn_id)
         return fn_id
 
@@ -104,9 +159,19 @@ class RegexCodeAnalyzer(BaseCodeAnalyzer):
             self._class_counter += 1
         return self._class_registry.get(name)
 
-    def _add_class(self, file_id, name, description=None, parent_ids=None,
-                   method_ids=None, attr_ids=None, tensor_member_ids=None,
-                   is_imported=False, source_import_id=None, introspect=True):
+    def _add_class(
+        self,
+        file_id,
+        name,
+        description=None,
+        parent_ids=None,
+        method_ids=None,
+        attr_ids=None,
+        tensor_member_ids=None,
+        is_imported=False,
+        source_import_id=None,
+        introspect=True,
+    ):
         cls_id = self._class_registry.get(name)
         if cls_id is None:
             cls_id = self._class_counter
@@ -129,21 +194,30 @@ class RegexCodeAnalyzer(BaseCodeAnalyzer):
                 row["class_description"] = description
             return cls_id
         row = {
-            "class_id": cls_id, "class_name": name, "class_description": description,
-            "parent_class_ids": parent_ids or [], "method_ids": method_ids or [],
-            "args_ids": [], "attr_ids": attr_ids or [],
+            "class_id": cls_id,
+            "class_name": name,
+            "class_description": description,
+            "parent_class_ids": parent_ids or [],
+            "method_ids": method_ids or [],
+            "args_ids": [],
+            "attr_ids": attr_ids or [],
             "tensor_member_ids": tensor_member_ids or [],
-            "is_imported": is_imported, "source_import_id": source_import_id,
+            "is_imported": is_imported,
+            "source_import_id": source_import_id,
         }
         self.classes_table.append(row)
         self._emitted_class_rows[cls_id] = row
         self._record_symbol(file_id, "class/struct/interface", cls_id)
         if introspect:
             self.record_introspection_metadata(
-                file_id=file_id, entity_id=cls_id, entity_type="class",
+                file_id=file_id,
+                entity_id=cls_id,
+                entity_type="class",
                 inspection_source=self.introspection_source,
-                structural_properties={"declared_fields": len(attr_ids or []),
-                                       "declared_methods": len(method_ids or [])},
+                structural_properties={
+                    "declared_fields": len(attr_ids or []),
+                    "declared_methods": len(method_ids or []),
+                },
             )
         return cls_id
 
@@ -210,8 +284,9 @@ class RegexCodeAnalyzer(BaseCodeAnalyzer):
         return "".join(out)
 
     @staticmethod
-    def _split_top_level(s: str, sep: str = ",",
-                         opens: str = "([{<", closes: str = ")]}>") -> List[str]:
+    def _split_top_level(
+        s: str, sep: str = ",", opens: str = "([{<", closes: str = ")]}>"
+    ) -> List[str]:
         """Split ``s`` on ``sep`` only at bracket depth 0."""
         parts, buf, depth = [], [], 0
         instr = None
@@ -239,8 +314,9 @@ class RegexCodeAnalyzer(BaseCodeAnalyzer):
         return [p.strip() for p in parts if p.strip()]
 
     @staticmethod
-    def _find_matching(text: str, open_pos: int, opener: str = "{",
-                       closer: str = "}") -> int:
+    def _find_matching(
+        text: str, open_pos: int, opener: str = "{", closer: str = "}"
+    ) -> int:
         """Given the index of an opening bracket, return the index just past its
         matching close (string-literal aware). Returns ``len(text)`` if
         unbalanced."""
@@ -305,8 +381,9 @@ class RegexCodeAnalyzer(BaseCodeAnalyzer):
     # ------------------------------------------------------------------
     def analyze(self) -> Dict[str, List[Dict[str, Any]]]:
         exts = {e.lower() for e in self.extensions}
-        valid_files = [p for p in self.file_paths
-                       if p.suffix.lower() in exts and p.exists()]
+        valid_files = [
+            p for p in self.file_paths if p.suffix.lower() in exts and p.exists()
+        ]
         for file_id, path in enumerate(valid_files, start=1):
             text = self._read_source(path)
             try:

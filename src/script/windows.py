@@ -14,14 +14,14 @@ from ..shell.shell_base import ShellScriptBase
 class PowerShellAnalyzer(ShellScriptBase):
     """PowerShell (`.ps1` script, `.psm1` module).
 
-        function Get-Thing { param([int]$n) ... }   -> function (+params)
-        filter Select-Even { ... }                  -> function
-        class Widget : Base { [int]$Size }          -> class (+parent)
-        enum Color { Red; Green }                   -> class row
-        Import-Module Pester                         -> import
-        using module ./lib.psm1                      -> import
-        . "$PSScriptRoot/helpers.ps1"                -> import (dot-source)
-        $script:Count = 0                            -> variable
+    function Get-Thing { param([int]$n) ... }   -> function (+params)
+    filter Select-Even { ... }                  -> function
+    class Widget : Base { [int]$Size }          -> class (+parent)
+    enum Color { Red; Green }                   -> class row
+    Import-Module Pester                         -> import
+    using module ./lib.psm1                      -> import
+    . "$PSScriptRoot/helpers.ps1"                -> import (dot-source)
+    $script:Count = 0                            -> variable
     """
 
     LANG_KEY = "powershell"
@@ -30,21 +30,31 @@ class PowerShellAnalyzer(ShellScriptBase):
     BLOCK_COMMENTS = (("<#", "#>"),)
     STRING_DELIMS = ('"', "'")
 
-    _FUNC = re.compile(r"(?im)^[ \t]*(?:function|filter|workflow|configuration)[ \t]+"
-                       r"(?:global:|local:|script:|private:)?([A-Za-z_][\w-]*)")
-    _CLASS = re.compile(r"(?im)^[ \t]*class[ \t]+([A-Za-z_]\w*)"
-                        r"(?:[ \t]*:[ \t]*([A-Za-z_][\w.,\s]*?))?[ \t]*\{")
+    _FUNC = re.compile(
+        r"(?im)^[ \t]*(?:function|filter|workflow|configuration)[ \t]+"
+        r"(?:global:|local:|script:|private:)?([A-Za-z_][\w-]*)"
+    )
+    _CLASS = re.compile(
+        r"(?im)^[ \t]*class[ \t]+([A-Za-z_]\w*)"
+        r"(?:[ \t]*:[ \t]*([A-Za-z_][\w.,\s]*?))?[ \t]*\{"
+    )
     _ENUM = re.compile(r"(?im)^[ \t]*enum[ \t]+([A-Za-z_]\w*)")
-    _IMPORT_MODULE = re.compile(r"(?im)^[ \t]*Import-Module[ \t]+"
-                                r"(?:-Name[ \t]+)?['\"]?([\w.\-/\\]+)")
-    _USING = re.compile(r"(?im)^[ \t]*using[ \t]+(?:module|namespace|assembly)[ \t]+"
-                        r"['\"]?([\w.\-/\\]+)")
+    _IMPORT_MODULE = re.compile(
+        r"(?im)^[ \t]*Import-Module[ \t]+" r"(?:-Name[ \t]+)?['\"]?([\w.\-/\\]+)"
+    )
+    _USING = re.compile(
+        r"(?im)^[ \t]*using[ \t]+(?:module|namespace|assembly)[ \t]+"
+        r"['\"]?([\w.\-/\\]+)"
+    )
     _DOTSOURCE = re.compile(r"(?m)^[ \t]*\.[ \t]+(['\"]?)([^\n'\";]+?)\1[ \t]*$")
     _PARAM_BLOCK = re.compile(r"(?is)\bparam[ \t]*\(")
-    _PARAM_VAR = re.compile(r"(?:\[[^\]]+\][ \t]*)*\$(?:global:|local:|script:|private:)?"
-                            r"([A-Za-z_]\w*)")
+    _PARAM_VAR = re.compile(
+        r"(?:\[[^\]]+\][ \t]*)*\$(?:global:|local:|script:|private:)?" r"([A-Za-z_]\w*)"
+    )
     # Top-level assignment: $Var = ...  /  $script:Var = ...
-    _ASSIGN = re.compile(r"(?m)^[ \t]*\$(?:global:|script:|env:)?([A-Za-z_]\w*)[ \t]*=(?!=)")
+    _ASSIGN = re.compile(
+        r"(?m)^[ \t]*\$(?:global:|script:|env:)?([A-Za-z_]\w*)[ \t]*=(?!=)"
+    )
 
     def _register_types(self, file_id, text, path):
         text = text.replace("\r\n", "\n").replace("\r", "\n")
@@ -64,9 +74,9 @@ class PowerShellAnalyzer(ShellScriptBase):
             elif c == ")":
                 depth -= 1
                 if depth == 0:
-                    return text[open_idx + 1:i]
+                    return text[open_idx + 1 : i]
             i += 1
-        return text[open_idx + 1:]
+        return text[open_idx + 1 :]
 
     def _extract_entities(self, file_id, text, path):
         text = text.replace("\r\n", "\n").replace("\r", "\n")
@@ -104,8 +114,9 @@ class PowerShellAnalyzer(ShellScriptBase):
                     pid = self._register_class(b.strip())
                     if pid is not None:
                         parents.append(pid)
-            self._add_class(file_id, name, parent_ids=parents,
-                            description="powershell class")
+            self._add_class(
+                file_id, name, parent_ids=parents, description="powershell class"
+            )
         for m in self._ENUM.finditer(clean):
             self._add_class(file_id, m.group(1), description="powershell enum")
 
@@ -122,8 +133,9 @@ class PowerShellAnalyzer(ShellScriptBase):
             if pm and pm.start() - m.end() < 200:
                 block = self._find_block(clean, pm.end() - 1)
                 params = self._uniq(self._PARAM_VAR.findall(block))
-            self._add_shell_function(file_id, name, params=params,
-                                     description="powershell function")
+            self._add_shell_function(
+                file_id, name, params=params, description="powershell function"
+            )
 
         # Module-level variables.
         seen_var = set()
@@ -135,31 +147,37 @@ class PowerShellAnalyzer(ShellScriptBase):
             self._add_variable(file_id, name, scope="module")
 
         self._record_module_meta(
-            file_id, dialect="powershell",
+            file_id,
+            dialect="powershell",
             is_module=path.suffix.lower() == ".psm1",
-            functions=len(seen_fn), variables=len(seen_var))
+            functions=len(seen_fn),
+            variables=len(seen_var),
+        )
 
 
 class BatchScriptAnalyzer(ShellScriptBase):
     """Windows / OS-2 batch (`.bat`, `.cmd`).
 
-        :build                                        -> function (label/subroutine)
-        call :build arg1                              -> (call target)
-        set NAME=value    set /a N=1    set /p X=?    -> variable
-        call other.bat                                -> import
-        %VAR%  !VAR!                                  -> (variable references)
+    :build                                        -> function (label/subroutine)
+    call :build arg1                              -> (call target)
+    set NAME=value    set /a N=1    set /p X=?    -> variable
+    call other.bat                                -> import
+    %VAR%  !VAR!                                  -> (variable references)
     """
 
     LANG_KEY = "batch"
     EXTENSIONS = (".bat", ".cmd")
-    LINE_COMMENTS = ("::",)          # `rem` handled explicitly below
+    LINE_COMMENTS = ("::",)  # `rem` handled explicitly below
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ('"',)
 
     _LABEL = re.compile(r"(?im)^[ \t]*:([A-Za-z_][\w.$-]*)[ \t]*$")
-    _SET = re.compile(r"(?im)^[ \t]*set[ \t]+(?:/a[ \t]+|/p[ \t]+)?"
-                      r"\"?([A-Za-z_][\w.#$-]*)=")
-    _CALL_FILE = re.compile(r"(?im)^[ \t]*call[ \t]+(?!:)\"?([\w.\-\\/%~]+\.(?:bat|cmd))")
+    _SET = re.compile(
+        r"(?im)^[ \t]*set[ \t]+(?:/a[ \t]+|/p[ \t]+)?" r"\"?([A-Za-z_][\w.#$-]*)="
+    )
+    _CALL_FILE = re.compile(
+        r"(?im)^[ \t]*call[ \t]+(?!:)\"?([\w.\-\\/%~]+\.(?:bat|cmd))"
+    )
     _CALL_LABEL = re.compile(r"(?im)^[ \t]*call[ \t]+:([A-Za-z_][\w.$-]*)")
     _GOTO = re.compile(r"(?im)^[ \t]*goto[ \t]+:?([A-Za-z_][\w.$-]*)")
 
@@ -202,6 +220,10 @@ class BatchScriptAnalyzer(ShellScriptBase):
 
         calls = len(self._CALL_LABEL.findall(clean))
         self._record_module_meta(
-            file_id, dialect="batch", labels=len(seen_fn),
-            variables=len(seen_var), subroutine_calls=calls,
-            gotos=len(self._GOTO.findall(clean)))
+            file_id,
+            dialect="batch",
+            labels=len(seen_fn),
+            variables=len(seen_var),
+            subroutine_calls=calls,
+            gotos=len(self._GOTO.findall(clean)),
+        )

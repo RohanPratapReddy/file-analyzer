@@ -13,7 +13,7 @@
 #   end module geometry
 #   program main ... end program                         -> program (class row)
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -25,32 +25,41 @@ class FortranAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"', "'")
 
     _USE = re.compile(
-        r"^\s*use\s+(?:,\s*\w+\s*::\s*)?([A-Za-z]\w*)"
-        r"(?:\s*,\s*only\s*:\s*(.+))?", re.IGNORECASE)
+        r"^\s*use\s+(?:,\s*\w+\s*::\s*)?([A-Za-z]\w*)" r"(?:\s*,\s*only\s*:\s*(.+))?",
+        re.IGNORECASE,
+    )
     _MODULE = re.compile(r"^\s*module\s+([A-Za-z]\w*)\s*$", re.IGNORECASE)
     _PROGRAM = re.compile(r"^\s*program\s+([A-Za-z]\w*)", re.IGNORECASE)
     _TYPE = re.compile(
-        r"^\s*type(?:\s*,\s*[\w()=, ]+?)?\s*(?:::\s*)?([A-Za-z]\w*)\s*$",
-        re.IGNORECASE)
+        r"^\s*type(?:\s*,\s*[\w()=, ]+?)?\s*(?:::\s*)?([A-Za-z]\w*)\s*$", re.IGNORECASE
+    )
     _END_TYPE = re.compile(r"^\s*end\s*type\b", re.IGNORECASE)
     _SUBROUTINE = re.compile(
         r"^\s*(?:(?:pure|elemental|recursive|module|attributes\([^)]*\))\s+)*"
-        r"subroutine\s+([A-Za-z]\w*)\s*(?:\(([^)]*)\))?", re.IGNORECASE)
+        r"subroutine\s+([A-Za-z]\w*)\s*(?:\(([^)]*)\))?",
+        re.IGNORECASE,
+    )
     _FUNCTION = re.compile(
         r"^\s*(?:(?:pure|elemental|recursive|module|[\w*()]+(?:\s*\([^)]*\))?)\s+)*?"
         r"function\s+([A-Za-z]\w*)\s*\(([^)]*)\)"
-        r"(?:\s*result\s*\(\s*([A-Za-z]\w*)\s*\))?", re.IGNORECASE)
+        r"(?:\s*result\s*\(\s*([A-Za-z]\w*)\s*\))?",
+        re.IGNORECASE,
+    )
     _END_UNIT = re.compile(
-        r"^\s*end\s*(module|program|subroutine|function)?\b", re.IGNORECASE)
+        r"^\s*end\s*(module|program|subroutine|function)?\b", re.IGNORECASE
+    )
     _DECL = re.compile(
         r"^\s*(integer|real|double\s+precision|complex|logical|character|type\s*\([^)]*\)|"
         r"class\s*\([^)]*\))"
-        r"(?:\s*\([^)]*\))?"                                   # kind/len selector
-        r"((?:\s*,\s*[\w()=.*: ]+)*)"                         # attributes
-        r"\s*::\s*(.+)$", re.IGNORECASE)
+        r"(?:\s*\([^)]*\))?"  # kind/len selector
+        r"((?:\s*,\s*[\w()=.*: ]+)*)"  # attributes
+        r"\s*::\s*(.+)$",
+        re.IGNORECASE,
+    )
 
     _INTRINSIC_TYPES = re.compile(
-        r"^(integer|real|double|complex|logical|character|type|class)$", re.IGNORECASE)
+        r"^(integer|real|double|complex|logical|character|type|class)$", re.IGNORECASE
+    )
 
     def _register_types(self, file_id, text, path):
         for line in text.splitlines():
@@ -77,8 +86,8 @@ class FortranAnalyzer(RegexCodeAnalyzer):
                     self._add_import(file_id, mod, mod)
 
         # container stack: modules/programs (own procedures); types (own fields)
-        containers = []      # dicts with name/kind/methods/attrs
-        stack = []           # (kind, dict-or-None) for nesting incl. procedures/types
+        containers = []  # dicts with name/kind/methods/attrs
+        stack = []  # (kind, dict-or-None) for nesting incl. procedures/types
         i = 0
         while i < n:
             line = lines[i]
@@ -172,13 +181,18 @@ class FortranAnalyzer(RegexCodeAnalyzer):
             i += 1
 
         for c in containers:
-            self._add_class(file_id, c["name"], description=f"fortran {c['kind']}",
-                            method_ids=c["methods"], attr_ids=c["attrs"])
+            self._add_class(
+                file_id,
+                c["name"],
+                description=f"fortran {c['kind']}",
+                method_ids=c["methods"],
+                attr_ids=c["attrs"],
+            )
 
     def _decl_names(self, rhs):
         names = []
         for part in self._split_top_level(rhs):
-            part = part.split("=")[0]                 # drop initializer
+            part = part.split("=")[0]  # drop initializer
             m = re.match(r"\s*([A-Za-z]\w*)", part)
             if m:
                 names.append(m.group(1))

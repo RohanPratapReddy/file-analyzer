@@ -12,7 +12,7 @@
 #   datatype color = Red | Green | Blue                    -> datatype (class + cons)
 #   type 'a stack = 'a list                                -> (type alias, skipped)
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_']*"
@@ -22,27 +22,30 @@ class SMLAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "sml"
     EXTENSIONS = (".sml", ".sig", ".fun")
     LINE_COMMENTS = ()
-    BLOCK_COMMENTS = ()          # handled by a nesting-aware stripper below
+    BLOCK_COMMENTS = ()  # handled by a nesting-aware stripper below
     STRING_DELIMS = ('"',)
 
     _MODULE = re.compile(
-        r"\b(structure|signature|functor)\s+(" + _ID + r")", re.IGNORECASE)
+        r"\b(structure|signature|functor)\s+(" + _ID + r")", re.IGNORECASE
+    )
     _OPEN = re.compile(r"\bopen\s+((?:" + _ID + r"(?:\." + _ID + r")*\s*)+)")
     _FUN = re.compile(r"\bfun\s+(" + _ID + r")\s*(.*?)=", re.DOTALL)
-    _VAL = re.compile(r"\bval\s+(?:rec\s+)?(" + _ID + r")\s*(?::[^=]+)?=\s*(.*?)$",
-                      re.MULTILINE)
-    _VALSPEC = re.compile(r"\bval\s+(" + _ID + r")\s*:")     # signature spec
+    _VAL = re.compile(
+        r"\bval\s+(?:rec\s+)?(" + _ID + r")\s*(?::[^=]+)?=\s*(.*?)$", re.MULTILINE
+    )
+    _VALSPEC = re.compile(r"\bval\s+(" + _ID + r")\s*:")  # signature spec
     _DATATYPE = re.compile(
         r"\bdatatype\s+(?:'[\w']+\s+|\([^)]*\)\s+)?(" + _ID + r")\s*=\s*([^;]+?)"
         r"(?=\b(?:datatype|type|fun|val|structure|signature|end|and)\b|$)",
-        re.DOTALL)
+        re.DOTALL,
+    )
 
     def _strip_ml_comments(self, text):
         """Remove nested (* *) comments, preserving newlines and strings."""
         out = []
         i, n, depth = 0, len(text), 0
         while i < n:
-            two = text[i:i + 2]
+            two = text[i : i + 2]
             if depth == 0 and text[i] == '"':
                 out.append('"')
                 i += 1
@@ -88,8 +91,15 @@ class SMLAnalyzer(RegexCodeAnalyzer):
         # module containers, ordered by position for nearest-owner assignment
         modules = []
         for m in self._MODULE.finditer(text):
-            modules.append({"pos": m.start(), "name": m.group(2),
-                            "kind": m.group(1).lower(), "methods": [], "attrs": []})
+            modules.append(
+                {
+                    "pos": m.start(),
+                    "name": m.group(2),
+                    "kind": m.group(1).lower(),
+                    "methods": [],
+                    "attrs": [],
+                }
+            )
 
         def owner_at(pos):
             best = None
@@ -140,27 +150,34 @@ class SMLAnalyzer(RegexCodeAnalyzer):
                     owner["methods"].append(fid)
             else:
                 if owner is not None:
-                    owner["attrs"].append(self._add_arg(name, None,
-                                          rhs.rstrip(";").strip() or None))
+                    owner["attrs"].append(
+                        self._add_arg(name, None, rhs.rstrip(";").strip() or None)
+                    )
                 else:
                     self._add_variable(file_id, name, rhs.rstrip(";").strip() or None)
 
         # signature specs: `val name : type` (no '=') in .sig / sig...end
         for m in self._VALSPEC.finditer(text):
             # skip if this is actually a val binding (has '=' after the type)
-            tail = text[m.end():m.end() + 200]
+            tail = text[m.end() : m.end() + 200]
             # a spec has no top-level '=' before the next 'val'/'end'
             owner = owner_at(m.start())
             if owner and owner["kind"] == "signature":
                 name = m.group(1)
                 cid = self._class_registry.get(owner["name"])
-                fid = self._add_function(file_id, name, [], [], class_id=cid,
-                                         description="sml spec")
+                fid = self._add_function(
+                    file_id, name, [], [], class_id=cid, description="sml spec"
+                )
                 owner["methods"].append(fid)
 
         for mod in modules:
-            self._add_class(file_id, mod["name"], description=f"sml {mod['kind']}",
-                            method_ids=mod["methods"], attr_ids=mod["attrs"])
+            self._add_class(
+                file_id,
+                mod["name"],
+                description=f"sml {mod['kind']}",
+                method_ids=mod["methods"],
+                attr_ids=mod["attrs"],
+            )
 
     def _fun_params(self, raw):
         raw = raw.strip()

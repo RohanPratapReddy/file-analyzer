@@ -20,7 +20,7 @@
 # `label`/`screen`/`transform`/`menu` blocks and `def` are functions; embedded
 # `class` is a class; `define`/`default`/`image`/`style`/`$` bind variables.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -34,19 +34,24 @@ class RenPyAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"', "'")
 
     # block-opening statements that carry a name (+ optional param list) then ':'
-    _BLOCK = re.compile(r"^[ \t]*(label|screen|transform|menu|python|init)\b"
-                        r"(?:\s+([A-Za-z_][\w.]*))?\s*(\([^)]*\))?[^:\n]*:",
-                        re.MULTILINE)
-    _DEFINE = re.compile(r"^[ \t]*(?:define|default)\s+([A-Za-z_][\w.\[\]]*)\s*(?:=|\+=)",
-                         re.MULTILINE)
+    _BLOCK = re.compile(
+        r"^[ \t]*(label|screen|transform|menu|python|init)\b"
+        r"(?:\s+([A-Za-z_][\w.]*))?\s*(\([^)]*\))?[^:\n]*:",
+        re.MULTILINE,
+    )
+    _DEFINE = re.compile(
+        r"^[ \t]*(?:define|default)\s+([A-Za-z_][\w.\[\]]*)\s*(?:=|\+=)", re.MULTILINE
+    )
     _IMAGE = re.compile(r"^[ \t]*image\s+([A-Za-z_][\w ]*?)\s*=", re.MULTILINE)
     _STYLE = re.compile(r"^[ \t]*style\s+([A-Za-z_][\w.]*)\b", re.MULTILINE)
-    _DOLLAR = re.compile(r"^[ \t]*\$\s*([A-Za-z_][\w.\[\]]*)\s*(?:=|\+=|-=|\*=)(?!=)",
-                         re.MULTILINE)
+    _DOLLAR = re.compile(
+        r"^[ \t]*\$\s*([A-Za-z_][\w.\[\]]*)\s*(?:=|\+=|-=|\*=)(?!=)", re.MULTILINE
+    )
     # embedded Python
     _PYDEF = re.compile(r"^[ \t]*def\s+(" + _ID + r")\s*\(([^)]*)\)", re.MULTILINE)
-    _PYCLASS = re.compile(r"^[ \t]*class\s+(" + _ID + r")\s*(?:\(([^)]*)\))?\s*:",
-                          re.MULTILINE)
+    _PYCLASS = re.compile(
+        r"^[ \t]*class\s+(" + _ID + r")\s*(?:\(([^)]*)\))?\s*:", re.MULTILINE
+    )
 
     def _register_types(self, file_id, text, path):
         for m in self._PYCLASS.finditer(text):
@@ -61,8 +66,12 @@ class RenPyAnalyzer(RegexCodeAnalyzer):
                     pid = self._register_class(p)
                     if pid is not None:
                         parents.append(pid)
-            self._add_class(file_id, m.group(1), description="renpy class",
-                            parent_ids=parents or None)
+            self._add_class(
+                file_id,
+                m.group(1),
+                description="renpy class",
+                parent_ids=parents or None,
+            )
 
         for m in self._DEFINE.finditer(text):
             self._add_variable(file_id, m.group(1), scope="define")
@@ -78,7 +87,7 @@ class RenPyAnalyzer(RegexCodeAnalyzer):
         for m in self._BLOCK.finditer(text):
             kind, name, params = m.group(1), m.group(2), m.group(3)
             if kind in ("python", "init") and not name:
-                continue                       # bare `python:` / `init python:`
+                continue  # bare `python:` / `init python:`
             if not name:
                 # anonymous `menu:` -> synthesize a name from position
                 name = kind
@@ -95,8 +104,9 @@ class RenPyAnalyzer(RegexCodeAnalyzer):
                 continue
             seen_fn.add(key)
             arg_ids = self._parse_params("(" + (m.group(2) or "") + ")")
-            self._add_function(file_id, m.group(1), arg_ids, [],
-                               description="renpy def")
+            self._add_function(
+                file_id, m.group(1), arg_ids, [], description="renpy def"
+            )
 
     def _parse_params(self, group):
         if not group:

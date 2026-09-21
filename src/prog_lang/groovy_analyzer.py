@@ -8,7 +8,7 @@
 #   String build(int n) { ... }                     -> function (typed)
 #   def x = 5   int y = 1                           -> variable
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -18,22 +18,36 @@ class GroovyAnalyzer(RegexCodeAnalyzer):
     LINE_COMMENTS = ("//",)
     BLOCK_COMMENTS = (("/*", "*/"),)
 
-    _IMPORT = re.compile(r"^\s*import\s+(?:static\s+)?([\w.]+)(?:\s+as\s+(\w+))?",
-                         re.MULTILINE)
+    _IMPORT = re.compile(
+        r"^\s*import\s+(?:static\s+)?([\w.]+)(?:\s+as\s+(\w+))?", re.MULTILINE
+    )
     _CLASS = re.compile(
         r"^\s*(?:(?:public|private|protected|abstract|final|static)\s+)*"
         r"(class|interface|trait|enum)\s+(\w+)"
         r"(?:\s+extends\s+([\w.,\s]+?))?"
-        r"(?:\s+implements\s+([\w.,\s]+?))?\s*\{", re.MULTILINE)
+        r"(?:\s+implements\s+([\w.,\s]+?))?\s*\{",
+        re.MULTILINE,
+    )
     _FUNC = re.compile(
         r"^\s*(?:(?:public|private|protected|static|final|abstract|synchronized)\s+)*"
         r"(?:def|void|[\w.<>\[\]]+)\s+(\w+)\s*\(([^)]*)\)\s*(?:throws\s[\w.,\s]+)?\{",
-        re.MULTILINE)
-    _VAR = re.compile(
-        r"^\s*(?:def|final)\s+(\w+)\s*=(?!=)", re.MULTILINE)
+        re.MULTILINE,
+    )
+    _VAR = re.compile(r"^\s*(?:def|final)\s+(\w+)\s*=(?!=)", re.MULTILINE)
 
-    _KEYWORDS = {"if", "for", "while", "switch", "catch", "return", "new",
-                 "else", "do", "try", "synchronized"}
+    _KEYWORDS = {
+        "if",
+        "for",
+        "while",
+        "switch",
+        "catch",
+        "return",
+        "new",
+        "else",
+        "do",
+        "try",
+        "synchronized",
+    }
 
     def _register_types(self, file_id, text, path):
         t = self._strip_comments(text)
@@ -44,8 +58,9 @@ class GroovyAnalyzer(RegexCodeAnalyzer):
         t = self._strip_comments(text)
 
         for m in self._IMPORT.finditer(t):
-            self._add_import(file_id, m.group(1).split(".")[-1], m.group(1),
-                             alias=m.group(2))
+            self._add_import(
+                file_id, m.group(1).split(".")[-1], m.group(1), alias=m.group(2)
+            )
 
         class_spans = []
         for m in self._CLASS.finditer(t):
@@ -59,8 +74,9 @@ class GroovyAnalyzer(RegexCodeAnalyzer):
                         pid = self._register_class(p.strip().split("<")[0])
                         if pid is not None:
                             parents.append(pid)
-            self._add_class(file_id, name, description=f"groovy {kind}",
-                            parent_ids=parents)
+            self._add_class(
+                file_id, name, description=f"groovy {kind}", parent_ids=parents
+            )
 
         def owner(pos):
             for a, b, name in class_spans:
@@ -72,8 +88,9 @@ class GroovyAnalyzer(RegexCodeAnalyzer):
             name = m.group(1)
             if name in self._KEYWORDS:
                 continue
-            self._add_function(file_id, name, self._args(m.group(2)),
-                               class_id=owner(m.start()))
+            self._add_function(
+                file_id, name, self._args(m.group(2)), class_id=owner(m.start())
+            )
         for m in self._VAR.finditer(t):
             self._add_variable(file_id, m.group(1))
 

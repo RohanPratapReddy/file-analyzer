@@ -10,7 +10,7 @@
 #   let pi = 3.14                                  -> value binding (variable)
 #   class counter = object ... end                 -> class
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -25,14 +25,17 @@ class OCamlAnalyzer(RegexCodeAnalyzer):
     _MODULE = re.compile(r"^\s*module\s+(?:type\s+)?(\w+)", re.MULTILINE)
     _TYPE = re.compile(
         r"^\s*(?:and|type)\s+(?:'[\w\s']+\s+)?(\w+)\s*=\s*(.*?)(?=^\s*(?:let|type|and|module|class|exception|val|external|open|include)\b|\Z)",
-        re.MULTILINE | re.DOTALL)
+        re.MULTILINE | re.DOTALL,
+    )
     _CLASS = re.compile(r"^\s*class\s+(?:virtual\s+)?(\w+)", re.MULTILINE)
     # A function binding has >=1 parameter token before '='; a value binding has
     # only the (optionally type-annotated) name.
-    _LET_FUN = re.compile(r"^\s*let\s+(?:rec\s+)?(\w+)[ \t]+[^\n=]*[^\s=][ \t]*=(?!=)",
-                          re.MULTILINE)
-    _LET_VAL = re.compile(r"^\s*let\s+(?:rec\s+)?(\w+)\s*(?::[^=]+)?=(?!=)",
-                          re.MULTILINE)
+    _LET_FUN = re.compile(
+        r"^\s*let\s+(?:rec\s+)?(\w+)[ \t]+[^\n=]*[^\s=][ \t]*=(?!=)", re.MULTILINE
+    )
+    _LET_VAL = re.compile(
+        r"^\s*let\s+(?:rec\s+)?(\w+)\s*(?::[^=]+)?=(?!=)", re.MULTILINE
+    )
     _VAL = re.compile(r"^\s*(?:val|external)\s+(\w+)\s*:", re.MULTILINE)
     _FIELD = re.compile(r"(\w+)\s*:\s*([\w.'\s]+?)(?:;|\})")
 
@@ -61,15 +64,13 @@ class OCamlAnalyzer(RegexCodeAnalyzer):
             attr_ids = []
             if "{" in rhs:  # record
                 for fm in self._FIELD.finditer(rhs):
-                    attr_ids.append(self._add_arg(fm.group(1),
-                                                  fm.group(2).strip()))
+                    attr_ids.append(self._add_arg(fm.group(1), fm.group(2).strip()))
             else:  # variant
                 for ctor in rhs.split("|"):
                     cm = re.match(r"\s*([A-Z]\w*)", ctor)
                     if cm:
                         attr_ids.append(self._add_arg(cm.group(1), "constructor"))
-            self._add_class(file_id, name, description="ocaml type",
-                            attr_ids=attr_ids)
+            self._add_class(file_id, name, description="ocaml type", attr_ids=attr_ids)
 
         for m in self._CLASS.finditer(t):
             self._add_class(file_id, m.group(1), description="ocaml class")

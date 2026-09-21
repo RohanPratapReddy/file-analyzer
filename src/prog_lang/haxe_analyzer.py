@@ -11,11 +11,13 @@
 #   function name(a:Int, b="x"):Void {}         -> method / function
 #   var x:Int = 0;  final y = 1;                -> field / variable
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
-_MOD = (r"(?:public|private|static|inline|override|dynamic|macro|extern|"
-        r"final|abstract|overload)\s+")
+_MOD = (
+    r"(?:public|private|static|inline|override|dynamic|macro|extern|"
+    r"final|abstract|overload)\s+"
+)
 
 
 class HaxeAnalyzer(RegexCodeAnalyzer):
@@ -27,23 +29,26 @@ class HaxeAnalyzer(RegexCodeAnalyzer):
         r"\b(class|interface|enum|typedef|abstract)\s+"
         r"([A-Za-z_]\w*)"
         r"(?:\s*<[^{(=]*?>)?"
-        r"(?:\s*\([^)]*\))?"                       # abstract underlying type
-        r"(?:\s*=\s*[^{;]*)?"                      # typedef alias head
+        r"(?:\s*\([^)]*\))?"  # abstract underlying type
+        r"(?:\s*=\s*[^{;]*)?"  # typedef alias head
         r"(?:\s+(?:extends|implements|from|to)\s+[\w.<>, ]+?)*"
-        r"\s*\{")
+        r"\s*\{"
+    )
     _EXTENDS = re.compile(r"(?:extends|implements)\s+([\w.]+)")
     _METHOD = re.compile(
         r"(?:" + _MOD + r")*"
         r"function\s+([A-Za-z_]\w*)\s*"
         r"(?:<[^>]*>)?\s*"
         r"\(([^{;]*?)\)\s*"
-        r"(?::\s*([\w.<>,\[\]{}? ]+?))?\s*\{")
+        r"(?::\s*([\w.<>,\[\]{}? ]+?))?\s*\{"
+    )
     _FIELD = re.compile(
         r"(?:" + _MOD + r")*"
         r"(?:var|final)\s+([A-Za-z_]\w*)\s*"
-        r"(?:\([^)]*\))?"                          # property access (get,set)
+        r"(?:\([^)]*\))?"  # property access (get,set)
         r"(?::\s*([\w.<>,\[\]{}? ]+?))?\s*"
-        r"(?:=\s*([^;]+?))?\s*;")
+        r"(?:=\s*([^;]+?))?\s*;"
+    )
 
     def _register_types(self, file_id, text, path):
         for m in self._TYPE.finditer(self._strip_comments(text)):
@@ -60,18 +65,30 @@ class HaxeAnalyzer(RegexCodeAnalyzer):
             name = m.group(2)
             bstart = text.index("{", m.start())
             bend = self._find_matching(text, bstart)
-            header = text[m.start():bstart]
-            parents = [self._class_registry[p.split(".")[-1]]
-                       for p in self._EXTENDS.findall(header)
-                       if p.split(".")[-1] in self._class_registry]
-            types.append({"name": name, "kind": m.group(1), "bstart": bstart,
-                          "bend": bend, "parents": parents,
-                          "methods": [], "attrs": []})
+            header = text[m.start() : bstart]
+            parents = [
+                self._class_registry[p.split(".")[-1]]
+                for p in self._EXTENDS.findall(header)
+                if p.split(".")[-1] in self._class_registry
+            ]
+            types.append(
+                {
+                    "name": name,
+                    "kind": m.group(1),
+                    "bstart": bstart,
+                    "bend": bend,
+                    "parents": parents,
+                    "methods": [],
+                    "attrs": [],
+                }
+            )
 
         def enclosing(pos):
             best = None
             for t in types:
-                if t["bstart"] <= pos < t["bend"] and (best is None or t["bstart"] > best["bstart"]):
+                if t["bstart"] <= pos < t["bend"] and (
+                    best is None or t["bstart"] > best["bstart"]
+                ):
                     best = t
             return best
 
@@ -85,7 +102,9 @@ class HaxeAnalyzer(RegexCodeAnalyzer):
             covered = self._find_matching(text, body)
             method_spans.append((body, covered))
             arg_ids = self._params(params)
-            out_ids = [self._add_output(ret.strip())] if ret and ret.strip() != "Void" else []
+            out_ids = (
+                [self._add_output(ret.strip())] if ret and ret.strip() != "Void" else []
+            )
             owner = enclosing(m.start())
             cid = self._class_registry.get(owner["name"]) if owner else None
             fid = self._add_function(file_id, name, arg_ids, out_ids, class_id=cid)
@@ -103,13 +122,23 @@ class HaxeAnalyzer(RegexCodeAnalyzer):
             if owner is None:
                 self._add_variable(file_id, name, val.strip() if val else None)
             else:
-                owner["attrs"].append(self._add_arg(name, vtype.strip() if vtype else None,
-                                                    val.strip() if val else None))
+                owner["attrs"].append(
+                    self._add_arg(
+                        name,
+                        vtype.strip() if vtype else None,
+                        val.strip() if val else None,
+                    )
+                )
 
         for t in types:
-            self._add_class(file_id, t["name"], description=f"haxe {t['kind']}",
-                            parent_ids=t["parents"], method_ids=t["methods"],
-                            attr_ids=t["attrs"])
+            self._add_class(
+                file_id,
+                t["name"],
+                description=f"haxe {t['kind']}",
+                parent_ids=t["parents"],
+                method_ids=t["methods"],
+                attr_ids=t["attrs"],
+            )
 
     def _params(self, params):
         arg_ids = []

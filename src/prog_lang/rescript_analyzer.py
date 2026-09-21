@@ -26,7 +26,7 @@
 # `//` is a line comment, `/* ... */` a (nesting) block comment, `"..."` a
 # string.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_']*"
@@ -41,17 +41,30 @@ class ReScriptAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"',)
 
     # let [rec] name [: type] = rhs
-    _LET = re.compile(r"(?m)^[ \t]*(?:@[\w.]+(?:\([^)]*\))?\s*)*"
-                      r"let\s+(rec\s+)?(" + _ID + r")\s*"
-                      r"(?::[^=]+)?=\s*(.*)$")
-    _EXTERNAL = re.compile(r"(?m)^[ \t]*(?:@[\w.]+(?:\([^)]*\))?\s*)*"
-                           r"external\s+(" + _ID + r")\s*:")
-    _MODULE = re.compile(r"(?m)^[ \t]*module\s+(?:type\s+)?(" + _UID +
-                         r")\b(?![ \t]*=[ \t]*" + _UID + r"[ \t]*$)")
+    _LET = re.compile(
+        r"(?m)^[ \t]*(?:@[\w.]+(?:\([^)]*\))?\s*)*"
+        r"let\s+(rec\s+)?(" + _ID + r")\s*"
+        r"(?::[^=]+)?=\s*(.*)$"
+    )
+    _EXTERNAL = re.compile(
+        r"(?m)^[ \t]*(?:@[\w.]+(?:\([^)]*\))?\s*)*" r"external\s+(" + _ID + r")\s*:"
+    )
+    _MODULE = re.compile(
+        r"(?m)^[ \t]*module\s+(?:type\s+)?("
+        + _UID
+        + r")\b(?![ \t]*=[ \t]*"
+        + _UID
+        + r"[ \t]*$)"
+    )
     _TYPE = re.compile(r"(?m)^[ \t]*type\s+(?:rec\s+)?(" + _ID + r")\b")
     _EXCEPTION = re.compile(r"(?m)^[ \t]*exception\s+(" + _UID + r")\b")
-    _OPEN = re.compile(r"(?m)^[ \t]*(?:open|include)\s+(?:module\s+)?(" +
-                       _UID + r"(?:\." + _UID + r")*)")
+    _OPEN = re.compile(
+        r"(?m)^[ \t]*(?:open|include)\s+(?:module\s+)?("
+        + _UID
+        + r"(?:\."
+        + _UID
+        + r")*)"
+    )
 
     # an arrow function RHS:  (...) => ...   or   x =>   or   async (...) =>
     _ARROW = re.compile(r"^\s*(?:async\s+)?(?:\([^;]*?\)|" + _ID + r")\s*=>")
@@ -67,23 +80,26 @@ class ReScriptAnalyzer(RegexCodeAnalyzer):
                 continue
             if is_rec or self._ARROW.match(rhs):
                 seen_fn.add(name)
-                self._add_function(file_id, name, [], [],
-                                   description="ReScript function")
+                self._add_function(
+                    file_id, name, [], [], description="ReScript function"
+                )
             else:
                 seen_v.add(name)
-                self._add_variable(file_id, name, rhs.strip() or None,
-                                   scope="module")
+                self._add_variable(file_id, name, rhs.strip() or None, scope="module")
 
         for m in self._EXTERNAL.finditer(clean):
             name = m.group(1)
             if name not in seen_fn:
                 seen_fn.add(name)
-                self._add_function(file_id, name, [], [],
-                                   description="ReScript external binding")
+                self._add_function(
+                    file_id, name, [], [], description="ReScript external binding"
+                )
 
-        for rx, desc in ((self._MODULE, "ReScript module"),
-                         (self._TYPE, "ReScript type"),
-                         (self._EXCEPTION, "ReScript exception")):
+        for rx, desc in (
+            (self._MODULE, "ReScript module"),
+            (self._TYPE, "ReScript type"),
+            (self._EXCEPTION, "ReScript exception"),
+        ):
             for m in rx.finditer(clean):
                 name = m.group(1)
                 if name in seen_c:

@@ -9,7 +9,7 @@
 #
 # Comments are 'BTW' (line) and 'OBTW ... TLDR' (block); strings use '"'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z][A-Za-z0-9_]*"
@@ -41,8 +41,7 @@ class LOLCODEAnalyzer(RegexCodeAnalyzer):
         for m in self._FUNC.finditer(clean):
             name = m.group(1)
             args = [self._add_arg(a.group(1)) for a in self._ARG.finditer(m.group(2))]
-            self._add_function(file_id, name, args, [],
-                               description="lolcode function")
+            self._add_function(file_id, name, args, [], description="lolcode function")
 
         for m in self._VAR.finditer(clean):
             self._add_variable(file_id, m.group(1), scope="module")

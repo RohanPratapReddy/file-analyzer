@@ -26,6 +26,7 @@ Two honest levels of extraction, never a stub:
 returns a placeholder: a documented parser that does not match its own magic
 falls through to the forensic profile with an honest ``note``.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -37,9 +38,9 @@ from typing import Any, Dict, List, Optional, Tuple
 # ---------------------------------------------------------------------------
 # byte helpers (self-contained; no payload retained)
 # ---------------------------------------------------------------------------
-_SCAN_CAP = 16 * 1024 * 1024          # bytes hashed / entropy-scanned per file
-_HEAD = 65536                          # bytes pulled for header parsing
-_STR_CAP = 24                          # ASCII strings sampled for forensic view
+_SCAN_CAP = 16 * 1024 * 1024  # bytes hashed / entropy-scanned per file
+_HEAD = 65536  # bytes pulled for header parsing
+_STR_CAP = 24  # ASCII strings sampled for forensic view
 
 
 def _head(path: Path, n: int = _HEAD) -> bytes:
@@ -127,21 +128,42 @@ def forensic_profile(path: Path, note: Optional[str] = None) -> Dict[str, Any]:
     return props
 
 
-def _ok(family: str, modality: str, subcategory: str, props: Dict[str, Any],
-        record_count: Optional[int] = None, status: str = "ok") -> Dict[str, Any]:
-    return {"family": family, "modality": modality, "subcategory": subcategory,
-            "record_count": record_count, "status": status,
-            "props": {k: v for k, v in props.items() if v is not None}}
+def _ok(
+    family: str,
+    modality: str,
+    subcategory: str,
+    props: Dict[str, Any],
+    record_count: Optional[int] = None,
+    status: str = "ok",
+) -> Dict[str, Any]:
+    return {
+        "family": family,
+        "modality": modality,
+        "subcategory": subcategory,
+        "record_count": record_count,
+        "status": status,
+        "props": {k: v for k, v in props.items() if v is not None},
+    }
 
 
 # ---------------------------------------------------------------------------
 # Documented-header parsers.  Each raises ValueError on magic mismatch so the
 # dispatcher can fall through to an honest forensic profile.
 # ---------------------------------------------------------------------------
-def _u16le(b, o): return struct.unpack_from("<H", b, o)[0]
-def _u16be(b, o): return struct.unpack_from(">H", b, o)[0]
-def _u32le(b, o): return struct.unpack_from("<I", b, o)[0]
-def _u32be(b, o): return struct.unpack_from(">I", b, o)[0]
+def _u16le(b, o):
+    return struct.unpack_from("<H", b, o)[0]
+
+
+def _u16be(b, o):
+    return struct.unpack_from(">H", b, o)[0]
+
+
+def _u32le(b, o):
+    return struct.unpack_from("<I", b, o)[0]
+
+
+def _u32be(b, o):
+    return struct.unpack_from(">I", b, o)[0]
 
 
 def parse_fits(path: Path) -> Dict[str, Any]:
@@ -153,7 +175,7 @@ def parse_fits(path: Path) -> Dict[str, Any]:
     naxis_dims: List[int] = []
     end = False
     for i in range(0, len(head) - 79, 80):
-        card = head[i:i + 80]
+        card = head[i : i + 80]
         if card[:8] == b"END     ":
             end = True
             break
@@ -211,15 +233,19 @@ def parse_grib(path: Path) -> Dict[str, Any]:
                 if len(lb) < 8:
                     break
                 total = struct.unpack(">Q", lb)[0]
-            else:                                  # GRIB1 / BUFR: 3-byte length
+            else:  # GRIB1 / BUFR: 3-byte length
                 total = struct.unpack(">I", b"\x00" + m[4:7])[0]
             editions.add(ed)
             msgs += 1
             if total < 8:
                 break
             offset += total
-    props = {"format": kind, "edition": edition,
-             "editions_seen": sorted(editions) or None, "message_count": msgs}
+    props = {
+        "format": kind,
+        "edition": edition,
+        "editions_seen": sorted(editions) or None,
+        "message_count": msgs,
+    }
     return _ok("grib", "scientific", "meteorology_grib", props, record_count=msgs)
 
 
@@ -227,8 +253,12 @@ def parse_pcap(path: Path) -> Dict[str, Any]:
     """libpcap / pcapng packet capture: global header + packet-record walk."""
     with open(path, "rb") as f:
         magic = f.read(4)
-        if magic in (b"\xd4\xc3\xb2\xa1", b"\xa1\xb2\xc3\xd4",
-                     b"\x4d\x3c\xb2\xa1", b"\xa1\xb2\x3c\x4d"):
+        if magic in (
+            b"\xd4\xc3\xb2\xa1",
+            b"\xa1\xb2\xc3\xd4",
+            b"\x4d\x3c\xb2\xa1",
+            b"\xa1\xb2\x3c\x4d",
+        ):
             le = magic in (b"\xd4\xc3\xb2\xa1", b"\x4d\x3c\xb2\xa1")
             nano = magic in (b"\x4d\x3c\xb2\xa1", b"\xa1\xb2\x3c\x4d")
             e = "<" if le else ">"
@@ -244,13 +274,18 @@ def parse_pcap(path: Path) -> Dict[str, Any]:
                 f.seek(caplen, 1)
                 total += caplen
                 pkts += 1
-            props = {"format": "pcap", "version": f"{vmaj}.{vmin}",
-                     "byte_order": "little" if le else "big",
-                     "timestamp_resolution": "nanosecond" if nano else "microsecond",
-                     "snaplen": snaplen, "link_type": linktype,
-                     "packet_count": pkts, "captured_bytes": total}
+            props = {
+                "format": "pcap",
+                "version": f"{vmaj}.{vmin}",
+                "byte_order": "little" if le else "big",
+                "timestamp_resolution": "nanosecond" if nano else "microsecond",
+                "snaplen": snaplen,
+                "link_type": linktype,
+                "packet_count": pkts,
+                "captured_bytes": total,
+            }
             return _ok("pcap", "network", "packet_capture", props, record_count=pkts)
-        if magic == b"\x0a\x0d\x0d\x0a":       # pcapng Section Header Block
+        if magic == b"\x0a\x0d\x0d\x0a":  # pcapng Section Header Block
             blen = f.read(4)
             bom = f.read(4)
             le = bom == b"\x4d\x3c\x2b\x1a"
@@ -266,9 +301,14 @@ def parse_pcap(path: Path) -> Dict[str, Any]:
                     break
                 f.seek(blk - 8, 1)
                 blocks += 1
-            props = {"format": "pcapng", "byte_order": "little" if le else "big",
-                     "block_count": blocks}
-            return _ok("pcap", "network", "packet_capture_ng", props, record_count=blocks)
+            props = {
+                "format": "pcapng",
+                "byte_order": "little" if le else "big",
+                "block_count": blocks,
+            }
+            return _ok(
+                "pcap", "network", "packet_capture_ng", props, record_count=blocks
+            )
     raise ValueError("not a pcap/pcapng capture")
 
 
@@ -278,9 +318,13 @@ def parse_git_pack(path: Path) -> Dict[str, Any]:
         raise ValueError("not a git packfile")
     version = _u32be(head, 4)
     nobj = _u32be(head, 8)
-    return _ok("gitpack", "repository", "git_packfile",
-               {"format": "git-pack", "version": version, "object_count": nobj},
-               record_count=nobj)
+    return _ok(
+        "gitpack",
+        "repository",
+        "git_packfile",
+        {"format": "git-pack", "version": version, "object_count": nobj},
+        record_count=nobj,
+    )
 
 
 def parse_hprof(path: Path) -> Dict[str, Any]:
@@ -290,8 +334,12 @@ def parse_hprof(path: Path) -> Dict[str, Any]:
     nul = head.index(b"\x00")
     fmt = head[:nul].decode("ascii", "replace")
     idsize = _u32be(head, nul + 1)
-    return _ok("hprof", "profile", "java_heap_dump",
-               {"format": fmt, "identifier_size": idsize}, )
+    return _ok(
+        "hprof",
+        "profile",
+        "java_heap_dump",
+        {"format": fmt, "identifier_size": idsize},
+    )
 
 
 def parse_jfr(path: Path) -> Dict[str, Any]:
@@ -300,8 +348,12 @@ def parse_jfr(path: Path) -> Dict[str, Any]:
         raise ValueError("not a JFR recording")
     major = _u16be(head, 4)
     minor = _u16be(head, 6)
-    return _ok("jfr", "profile", "java_flight_recorder",
-               {"format": "JFR", "version": f"{major}.{minor}"})
+    return _ok(
+        "jfr",
+        "profile",
+        "java_flight_recorder",
+        {"format": "JFR", "version": f"{major}.{minor}"},
+    )
 
 
 def parse_root(path: Path) -> Dict[str, Any]:
@@ -309,8 +361,12 @@ def parse_root(path: Path) -> Dict[str, Any]:
     if head[:4] != b"root":
         raise ValueError("not a CERN ROOT file")
     version = _u32be(head, 4)
-    return _ok("root", "scientific", "physics_root",
-               {"format": "ROOT", "file_version": version})
+    return _ok(
+        "root",
+        "scientific",
+        "physics_root",
+        {"format": "ROOT", "file_version": version},
+    )
 
 
 def parse_matlab_mat(path: Path) -> Dict[str, Any]:
@@ -323,8 +379,12 @@ def parse_matlab_mat(path: Path) -> Dict[str, Any]:
     ver = _u16le(head, 124)
     endian = head[126:128]
     is_be = endian == b"MI"
-    props = {"format": "MATLAB", "descriptive_text": text.strip().rstrip("\x00")[:120],
-             "version_tag": f"0x{ver:04x}", "byte_order": "big" if is_be else "little"}
+    props = {
+        "format": "MATLAB",
+        "descriptive_text": text.strip().rstrip("\x00")[:120],
+        "version_tag": f"0x{ver:04x}",
+        "byte_order": "big" if is_be else "little",
+    }
     if "5.0" in text or ver == 0x0100:
         props["mat_version"] = "v5"
     return _ok("mat", "scientific", "matlab_workspace", props)
@@ -334,7 +394,7 @@ def parse_rdata(path: Path) -> Dict[str, Any]:
     head = _head(path, 16)
     magic = head[:5]
     fmt = None
-    if magic[:2] == b"RD":            # RDX2/RDX3 + \n
+    if magic[:2] == b"RD":  # RDX2/RDX3 + \n
         fmt = head[:4].decode("ascii", "replace")
     elif head[:2] in (b"\x1f\x8b",):  # gzip-wrapped RData
         fmt = "gzip-RData"
@@ -360,10 +420,19 @@ def parse_dcd(path: Path) -> Dict[str, Any]:
             nset = struct.unpack_from(e + "i", head, 8)[0]
             istart = struct.unpack_from(e + "i", head, 12)[0]
             nsavc = struct.unpack_from(e + "i", head, 16)[0]
-            return _ok("trajectory", "scientific", "md_trajectory_dcd",
-                       {"format": "DCD", "byte_order": "little" if e == "<" else "big",
-                        "frame_count": nset, "first_step": istart, "save_freq": nsavc},
-                       record_count=nset)
+            return _ok(
+                "trajectory",
+                "scientific",
+                "md_trajectory_dcd",
+                {
+                    "format": "DCD",
+                    "byte_order": "little" if e == "<" else "big",
+                    "frame_count": nset,
+                    "first_step": istart,
+                    "save_freq": nsavc,
+                },
+                record_count=nset,
+            )
     raise ValueError("not a DCD trajectory")
 
 
@@ -373,11 +442,19 @@ def parse_xtc_trr(path: Path) -> Dict[str, Any]:
     magic = _u32be(head, 0)
     if magic == 1995:
         natoms = _u32be(head, 4)
-        return _ok("trajectory", "scientific", "md_trajectory_xtc",
-                   {"format": "XTC", "atom_count": natoms})
+        return _ok(
+            "trajectory",
+            "scientific",
+            "md_trajectory_xtc",
+            {"format": "XTC", "atom_count": natoms},
+        )
     if magic == 1993:
-        return _ok("trajectory", "scientific", "md_trajectory_trr",
-                   {"format": "TRR", "magic": magic})
+        return _ok(
+            "trajectory",
+            "scientific",
+            "md_trajectory_trr",
+            {"format": "TRR", "magic": magic},
+        )
     raise ValueError("not an XTC/TRR trajectory")
 
 
@@ -401,9 +478,13 @@ def parse_tdms(path: Path) -> Dict[str, Any]:
             if next_off in (0, 0xFFFFFFFFFFFFFFFF):
                 break
             offset += 28 + next_off
-    return _ok("tdms", "scientific", "ni_tdms",
-               {"format": "TDMS", "toc_version": ver, "segment_count": segs},
-               record_count=segs)
+    return _ok(
+        "tdms",
+        "scientific",
+        "ni_tdms",
+        {"format": "TDMS", "toc_version": ver, "segment_count": segs},
+        record_count=segs,
+    )
 
 
 def parse_igor_ibw(path: Path) -> Dict[str, Any]:
@@ -411,9 +492,16 @@ def parse_igor_ibw(path: Path) -> Dict[str, Any]:
     for e in ("<", ">"):
         ver = struct.unpack_from(e + "h", head, 0)[0]
         if ver in (1, 2, 3, 5):
-            return _ok("igor", "scientific", "igor_wave",
-                       {"format": "Igor Binary Wave", "version": ver,
-                        "byte_order": "little" if e == "<" else "big"})
+            return _ok(
+                "igor",
+                "scientific",
+                "igor_wave",
+                {
+                    "format": "Igor Binary Wave",
+                    "version": ver,
+                    "byte_order": "little" if e == "<" else "big",
+                },
+            )
     raise ValueError("not an Igor .ibw")
 
 
@@ -426,22 +514,44 @@ def parse_tracker_module(path: Path) -> Dict[str, Any]:
         ins = _u16le(head, 0x22)
         smp = _u16le(head, 0x24)
         pat = _u16le(head, 0x26)
-        return _ok("tracker", "audio", "tracker_module",
-                   {"format": "Impulse Tracker", "title": title or None,
-                    "orders": ords, "instruments": ins, "samples": smp,
-                    "patterns": pat})
+        return _ok(
+            "tracker",
+            "audio",
+            "tracker_module",
+            {
+                "format": "Impulse Tracker",
+                "title": title or None,
+                "orders": ords,
+                "instruments": ins,
+                "samples": smp,
+                "patterns": pat,
+            },
+        )
     if head[0x2C:0x30] == b"SCRM":
         title = head[:28].split(b"\x00")[0].decode("latin-1", "replace")
         ordnum = _u16le(head, 0x20)
         insnum = _u16le(head, 0x22)
         patnum = _u16le(head, 0x24)
-        return _ok("tracker", "audio", "tracker_module",
-                   {"format": "ScreamTracker 3", "title": title or None,
-                    "orders": ordnum, "instruments": insnum, "patterns": patnum})
+        return _ok(
+            "tracker",
+            "audio",
+            "tracker_module",
+            {
+                "format": "ScreamTracker 3",
+                "title": title or None,
+                "orders": ordnum,
+                "instruments": insnum,
+                "patterns": patnum,
+            },
+        )
     if head[:17] == b"Extended Module: ":
         title = head[17:37].split(b"\x00")[0].decode("latin-1", "replace")
-        return _ok("tracker", "audio", "tracker_module",
-                   {"format": "FastTracker II", "title": title.strip() or None})
+        return _ok(
+            "tracker",
+            "audio",
+            "tracker_module",
+            {"format": "FastTracker II", "title": title.strip() or None},
+        )
     if head[:3] == b"MTM":
         return _ok("tracker", "audio", "tracker_module", {"format": "MultiTracker"})
     if head[:4] == b"FAR\xfe":
@@ -460,17 +570,28 @@ def parse_chiptune(path: Path) -> Dict[str, Any]:
         songs = head[6]
         title = head[14:46].split(b"\x00")[0].decode("latin-1", "replace")
         artist = head[46:78].split(b"\x00")[0].decode("latin-1", "replace")
-        return _ok("chiptune", "audio", "chiptune",
-                   {"format": "NSF", "songs": songs, "title": title or None,
-                    "artist": artist or None})
+        return _ok(
+            "chiptune",
+            "audio",
+            "chiptune",
+            {
+                "format": "NSF",
+                "songs": songs,
+                "title": title or None,
+                "artist": artist or None,
+            },
+        )
     if head[:27] == b"SNES-SPC700 Sound File Data":
         return _ok("chiptune", "audio", "chiptune", {"format": "SPC700"})
     if head[:4] == b"Vgm ":
         version = _u32le(head, 8)
         total = _u32le(head, 0x18)
-        return _ok("chiptune", "audio", "chiptune",
-                   {"format": "VGM", "version": f"0x{version:x}",
-                    "total_samples": total})
+        return _ok(
+            "chiptune",
+            "audio",
+            "chiptune",
+            {"format": "VGM", "version": f"0x{version:x}", "total_samples": total},
+        )
     if head[:3] == b"GBS":
         songs = head[4]
         return _ok("chiptune", "audio", "chiptune", {"format": "GBS", "songs": songs})
@@ -478,9 +599,17 @@ def parse_chiptune(path: Path) -> Dict[str, Any]:
         version = _u16be(head, 4)
         songs = _u16be(head, 0x0E)
         name = head[0x16:0x36].split(b"\x00")[0].decode("latin-1", "replace")
-        return _ok("chiptune", "audio", "chiptune",
-                   {"format": head[:4].decode(), "version": version,
-                    "songs": songs, "title": name or None})
+        return _ok(
+            "chiptune",
+            "audio",
+            "chiptune",
+            {
+                "format": head[:4].decode(),
+                "version": version,
+                "songs": songs,
+                "title": name or None,
+            },
+        )
     raise ValueError("no chiptune magic")
 
 
@@ -488,8 +617,12 @@ def parse_soundfont(path: Path) -> Dict[str, Any]:
     head = _head(path, 64)
     if head[:4] != b"RIFF" or head[8:12] not in (b"sfbk",):
         raise ValueError("not a SoundFont")
-    return _ok("soundfont", "audio", "soundfont",
-               {"format": "SoundFont 2", "container": "RIFF/sfbk"})
+    return _ok(
+        "soundfont",
+        "audio",
+        "soundfont",
+        {"format": "SoundFont 2", "container": "RIFF/sfbk"},
+    )
 
 
 def parse_riff_generic(path: Path) -> Dict[str, Any]:
@@ -500,13 +633,16 @@ def parse_riff_generic(path: Path) -> Dict[str, Any]:
     chunks: List[str] = []
     off = 12
     while off + 8 <= len(head) and len(chunks) < 32:
-        cid = head[off:off + 4].decode("latin-1", "replace")
+        cid = head[off : off + 4].decode("latin-1", "replace")
         csz = _u32le(head, off + 4)
         chunks.append(cid)
         off += 8 + csz + (csz & 1)
-    return _ok("riff", "binary", "riff_container",
-               {"format": head[:4].decode(), "form_type": form,
-                "chunks_sampled": chunks})
+    return _ok(
+        "riff",
+        "binary",
+        "riff_container",
+        {"format": head[:4].decode(), "form_type": form, "chunks_sampled": chunks},
+    )
 
 
 def parse_avro(path: Path) -> Dict[str, Any]:
@@ -537,8 +673,12 @@ def parse_bson(path: Path) -> Dict[str, Any]:
         size = None
     if doclen < 5 or (size is not None and doclen > size):
         raise ValueError("implausible bson document length")
-    return _ok("bson", "data", "bson_document",
-               {"format": "BSON", "first_document_bytes": doclen})
+    return _ok(
+        "bson",
+        "data",
+        "bson_document",
+        {"format": "BSON", "first_document_bytes": doclen},
+    )
 
 
 def parse_regf(path: Path) -> Dict[str, Any]:
@@ -549,10 +689,18 @@ def parse_regf(path: Path) -> Dict[str, Any]:
     seq2 = _u32le(head, 8)
     major = _u32le(head, 20)
     minor = _u32le(head, 24)
-    return _ok("regf", "forensic", "registry_hive",
-               {"format": "regf", "version": f"{major}.{minor}",
-                "primary_seq": seq1, "secondary_seq": seq2,
-                "dirty": seq1 != seq2})
+    return _ok(
+        "regf",
+        "forensic",
+        "registry_hive",
+        {
+            "format": "regf",
+            "version": f"{major}.{minor}",
+            "primary_seq": seq1,
+            "secondary_seq": seq2,
+            "dirty": seq1 != seq2,
+        },
+    )
 
 
 def parse_lnk(path: Path) -> Dict[str, Any]:
@@ -565,9 +713,16 @@ def parse_lnk(path: Path) -> Dict[str, Any]:
         raise ValueError("bad shell-link CLSID")
     flags = _u32le(head, 20)
     attrs = _u32le(head, 24)
-    return _ok("lnk", "forensic", "shell_link_artifact",
-               {"format": "MS-SHLLINK", "link_flags": f"0x{flags:08x}",
-                "file_attributes": f"0x{attrs:08x}"})
+    return _ok(
+        "lnk",
+        "forensic",
+        "shell_link_artifact",
+        {
+            "format": "MS-SHLLINK",
+            "link_flags": f"0x{flags:08x}",
+            "file_attributes": f"0x{attrs:08x}",
+        },
+    )
 
 
 def parse_evtx(path: Path) -> Dict[str, Any]:
@@ -577,20 +732,36 @@ def parse_evtx(path: Path) -> Dict[str, Any]:
     cur_chunk = struct.unpack_from("<Q", head, 16)[0]
     next_rec = struct.unpack_from("<Q", head, 24)[0]
     chunk_count = struct.unpack_from("<H", head, 42)[0]
-    return _ok("evtx", "forensic", "windows_event_log",
-               {"format": "EVTX", "chunk_count": chunk_count,
-                "current_chunk": cur_chunk, "next_record_id": next_rec})
+    return _ok(
+        "evtx",
+        "forensic",
+        "windows_event_log",
+        {
+            "format": "EVTX",
+            "chunk_count": chunk_count,
+            "current_chunk": cur_chunk,
+            "next_record_id": next_rec,
+        },
+    )
 
 
 def parse_prefetch(path: Path) -> Dict[str, Any]:
     head = _head(path, 16)
     if head[:3] == b"MAM":
-        return _ok("prefetch", "forensic", "windows_prefetch",
-                   {"format": "Prefetch (MAM compressed)", "compression": "LZXPRESS"})
+        return _ok(
+            "prefetch",
+            "forensic",
+            "windows_prefetch",
+            {"format": "Prefetch (MAM compressed)", "compression": "LZXPRESS"},
+        )
     ver = _u32le(head, 0)
     if head[4:8] == b"SCCA" and ver in (17, 23, 26, 30):
-        return _ok("prefetch", "forensic", "windows_prefetch",
-                   {"format": "Prefetch", "version": ver})
+        return _ok(
+            "prefetch",
+            "forensic",
+            "windows_prefetch",
+            {"format": "Prefetch", "version": ver},
+        )
     raise ValueError("not a prefetch file")
 
 
@@ -598,12 +769,14 @@ def parse_gcov(path: Path) -> Dict[str, Any]:
     head = _head(path, 12)
     if head[:4] in (b"gcno", b"oncg"):
         ver = head[4:8].decode("latin-1", "replace")
-        return _ok("gcov", "profile", "coverage_notes",
-                   {"format": "gcno", "version_tag": ver})
+        return _ok(
+            "gcov", "profile", "coverage_notes", {"format": "gcno", "version_tag": ver}
+        )
     if head[:4] in (b"gcda", b"adcg"):
         ver = head[4:8].decode("latin-1", "replace")
-        return _ok("gcov", "profile", "coverage_data",
-                   {"format": "gcda", "version_tag": ver})
+        return _ok(
+            "gcov", "profile", "coverage_data", {"format": "gcda", "version_tag": ver}
+        )
     raise ValueError("not a gcov file")
 
 
@@ -617,10 +790,19 @@ def parse_sac(path: Path) -> Dict[str, Any]:
         if nvhdr in (6, 7):
             delta = struct.unpack_from(e + "f", head, 0)[0]
             npts = struct.unpack_from(e + "i", head, 79 * 4)[0]
-            return _ok("seismic", "scientific", "seismic_sac",
-                       {"format": "SAC", "byte_order": "little" if e == "<" else "big",
-                        "header_version": nvhdr, "sample_interval_s": round(delta, 6),
-                        "sample_count": npts}, record_count=npts)
+            return _ok(
+                "seismic",
+                "scientific",
+                "seismic_sac",
+                {
+                    "format": "SAC",
+                    "byte_order": "little" if e == "<" else "big",
+                    "header_version": nvhdr,
+                    "sample_interval_s": round(delta, 6),
+                    "sample_count": npts,
+                },
+                record_count=npts,
+            )
     raise ValueError("not a SAC file")
 
 
@@ -631,14 +813,22 @@ def parse_segy(path: Path) -> Dict[str, Any]:
         raise ValueError("short SEG-Y")
     bh = head[3200:3600]
     # binary header fields are big-endian, 1-based byte positions
-    sample_interval = struct.unpack_from(">H", bh, 16)[0]     # bytes 3217-18
-    samples_per_trace = struct.unpack_from(">H", bh, 20)[0]   # bytes 3221-22
-    fmt_code = struct.unpack_from(">H", bh, 24)[0]            # bytes 3225-26
+    sample_interval = struct.unpack_from(">H", bh, 16)[0]  # bytes 3217-18
+    samples_per_trace = struct.unpack_from(">H", bh, 20)[0]  # bytes 3221-22
+    fmt_code = struct.unpack_from(">H", bh, 24)[0]  # bytes 3225-26
     if not (1 <= fmt_code <= 16) or samples_per_trace == 0:
         raise ValueError("implausible SEG-Y binary header")
-    return _ok("seismic", "scientific", "seismic_segy",
-               {"format": "SEG-Y", "sample_interval_us": sample_interval,
-                "samples_per_trace": samples_per_trace, "data_format_code": fmt_code})
+    return _ok(
+        "seismic",
+        "scientific",
+        "seismic_segy",
+        {
+            "format": "SEG-Y",
+            "sample_interval_us": sample_interval,
+            "samples_per_trace": samples_per_trace,
+            "data_format_code": fmt_code,
+        },
+    )
 
 
 def parse_miniseed(path: Path) -> Dict[str, Any]:
@@ -657,12 +847,21 @@ def parse_miniseed(path: Path) -> Dict[str, Any]:
     for e in (">", "<"):
         nsamp = struct.unpack_from(e + "H", head, 30)[0]
         if nsamp <= 20000:
-            return _ok("seismic", "scientific", "seismic_miniseed",
-                       {"format": "miniSEED", "quality": dq.decode(),
-                        "network": network or None, "station": station or None,
-                        "location": location or None, "channel": channel or None,
-                        "first_record_samples": nsamp,
-                        "byte_order": "big" if e == ">" else "little"})
+            return _ok(
+                "seismic",
+                "scientific",
+                "seismic_miniseed",
+                {
+                    "format": "miniSEED",
+                    "quality": dq.decode(),
+                    "network": network or None,
+                    "station": station or None,
+                    "location": location or None,
+                    "channel": channel or None,
+                    "first_record_samples": nsamp,
+                    "byte_order": "big" if e == ">" else "little",
+                },
+            )
     raise ValueError("implausible miniSEED sample count")
 
 
@@ -674,9 +873,11 @@ def parse_hdf5(path: Path) -> Dict[str, Any]:
     props: Dict[str, Any] = {"format": "HDF5", "container": "hdf5"}
     try:
         import h5py  # optional acceleration only
+
         groups = datasets = 0
         shapes: List[str] = []
         with h5py.File(str(path), "r") as f:
+
             def _visit(name, obj):
                 nonlocal groups, datasets
                 if isinstance(obj, h5py.Group):
@@ -685,9 +886,16 @@ def parse_hdf5(path: Path) -> Dict[str, Any]:
                     datasets += 1
                     if len(shapes) < 16:
                         shapes.append(f"{name}:{tuple(obj.shape)}:{obj.dtype}")
+
             f.visititems(_visit)
-        props.update({"probe": "h5py", "group_count": groups,
-                      "dataset_count": datasets, "datasets_sampled": shapes or None})
+        props.update(
+            {
+                "probe": "h5py",
+                "group_count": groups,
+                "dataset_count": datasets,
+                "datasets_sampled": shapes or None,
+            }
+        )
     except Exception:
         props["probe"] = "superblock"
     return _ok("hdf5", "scientific", "hdf5_container", props)
@@ -696,6 +904,7 @@ def parse_hdf5(path: Path) -> Dict[str, Any]:
 def parse_zarr(path: Path) -> Dict[str, Any]:
     """Zarr array/group: JSON .zarray/.zgroup metadata (file or store root)."""
     import json
+
     p = Path(path)
     meta = None
     if p.is_dir():
@@ -712,11 +921,18 @@ def parse_zarr(path: Path) -> Dict[str, Any]:
         obj = json.loads(Path(meta).read_text(encoding="utf-8", errors="replace"))
     except Exception:
         raise ValueError("zarr metadata not JSON")
-    props = {"format": "Zarr", "zarr_format": obj.get("zarr_format"),
-             "shape": obj.get("shape"), "chunks": obj.get("chunks"),
-             "dtype": obj.get("dtype"), "compressor":
-                 (obj.get("compressor") or {}).get("id") if isinstance(
-                     obj.get("compressor"), dict) else None}
+    props = {
+        "format": "Zarr",
+        "zarr_format": obj.get("zarr_format"),
+        "shape": obj.get("shape"),
+        "chunks": obj.get("chunks"),
+        "dtype": obj.get("dtype"),
+        "compressor": (
+            (obj.get("compressor") or {}).get("id")
+            if isinstance(obj.get("compressor"), dict)
+            else None
+        ),
+    }
     return _ok("zarr", "scientific", "zarr_store", props)
 
 
@@ -732,124 +948,484 @@ def _grp(mapping: Dict[str, Tuple[str, ...]]) -> Dict[str, str]:
 
 
 # Documented-header families (a real parser exists).
-_DOCUMENTED = _grp({
-    "fits": (".fits", ".fit", ".psrfits", ".sdfits", ".uvfits", ".kepler",
-             ".tess", ".xisf", ".vic", ".cub", ".qub", ".sbig"),
-    "grib": (".grb", ".grib", ".grib2", ".bufr", ".gempak"),
-    "pcap": (".pcap", ".pcapng", ".ntar", ".nfdump", ".mdf"),
-    "gitpack": (".pack",),
-    "hprof": (".hprof",),
-    "jfr": (".jfr",),
-    "root": (".root",),
-    "mat": (".mat",),
-    "rdata": (".rds", ".rdata", ".rda"),
-    "trajectory": (".dcd", ".xtc", ".trr", ".mdcrd"),
-    "tdms": (".tdms",),
-    "igor": (".ibw",),
-    "tracker": (".it", ".s3m", ".xm", ".mtm", ".far", ".okt", ".669", ".stm",
-                ".ult", ".ptm", ".dmf"),
-    "chiptune": (".nsf", ".spc", ".vgm", ".gbs", ".psid", ".sid", ".rol",
-                 ".imf", ".cmf"),
-    "soundfont": (".sf2", ".sf3", ".dls", ".gig"),
-    "riff": (".rmi", ".8svx", ".voc", ".anim"),
-    "avro": (".avro",),
-    "bson": (".bson",),
-    "regf": (".hiv", ".amcache", ".shellbag"),
-    "lnk": (".lnk", ".jumplist", ".automaticdestinations-ms"),
-    "evtx": (".evtx", ".evt", ".evtxlog"),
-    "prefetch": (".pf", ".prefetch", ".thumbcache", ".thumbdata"),
-    "gcov": (".gcda", ".gcno", ".profraw", ".profdata"),
-    "sac": (".sac",),
-    "segy": (".segy", ".sgy", ".seg2", ".segd", ".su", ".dzt", ".rad"),
-    "miniseed": (".miniseed", ".mseed", ".seed"),
-    "hdf5": (".h5ad", ".loom", ".nwb", ".mf4", ".fcs", ".wfdb", ".ark",
-             ".chk", ".fmt"),
-    "zarr": (".zarr",),
-})
+_DOCUMENTED = _grp(
+    {
+        "fits": (
+            ".fits",
+            ".fit",
+            ".psrfits",
+            ".sdfits",
+            ".uvfits",
+            ".kepler",
+            ".tess",
+            ".xisf",
+            ".vic",
+            ".cub",
+            ".qub",
+            ".sbig",
+        ),
+        "grib": (".grb", ".grib", ".grib2", ".bufr", ".gempak"),
+        "pcap": (".pcap", ".pcapng", ".ntar", ".nfdump", ".mdf"),
+        "gitpack": (".pack",),
+        "hprof": (".hprof",),
+        "jfr": (".jfr",),
+        "root": (".root",),
+        "mat": (".mat",),
+        "rdata": (".rds", ".rdata", ".rda"),
+        "trajectory": (".dcd", ".xtc", ".trr", ".mdcrd"),
+        "tdms": (".tdms",),
+        "igor": (".ibw",),
+        "tracker": (
+            ".it",
+            ".s3m",
+            ".xm",
+            ".mtm",
+            ".far",
+            ".okt",
+            ".669",
+            ".stm",
+            ".ult",
+            ".ptm",
+            ".dmf",
+        ),
+        "chiptune": (
+            ".nsf",
+            ".spc",
+            ".vgm",
+            ".gbs",
+            ".psid",
+            ".sid",
+            ".rol",
+            ".imf",
+            ".cmf",
+        ),
+        "soundfont": (".sf2", ".sf3", ".dls", ".gig"),
+        "riff": (".rmi", ".8svx", ".voc", ".anim"),
+        "avro": (".avro",),
+        "bson": (".bson",),
+        "regf": (".hiv", ".amcache", ".shellbag"),
+        "lnk": (".lnk", ".jumplist", ".automaticdestinations-ms"),
+        "evtx": (".evtx", ".evt", ".evtxlog"),
+        "prefetch": (".pf", ".prefetch", ".thumbcache", ".thumbdata"),
+        "gcov": (".gcda", ".gcno", ".profraw", ".profdata"),
+        "sac": (".sac",),
+        "segy": (".segy", ".sgy", ".seg2", ".segd", ".su", ".dzt", ".rad"),
+        "miniseed": (".miniseed", ".mseed", ".seed"),
+        "hdf5": (
+            ".h5ad",
+            ".loom",
+            ".nwb",
+            ".mf4",
+            ".fcs",
+            ".wfdb",
+            ".ark",
+            ".chk",
+            ".fmt",
+        ),
+        "zarr": (".zarr",),
+    }
+)
 
 _DOC_PARSERS = {
-    "fits": parse_fits, "grib": parse_grib, "pcap": parse_pcap,
-    "gitpack": parse_git_pack, "hprof": parse_hprof, "jfr": parse_jfr,
-    "root": parse_root, "mat": parse_matlab_mat, "rdata": parse_rdata,
-    "trajectory": lambda p: parse_dcd(p) if _head(p, 8)[4:8] == b"CORD"
-    else parse_xtc_trr(p), "tdms": parse_tdms, "igor": parse_igor_ibw,
-    "tracker": parse_tracker_module, "chiptune": parse_chiptune,
-    "soundfont": parse_soundfont, "riff": parse_riff_generic,
-    "avro": parse_avro, "bson": parse_bson, "regf": parse_regf,
-    "lnk": parse_lnk, "evtx": parse_evtx, "prefetch": parse_prefetch,
-    "gcov": parse_gcov, "sac": parse_sac, "segy": parse_segy,
-    "miniseed": parse_miniseed, "hdf5": parse_hdf5, "zarr": parse_zarr,
+    "fits": parse_fits,
+    "grib": parse_grib,
+    "pcap": parse_pcap,
+    "gitpack": parse_git_pack,
+    "hprof": parse_hprof,
+    "jfr": parse_jfr,
+    "root": parse_root,
+    "mat": parse_matlab_mat,
+    "rdata": parse_rdata,
+    "trajectory": lambda p: (
+        parse_dcd(p) if _head(p, 8)[4:8] == b"CORD" else parse_xtc_trr(p)
+    ),
+    "tdms": parse_tdms,
+    "igor": parse_igor_ibw,
+    "tracker": parse_tracker_module,
+    "chiptune": parse_chiptune,
+    "soundfont": parse_soundfont,
+    "riff": parse_riff_generic,
+    "avro": parse_avro,
+    "bson": parse_bson,
+    "regf": parse_regf,
+    "lnk": parse_lnk,
+    "evtx": parse_evtx,
+    "prefetch": parse_prefetch,
+    "gcov": parse_gcov,
+    "sac": parse_sac,
+    "segy": parse_segy,
+    "miniseed": parse_miniseed,
+    "hdf5": parse_hdf5,
+    "zarr": parse_zarr,
 }
 
 # Opaque / proprietary / encrypted families -> honest forensic profile only.
 # (subcategory is used for the dataset row; every one is real byte metadata.)
-_FORENSIC_SUB = _grp({
-    "encrypted_container": (".aes", ".age", ".enc", ".luks", ".vault", ".gpg",
-                            ".dbcrypt", ".dbcrypt14", ".signalbackup", ".sops"),
-    "disk_or_app_backup": (".abf", ".backupdb", ".bkf", ".bkp", ".dmp", ".gho",
-                           ".old", ".sparsebundle", ".spf", ".tib", ".tibx",
-                           ".v2i", ".vbk", ".vib", ".vrb", ".qbb", ".orig",
-                           ".trn", ".hbs", ".as400", ".bck", ".savf", ".ab",
-                           ".mobiledevice", ".bak", ".bup", ".vbox-prev", ".~"),
-    "cache_artifact": (".solv", ".cmakecache", ".nwc", ".thumb", ".slxc",
-                       ".cache", ".gid", ".syd", ".fdb_latexmk"),
-    "forensic_capture": (".hiberfil", ".mal", ".mem", ".mft", ".olly",
-                         ".pagefile", ".quarantine", ".swapfile", ".usnjrnl",
-                         ".vir", ".vmem", ".vmss", ".core", ".mdmp", ".dump",
-                         ".dd64", ".x32dbg"),
-    "game_asset": (".bsp", ".asset", ".esm", ".esp", ".ess", ".rvdata2",
-                   ".uasset", ".umap", ".upk", ".xnb", ".srm", ".state",
-                   ".sna", ".z80", ".ctb", ".form", ".sl1", ".bgcode", ".gx",
-                   ".makerbot", ".arobject", ".vrma", ".nib", ".spa"),
-    "vector_search_index": (".faiss", ".index", ".kv", ".petastorm", ".annoy",
-                            ".cfs", ".druid", ".fdt", ".hnsw", ".lance",
-                            ".lucene", ".meili", ".mrk", ".nvd", ".qdrant",
-                            ".segments", ".sphinx", ".tim", ".typesense",
-                            ".usearch"),
-    "instrument_raw_binary": (".baf", ".brukerraw", ".ccp4", ".ch", ".chrom",
-                              ".fid", ".ibd", ".lcd", ".mtz", ".nmr", ".qgd",
-                              ".tdf", ".ucsf", ".wiff", ".ab1", ".scf", ".idat",
-                              ".2bit", ".bam", ".cram", ".bgen", ".bigbed",
-                              ".bigwig", ".bai", ".gdf", ".edf", ".mfer", ".xdf",
-                              ".c3d", ".dfdr", ".fdr", ".qar", ".arinc429",
-                              ".mb", ".hds", ".all", ".kmall", ".gsf", ".adcp",
-                              ".jsf", ".xtf", ".odv", ".gocad", ".hrit", ".lrit",
-                              ".nexrad", ".level2", ".gempak", ".safe"),
-    "sim_result_binary": (".d3plot", ".op2", ".cgns", ".emx", ".ensight",
-                          ".exo", ".silo", ".szplt", ".cdb", ".chgcar", ".ck",
-                          ".spk", ".stdhep", ".edm4hep", ".wfn", ".dlis"),
-    "physics_binary": (".mol2", ".mmcif", ".cif"),
-    "vendor_document": (".t23", ".tax", ".tax2023", ".journal", ".kpf", ".nbk",
-                        ".one", ".xopp", ".bwp", ".cwk", ".fm", ".mwp", ".wn",
-                        ".xwp", ".pades", ".pdfx", ".mcdx", ".tns", ".xmcd",
-                        ".gp5", ".mscz", ".musx", ".mxl", ".ptb", ".sib",
-                        ".pressready", ".wwf", ".afp", ".pdfvt", ".pdfx1a",
-                        ".pdfx4", ".ps3", ".spv", ".xdv", ".modca", ".jasper",
-                        ".gph", ".sas7bcat", ".sas7bndx", ".xlc", ".cobie",
-                        ".rep", ".one"),
-    "stats_binary": (".jmp", ".mtw", ".omv", ".gdt", ".wf1", ".ssd", ".rda",
-                     ".adam", ".sdtm", ".cdisc"),
-    "print_stream": (".cip3", ".cutjob", ".esc", ".escpos", ".kpdl", ".pcl5",
-                     ".pclxl", ".prt", ".rtl"),
-    "telecom_binary": (".asn1", ".ber", ".rap", ".ss7", ".tap3", ".syx",
-                       ".nki", ".nkm", ".arsc", ".axml", ".baml", ".nls",
-                       ".tlb", ".swiftmodule", ".qm", ".icu", ".resources",
-                       ".par2", ".qpy", ".qsim", ".qtn"),
-    "market_data_binary": (".cme", ".ez", ".fxt", ".hst", ".itch", ".ouch",
-                           ".sbe", ".blk", ".psbt"),
-    "serialized_binary": (".cbor", ".ubj"),
-    "hardware_blob": (".gresource", ".nvram", ".ds_store", ".bgl", ".edid",
-                      ".xsvf", ".dtb", ".fst", ".lat", ".wkb", ".ebcdic",
-                      ".grp", ".ovl", ".ovr", ".fifo", ".sock", ".tfplan",
-                      ".iq", ".sdr", ".nvram", ".d64", ".pol", ".job", ".shs",
-                      ".hiv", ".gds", ".gds2", ".oas", ".fsdb", ".ghw", ".shm",
-                      ".blob", ".ceph", ".chunk", ".dedup", ".gluster", ".gpt",
-                      ".mbr", ".part", ".shard", ".vsan", ".tpm", ".tvs",
-                      ".vmsn", ".otlp", ".sflow", ".amqp", ".etcd", ".savepoint",
-                      ".snapshot", ".timeindex", ".zk", ".dsym", ".nvvp",
-                      ".perf", ".qdrep", ".svn-base", ".rvdata2", ".n2k",
-                      ".sl2", ".sl3", ".son", ".usr", ".dis", ".link16", ".pprof"),
-})
+_FORENSIC_SUB = _grp(
+    {
+        "encrypted_container": (
+            ".aes",
+            ".age",
+            ".enc",
+            ".luks",
+            ".vault",
+            ".gpg",
+            ".dbcrypt",
+            ".dbcrypt14",
+            ".signalbackup",
+            ".sops",
+        ),
+        "disk_or_app_backup": (
+            ".abf",
+            ".backupdb",
+            ".bkf",
+            ".bkp",
+            ".dmp",
+            ".gho",
+            ".old",
+            ".sparsebundle",
+            ".spf",
+            ".tib",
+            ".tibx",
+            ".v2i",
+            ".vbk",
+            ".vib",
+            ".vrb",
+            ".qbb",
+            ".orig",
+            ".trn",
+            ".hbs",
+            ".as400",
+            ".bck",
+            ".savf",
+            ".ab",
+            ".mobiledevice",
+            ".bak",
+            ".bup",
+            ".vbox-prev",
+            ".~",
+        ),
+        "cache_artifact": (
+            ".solv",
+            ".cmakecache",
+            ".nwc",
+            ".thumb",
+            ".slxc",
+            ".cache",
+            ".gid",
+            ".syd",
+            ".fdb_latexmk",
+        ),
+        "forensic_capture": (
+            ".hiberfil",
+            ".mal",
+            ".mem",
+            ".mft",
+            ".olly",
+            ".pagefile",
+            ".quarantine",
+            ".swapfile",
+            ".usnjrnl",
+            ".vir",
+            ".vmem",
+            ".vmss",
+            ".core",
+            ".mdmp",
+            ".dump",
+            ".dd64",
+            ".x32dbg",
+        ),
+        "game_asset": (
+            ".bsp",
+            ".asset",
+            ".esm",
+            ".esp",
+            ".ess",
+            ".rvdata2",
+            ".uasset",
+            ".umap",
+            ".upk",
+            ".xnb",
+            ".srm",
+            ".state",
+            ".sna",
+            ".z80",
+            ".ctb",
+            ".form",
+            ".sl1",
+            ".bgcode",
+            ".gx",
+            ".makerbot",
+            ".arobject",
+            ".vrma",
+            ".nib",
+            ".spa",
+        ),
+        "vector_search_index": (
+            ".faiss",
+            ".index",
+            ".kv",
+            ".petastorm",
+            ".annoy",
+            ".cfs",
+            ".druid",
+            ".fdt",
+            ".hnsw",
+            ".lance",
+            ".lucene",
+            ".meili",
+            ".mrk",
+            ".nvd",
+            ".qdrant",
+            ".segments",
+            ".sphinx",
+            ".tim",
+            ".typesense",
+            ".usearch",
+        ),
+        "instrument_raw_binary": (
+            ".baf",
+            ".brukerraw",
+            ".ccp4",
+            ".ch",
+            ".chrom",
+            ".fid",
+            ".ibd",
+            ".lcd",
+            ".mtz",
+            ".nmr",
+            ".qgd",
+            ".tdf",
+            ".ucsf",
+            ".wiff",
+            ".ab1",
+            ".scf",
+            ".idat",
+            ".2bit",
+            ".bam",
+            ".cram",
+            ".bgen",
+            ".bigbed",
+            ".bigwig",
+            ".bai",
+            ".gdf",
+            ".edf",
+            ".mfer",
+            ".xdf",
+            ".c3d",
+            ".dfdr",
+            ".fdr",
+            ".qar",
+            ".arinc429",
+            ".mb",
+            ".hds",
+            ".all",
+            ".kmall",
+            ".gsf",
+            ".adcp",
+            ".jsf",
+            ".xtf",
+            ".odv",
+            ".gocad",
+            ".hrit",
+            ".lrit",
+            ".nexrad",
+            ".level2",
+            ".gempak",
+            ".safe",
+        ),
+        "sim_result_binary": (
+            ".d3plot",
+            ".op2",
+            ".cgns",
+            ".emx",
+            ".ensight",
+            ".exo",
+            ".silo",
+            ".szplt",
+            ".cdb",
+            ".chgcar",
+            ".ck",
+            ".spk",
+            ".stdhep",
+            ".edm4hep",
+            ".wfn",
+            ".dlis",
+        ),
+        "physics_binary": (".mol2", ".mmcif", ".cif"),
+        "vendor_document": (
+            ".t23",
+            ".tax",
+            ".tax2023",
+            ".journal",
+            ".kpf",
+            ".nbk",
+            ".one",
+            ".xopp",
+            ".bwp",
+            ".cwk",
+            ".fm",
+            ".mwp",
+            ".wn",
+            ".xwp",
+            ".pades",
+            ".pdfx",
+            ".mcdx",
+            ".tns",
+            ".xmcd",
+            ".gp5",
+            ".mscz",
+            ".musx",
+            ".mxl",
+            ".ptb",
+            ".sib",
+            ".pressready",
+            ".wwf",
+            ".afp",
+            ".pdfvt",
+            ".pdfx1a",
+            ".pdfx4",
+            ".ps3",
+            ".spv",
+            ".xdv",
+            ".modca",
+            ".jasper",
+            ".gph",
+            ".sas7bcat",
+            ".sas7bndx",
+            ".xlc",
+            ".cobie",
+            ".rep",
+            ".one",
+        ),
+        "stats_binary": (
+            ".jmp",
+            ".mtw",
+            ".omv",
+            ".gdt",
+            ".wf1",
+            ".ssd",
+            ".rda",
+            ".adam",
+            ".sdtm",
+            ".cdisc",
+        ),
+        "print_stream": (
+            ".cip3",
+            ".cutjob",
+            ".esc",
+            ".escpos",
+            ".kpdl",
+            ".pcl5",
+            ".pclxl",
+            ".prt",
+            ".rtl",
+        ),
+        "telecom_binary": (
+            ".asn1",
+            ".ber",
+            ".rap",
+            ".ss7",
+            ".tap3",
+            ".syx",
+            ".nki",
+            ".nkm",
+            ".arsc",
+            ".axml",
+            ".baml",
+            ".nls",
+            ".tlb",
+            ".swiftmodule",
+            ".qm",
+            ".icu",
+            ".resources",
+            ".par2",
+            ".qpy",
+            ".qsim",
+            ".qtn",
+        ),
+        "market_data_binary": (
+            ".cme",
+            ".ez",
+            ".fxt",
+            ".hst",
+            ".itch",
+            ".ouch",
+            ".sbe",
+            ".blk",
+            ".psbt",
+        ),
+        "serialized_binary": (".cbor", ".ubj"),
+        "hardware_blob": (
+            ".gresource",
+            ".nvram",
+            ".ds_store",
+            ".bgl",
+            ".edid",
+            ".xsvf",
+            ".dtb",
+            ".fst",
+            ".lat",
+            ".wkb",
+            ".ebcdic",
+            ".grp",
+            ".ovl",
+            ".ovr",
+            ".fifo",
+            ".sock",
+            ".tfplan",
+            ".iq",
+            ".sdr",
+            ".nvram",
+            ".d64",
+            ".pol",
+            ".job",
+            ".shs",
+            ".hiv",
+            ".gds",
+            ".gds2",
+            ".oas",
+            ".fsdb",
+            ".ghw",
+            ".shm",
+            ".blob",
+            ".ceph",
+            ".chunk",
+            ".dedup",
+            ".gluster",
+            ".gpt",
+            ".mbr",
+            ".part",
+            ".shard",
+            ".vsan",
+            ".tpm",
+            ".tvs",
+            ".vmsn",
+            ".otlp",
+            ".sflow",
+            ".amqp",
+            ".etcd",
+            ".savepoint",
+            ".snapshot",
+            ".timeindex",
+            ".zk",
+            ".dsym",
+            ".nvvp",
+            ".perf",
+            ".qdrep",
+            ".svn-base",
+            ".rvdata2",
+            ".n2k",
+            ".sl2",
+            ".sl3",
+            ".son",
+            ".usr",
+            ".dis",
+            ".link16",
+            ".pprof",
+        ),
+    }
+)
 
 
 def analyze(path: Any, ext: str) -> Dict[str, Any]:

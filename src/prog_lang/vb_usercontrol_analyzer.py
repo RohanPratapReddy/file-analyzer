@@ -28,7 +28,7 @@
 # `'` and `REM` start comments; `"` delimits strings; keywords are
 # case-insensitive.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -43,15 +43,22 @@ class VBUserControlAnalyzer(RegexCodeAnalyzer):
 
     _UC = re.compile(r"(?mi)^[ \t]*Begin\s+VB\.UserControl\s+(" + _ID + r")\b")
     _VBNAME = re.compile(r'(?mi)^[ \t]*Attribute\s+VB_Name\s*=\s*"([^"]+)"')
-    _CHILD = re.compile(r"(?mi)^[ \t]*Begin\s+(?:VB|MSComctlLib|[A-Za-z0-9_]+)\."
-                        r"(?!UserControl\b)" + _ID + r"\s+(" + _ID + r")\b")
-    _PROC = re.compile(r"(?mi)^[ \t]*(?:(?:Public|Private|Friend|Static)\s+)*"
-                       r"(?:Sub|Function|Property\s+(?:Get|Let|Set))\s+(" +
-                       _ID + r")\s*\(")
-    _DECL = re.compile(r"(?mi)^[ \t]*(?:Private|Public|Dim|Global|Friend)\s+"
-                       r"(?:WithEvents\s+)?(" + _ID + r")\s+As\b")
-    _CONST = re.compile(r"(?mi)^[ \t]*(?:(?:Private|Public|Global|Friend)\s+)?"
-                        r"Const\s+(" + _ID + r")\s*=")
+    _CHILD = re.compile(
+        r"(?mi)^[ \t]*Begin\s+(?:VB|MSComctlLib|[A-Za-z0-9_]+)\."
+        r"(?!UserControl\b)" + _ID + r"\s+(" + _ID + r")\b"
+    )
+    _PROC = re.compile(
+        r"(?mi)^[ \t]*(?:(?:Public|Private|Friend|Static)\s+)*"
+        r"(?:Sub|Function|Property\s+(?:Get|Let|Set))\s+(" + _ID + r")\s*\("
+    )
+    _DECL = re.compile(
+        r"(?mi)^[ \t]*(?:Private|Public|Dim|Global|Friend)\s+"
+        r"(?:WithEvents\s+)?(" + _ID + r")\s+As\b"
+    )
+    _CONST = re.compile(
+        r"(?mi)^[ \t]*(?:(?:Private|Public|Global|Friend)\s+)?"
+        r"Const\s+(" + _ID + r")\s*="
+    )
 
     def _extract_entities(self, file_id, text, path):
         clean = self._strip_comments(text)
@@ -62,16 +69,14 @@ class VBUserControlAnalyzer(RegexCodeAnalyzer):
                 name = m.group(1)
                 if name not in seen_c:
                     seen_c.add(name)
-                    self._add_class(file_id, name,
-                                    description="VB6 user control")
+                    self._add_class(file_id, name, description="VB6 user control")
 
         seen_fn = set()
         for m in self._PROC.finditer(clean):
             name = m.group(1)
             if name not in seen_fn:
                 seen_fn.add(name)
-                self._add_function(file_id, name, [], [],
-                                   description="VB6 procedure")
+                self._add_function(file_id, name, [], [], description="VB6 procedure")
 
         seen_v = set()
         for m in self._CHILD.finditer(clean):

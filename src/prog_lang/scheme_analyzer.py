@@ -13,6 +13,7 @@
 #     (make-point x y) point? (x point-x) (y point-y))    -> fields
 import re
 from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _SYM = r"[A-Za-z0-9+\-*/<>=!?._%&$:~^]+"
@@ -26,15 +27,19 @@ class SchemeAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"',)
 
     _DEFUN = re.compile(r"\(\s*define\s*\(\s*(" + _SYM + r")", re.IGNORECASE)
-    _DEFVAL = re.compile(r"\(\s*define\s+(" + _SYM + r")\s+(.*?)$",
-                         re.IGNORECASE | re.MULTILINE)
+    _DEFVAL = re.compile(
+        r"\(\s*define\s+(" + _SYM + r")\s+(.*?)$", re.IGNORECASE | re.MULTILINE
+    )
     _DEFSYNTAX = re.compile(
         r"\(\s*(define-syntax|define-syntax-rule)\s*\(?\s*(" + _SYM + r")",
-        re.IGNORECASE)
+        re.IGNORECASE,
+    )
     _RECORD = re.compile(
-        r"\(\s*define-record-type\s*\(?\s*(" + _SYM + r")", re.IGNORECASE)
+        r"\(\s*define-record-type\s*\(?\s*(" + _SYM + r")", re.IGNORECASE
+    )
     _IMPORT = re.compile(
-        r"\(\s*(?:import|use-modules|require|library)\b", re.IGNORECASE)
+        r"\(\s*(?:import|use-modules|require|library)\b", re.IGNORECASE
+    )
     _LOAD = re.compile(r'\(\s*load\s+"([^"]+)"', re.IGNORECASE)
 
     def _register_types(self, file_id, text, path):
@@ -52,8 +57,7 @@ class SchemeAnalyzer(RegexCodeAnalyzer):
             form = self._form_at(text, m.start())
             record_spans.append((m.start(), m.start() + len(form)))
             attrs = self._parse_record(form, name)
-            self._add_class(file_id, name, description="scheme record",
-                            attr_ids=attrs)
+            self._add_class(file_id, name, description="scheme record", attr_ids=attrs)
 
         def in_record(pos):
             return any(a <= pos < b for a, b in record_spans)
@@ -65,8 +69,11 @@ class SchemeAnalyzer(RegexCodeAnalyzer):
             # plus bare symbols
             for grp in re.findall(r"\(([^()]*)\)", form):
                 syms = re.findall(_SYM, grp)
-                syms = [s for s in syms if s.lower() not in (
-                    "only", "except", "prefix", "rename", "srfi")]
+                syms = [
+                    s
+                    for s in syms
+                    if s.lower() not in ("only", "except", "prefix", "rename", "srfi")
+                ]
                 if syms:
                     self._add_import(file_id, syms[-1].lstrip(":"), " ".join(syms))
         for m in self._LOAD.finditer(text):
@@ -89,8 +96,9 @@ class SchemeAnalyzer(RegexCodeAnalyzer):
             name, rest = m.group(1), m.group(2).strip()
             if name.startswith("("):
                 continue
-            lm = re.match(r"\(\s*(lambda|case-lambda|named-lambda)\b", rest,
-                          re.IGNORECASE)
+            lm = re.match(
+                r"\(\s*(lambda|case-lambda|named-lambda)\b", rest, re.IGNORECASE
+            )
             if lm:
                 params = self._lambda_list(rest, lm.end())
                 arg_ids = [self._add_arg(p) for p in params]
@@ -122,7 +130,7 @@ class SchemeAnalyzer(RegexCodeAnalyzer):
             return []
         if text[i] == "(":
             rp = self._find_matching(text, i, "(", ")")
-            inner = text[i + 1:rp - 1]
+            inner = text[i + 1 : rp - 1]
             return [t for t in re.findall(_SYM, inner) if t != "."]
         m = re.match(_SYM, text[i:])
         return [m.group(0)] if m else []

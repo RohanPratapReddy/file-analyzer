@@ -11,7 +11,7 @@
 #   field as int   /   x = 5                     -> attribute / variable
 #   [property(Name)] name as string             -> property field
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -22,19 +22,20 @@ class BooAnalyzer(RegexCodeAnalyzer):
     BLOCK_COMMENTS = (("/*", "*/"),)
 
     _IMPORT = re.compile(
-        r"^\s*import\s+([\w.]+)(?:\s+from\s+([\w.]+))?(?:\s+as\s+(\w+))?",
-        re.MULTILINE)
+        r"^\s*import\s+([\w.]+)(?:\s+from\s+([\w.]+))?(?:\s+as\s+(\w+))?", re.MULTILINE
+    )
     _TYPE = re.compile(
         r"^(\s*)(?:\[[^\]]*\]\s*)*(?:public\s+|internal\s+|abstract\s+|"
         r"partial\s+|final\s+|sealed\s+)*"
         r"(class|struct|interface|enum)\s+([A-Za-z_]\w*)"
-        r"(?:\s*\(([^)]*)\))?\s*:")
+        r"(?:\s*\(([^)]*)\))?\s*:"
+    )
     _DEF = re.compile(
         r"^(\s*)(?:\[[^\]]*\]\s*)*(?:public\s+|private\s+|protected\s+|"
         r"internal\s+|static\s+|virtual\s+|override\s+|abstract\s+|final\s+)*"
-        r"def\s+([A-Za-z_]\w*)\s*\(([^)]*)\)\s*(?:as\s+([\w.\[\], ]+?))?\s*:")
-    _FIELD = re.compile(
-        r"^(\s*)([A-Za-z_]\w*)\s+as\s+([\w.\[\], ]+?)\s*(?:=\s*(.+))?$")
+        r"def\s+([A-Za-z_]\w*)\s*\(([^)]*)\)\s*(?:as\s+([\w.\[\], ]+?))?\s*:"
+    )
+    _FIELD = re.compile(r"^(\s*)([A-Za-z_]\w*)\s+as\s+([\w.\[\], ]+?)\s*(?:=\s*(.+))?$")
     _ASSIGN = re.compile(r"^(\s*)([A-Za-z_]\w*)\s*=\s*(.+)$")
 
     def _register_types(self, file_id, text, path):
@@ -100,7 +101,11 @@ class BooAnalyzer(RegexCodeAnalyzer):
             if dm:
                 name, params, ret = dm.group(2), dm.group(3), dm.group(4)
                 arg_ids = self._params(params)
-                out_ids = [self._add_output(ret.strip())] if ret and ret.strip() != "void" else []
+                out_ids = (
+                    [self._add_output(ret.strip())]
+                    if ret and ret.strip() != "void"
+                    else []
+                )
                 owner = cur_class()
                 cid = self._class_registry.get(owner) if owner else None
                 fid = self._add_function(file_id, name, arg_ids, out_ids, class_id=cid)
@@ -120,7 +125,8 @@ class BooAnalyzer(RegexCodeAnalyzer):
                     self._add_variable(file_id, name, val.strip() if val else None)
                 else:
                     get_class_row(owner)["attrs"].append(
-                        self._add_arg(name, vtype, val.strip() if val else None))
+                        self._add_arg(name, vtype, val.strip() if val else None)
+                    )
                 continue
 
             am = self._ASSIGN.match(raw)
@@ -131,13 +137,19 @@ class BooAnalyzer(RegexCodeAnalyzer):
                     self._add_variable(file_id, name, val.strip())
                 else:
                     get_class_row(owner)["attrs"].append(
-                        self._add_arg(name, None, val.strip()))
+                        self._add_arg(name, None, val.strip())
+                    )
                 continue
 
         for name, row in emitted.items():
-            self._add_class(file_id, name, description=f"boo {row.get('kind','class')}",
-                            parent_ids=row.get("parents", []),
-                            method_ids=row["methods"], attr_ids=row["attrs"])
+            self._add_class(
+                file_id,
+                name,
+                description=f"boo {row.get('kind','class')}",
+                parent_ids=row.get("parents", []),
+                method_ids=row["methods"],
+                attr_ids=row["attrs"],
+            )
 
     def _params(self, params):
         arg_ids = []

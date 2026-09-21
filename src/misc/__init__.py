@@ -7,8 +7,8 @@ each file to its own per-type child parser class (see :mod:`.parsers`), each
 stitched to its own extension set, normalizing every file into
 ``document -> sections -> records -> fields`` tables.
 """
+
+from . import misc_formats, parsers
 from .misc_analyzer import MiscAnalyzer
-from . import misc_formats
-from . import parsers
 
 __all__ = ["MiscAnalyzer", "misc_formats", "parsers"]

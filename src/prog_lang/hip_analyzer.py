@@ -21,14 +21,16 @@
 # `__global__`/`__device__`/`__host__` and plain C++ function/record/enum
 # definitions are emitted.  Comments are '//' and '/* */'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
 _QNAME = r"~?" + _ID + r"(?:\s*::\s*~?" + _ID + r")*"
 # execution-space / launch-bound qualifiers to erase before function scanning
-_QUALS = (r"__global__|__device__|__host__|__forceinline__|__noinline__|"
-          r"__launch_bounds__\s*\([^)]*\)|__restrict__")
+_QUALS = (
+    r"__global__|__device__|__host__|__forceinline__|__noinline__|"
+    r"__launch_bounds__\s*\([^)]*\)|__restrict__"
+)
 
 
 class HipAnalyzer(RegexCodeAnalyzer):
@@ -43,27 +45,61 @@ class HipAnalyzer(RegexCodeAnalyzer):
     _USING_ALIAS = re.compile(r"(?m)^\s*using\s+(" + _ID + r")\s*=\s*([^;]+);")
     _DEFINE = re.compile(r"(?m)^\s*#\s*define\s+(" + _ID + r")\b")
 
-    _NAMESPACE = re.compile(r"(?m)^\s*(?:inline\s+)?namespace\s+(" +
-                            _ID + r"(?:\s*::\s*" + _ID + r")*)\s*\{")
-    _RECORD = re.compile(r"(?m)^\s*(?:template\s*<[^;{]*>\s*)?"
-                         r"(?:class|struct|union)\s+(" + _ID + r")\b(?!\s*::)"
-                         r"(?:\s+final)?\s*(?:(;)|(?::\s*([^{}]+?))?\s*\{)")
+    _NAMESPACE = re.compile(
+        r"(?m)^\s*(?:inline\s+)?namespace\s+("
+        + _ID
+        + r"(?:\s*::\s*"
+        + _ID
+        + r")*)\s*\{"
+    )
+    _RECORD = re.compile(
+        r"(?m)^\s*(?:template\s*<[^;{]*>\s*)?"
+        r"(?:class|struct|union)\s+(" + _ID + r")\b(?!\s*::)"
+        r"(?:\s+final)?\s*(?:(;)|(?::\s*([^{}]+?))?\s*\{)"
+    )
     _ENUM = re.compile(r"(?m)^\s*enum\s+(?:class\s+|struct\s+)?(" + _ID + r")\b")
 
     # execution-space qualified data too: __constant__ / __shared__ / __device__
-    _VAR = re.compile(r"(?m)^\s*(?:__constant__|__shared__|__device__|__managed__|"
-                      r"constexpr|inline|static|const|extern)\s+"
-                      r"[\w:<>,\*&\[\]\s]*?\b(" + _ID + r")\s*(?:=|\[|\{|;)")
+    _VAR = re.compile(
+        r"(?m)^\s*(?:__constant__|__shared__|__device__|__managed__|"
+        r"constexpr|inline|static|const|extern)\s+"
+        r"[\w:<>,\*&\[\]\s]*?\b(" + _ID + r")\s*(?:=|\[|\{|;)"
+    )
 
     _CALL = re.compile(r"(" + _QNAME + r")\s*\(")
-    _NOT_FUNC = {"if", "for", "while", "switch", "catch", "return", "sizeof",
-                 "new", "delete", "throw", "and", "or", "not", "static_cast",
-                 "dynamic_cast", "reinterpret_cast", "const_cast", "decltype",
-                 "noexcept", "alignof", "alignas", "typeid", "assert",
-                 "static_assert", "defined", "operator"}
-    _TRAILING = re.compile(r"\s*(?:const|noexcept(?:\([^)]*\))?|override|final|"
-                           r"mutable|volatile|&|&&|\[\[[^\]]*\]\]|"
-                           r"->\s*[\w:<>,\*&\[\] ]+|:\s*[^{;]+)*\s*")
+    _NOT_FUNC = {
+        "if",
+        "for",
+        "while",
+        "switch",
+        "catch",
+        "return",
+        "sizeof",
+        "new",
+        "delete",
+        "throw",
+        "and",
+        "or",
+        "not",
+        "static_cast",
+        "dynamic_cast",
+        "reinterpret_cast",
+        "const_cast",
+        "decltype",
+        "noexcept",
+        "alignof",
+        "alignas",
+        "typeid",
+        "assert",
+        "static_assert",
+        "defined",
+        "operator",
+    }
+    _TRAILING = re.compile(
+        r"\s*(?:const|noexcept(?:\([^)]*\))?|override|final|"
+        r"mutable|volatile|&|&&|\[\[[^\]]*\]\]|"
+        r"->\s*[\w:<>,\*&\[\] ]+|:\s*[^{;]+)*\s*"
+    )
 
     def _register_types(self, file_id, text, path):
         clean = self._strip_comments(text)
@@ -87,16 +123,19 @@ class HipAnalyzer(RegexCodeAnalyzer):
         alias_names = set()
         for m in self._USING_ALIAS.finditer(clean):
             alias_names.add(m.group(1))
-            self._add_variable(file_id, m.group(1), value=m.group(2).strip(),
-                               scope="type-alias")
+            self._add_variable(
+                file_id, m.group(1), value=m.group(2).strip(), scope="type-alias"
+            )
 
         for m in self._NAMESPACE.finditer(clean):
-            self._add_class(file_id, m.group(1).split("::")[-1].strip(),
-                            description="c++ namespace")
+            self._add_class(
+                file_id, m.group(1).split("::")[-1].strip(), description="c++ namespace"
+            )
         for m in self._RECORD.finditer(clean):
             parents = self._parse_bases(m.group(3))
-            self._add_class(file_id, m.group(1), description="c++ type",
-                            parent_ids=parents or None)
+            self._add_class(
+                file_id, m.group(1), description="c++ type", parent_ids=parents or None
+            )
         for m in self._ENUM.finditer(clean):
             self._add_class(file_id, m.group(1), description="c++ enum")
 
@@ -154,11 +193,12 @@ class HipAnalyzer(RegexCodeAnalyzer):
                     cls_id = self._register_class(owner)
             args = self._paren_args(clean, open_paren, close)
             outs = self._return_output(clean, m.start(), bare, owner)
-            self._add_function(file_id, bare, args, outs, class_id=cls_id,
-                               description="hip function")
+            self._add_function(
+                file_id, bare, args, outs, class_id=cls_id, description="hip function"
+            )
 
     def _paren_args(self, clean, open_paren, close):
-        body = clean[open_paren + 1:close - 1].strip()
+        body = clean[open_paren + 1 : close - 1].strip()
         if not body or body == "void":
             return []
         arg_ids = []
@@ -170,7 +210,7 @@ class HipAnalyzer(RegexCodeAnalyzer):
             if not toks:
                 continue
             name = toks[-1]
-            atype = part[:part.rfind(name)].strip().rstrip("*&") or None
+            atype = part[: part.rfind(name)].strip().rstrip("*&") or None
             arg_ids.append(self._add_arg(name, atype))
         return arg_ids
 
@@ -178,8 +218,9 @@ class HipAnalyzer(RegexCodeAnalyzer):
         line_start = clean.rfind("\n", 0, name_start) + 1
         pre = clean[line_start:name_start].strip()
         pre = re.sub(r"^\s*template\s*<[^>]*>\s*", "", pre)
-        pre = re.sub(r"\b(?:inline|static|virtual|explicit|constexpr|friend|extern)\b",
-                     " ", pre)
+        pre = re.sub(
+            r"\b(?:inline|static|virtual|explicit|constexpr|friend|extern)\b", " ", pre
+        )
         pre = pre.strip()
         if not pre or bare == owner or bare.startswith("~"):
             return []

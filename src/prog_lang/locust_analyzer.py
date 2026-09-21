@@ -24,9 +24,15 @@ class LocustAnalyzer(PythonEmbeddedAnalyzer):
     LANG_KEY = "locust"
     EXTENSIONS = (".locustfile",)
     DSL_BASECLASSES = (
-        "HttpUser", "locust.HttpUser", "User", "locust.User",
-        "FastHttpUser", "locust.contrib.fasthttp.FastHttpUser",
-        "TaskSet", "locust.TaskSet", "SequentialTaskSet",
+        "HttpUser",
+        "locust.HttpUser",
+        "User",
+        "locust.User",
+        "FastHttpUser",
+        "locust.contrib.fasthttp.FastHttpUser",
+        "TaskSet",
+        "locust.TaskSet",
+        "SequentialTaskSet",
         "locust.SequentialTaskSet",
     )
     DSL_DECORATORS = ("task", "locust.task", "tag", "locust.tag")

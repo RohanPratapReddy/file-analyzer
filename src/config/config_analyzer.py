@@ -58,7 +58,6 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from . import config_formats
 
-
 # maximum tree nodes emitted per file (guards pathological/huge configs)
 _NODE_BUDGET = 20000
 
@@ -89,9 +88,17 @@ class ConfigAnalyzer:
         self.config_properties_table: List[Dict[str, Any]] = []
         self.config_file_index: List[Dict[str, Any]] = []
 
-        self._ids = {k: 0 for k in (
-            "file", "section", "key", "value", "property", "cfi",
-        )}
+        self._ids = {
+            k: 0
+            for k in (
+                "file",
+                "section",
+                "key",
+                "value",
+                "property",
+                "cfi",
+            )
+        }
         self._budget = 0  # per-file remaining node budget
         self._section_rows: Dict[int, Dict[str, Any]] = {}  # section_id -> row
 
@@ -155,8 +162,9 @@ class ConfigAnalyzer:
     # ==================================================================
     # Row builders
     # ==================================================================
-    def _emit_file(self, path: Path, ext: str, profile: Dict[str, Any],
-                   local_fid: int) -> None:
+    def _emit_file(
+        self, path: Path, ext: str, profile: Dict[str, Any], local_fid: int
+    ) -> None:
         config_file_id = self._next("file")
         root = profile.get("root")
 
@@ -185,7 +193,7 @@ class ConfigAnalyzer:
 
         # file-level metadata / forensic profile -> properties
         prop_count = 0
-        for entry in (profile.get("properties") or []):
+        for entry in profile.get("properties") or []:
             if self._emit_property(config_file_id, entry, local_fid):
                 prop_count += 1
 
@@ -201,14 +209,17 @@ class ConfigAnalyzer:
         file_row["property_count"] = prop_count
         file_row["max_depth"] = stats["max_depth"]
         if self._budget <= 0:
-            file_row["notes"] = ((file_row["notes"] + "; ") if file_row["notes"] else "") \
-                + f"tree truncated at {_NODE_BUDGET} nodes"
+            file_row["notes"] = (
+                (file_row["notes"] + "; ") if file_row["notes"] else ""
+            ) + f"tree truncated at {_NODE_BUDGET} nodes"
 
-    def _flatten_root(self, cfg_id: int, root: Any, local_fid: int,
-                      stats: Dict[str, int]) -> None:
+    def _flatten_root(
+        self, cfg_id: int, root: Any, local_fid: int, stats: Dict[str, int]
+    ) -> None:
         # the synthetic root key/value (parent of everything)
         root_key_id = self._emit_key(
-            cfg_id, None, "<root>", "<root>", None, 0, root, local_fid, stats)
+            cfg_id, None, "<root>", "<root>", None, 0, root, local_fid, stats
+        )
         self._emit_value(cfg_id, root_key_id, None, None, root, None, local_fid, stats)
 
         default_section: Optional[int] = None
@@ -217,86 +228,170 @@ class ConfigAnalyzer:
             nonlocal default_section
             if default_section is None:
                 default_section = self._emit_section(
-                    cfg_id, "(root)", "(root)", "root", None, local_fid, stats)
+                    cfg_id, "(root)", "(root)", "root", None, local_fid, stats
+                )
             return default_section
 
         if isinstance(root, dict):
             for k, v in root.items():
-                sec = (self._emit_section(cfg_id, str(k), str(k),
-                                          self._sec_type(v), None, local_fid, stats)
-                       if isinstance(v, (dict, list)) else _default())
-                self._walk(cfg_id, v, str(k), str(k), root_key_id, 1, sec,
-                           None, local_fid, stats)
+                sec = (
+                    self._emit_section(
+                        cfg_id,
+                        str(k),
+                        str(k),
+                        self._sec_type(v),
+                        None,
+                        local_fid,
+                        stats,
+                    )
+                    if isinstance(v, (dict, list))
+                    else _default()
+                )
+                self._walk(
+                    cfg_id,
+                    v,
+                    str(k),
+                    str(k),
+                    root_key_id,
+                    1,
+                    sec,
+                    None,
+                    local_fid,
+                    stats,
+                )
         elif isinstance(root, list):
             for i, v in enumerate(root):
                 name = f"[{i}]"
-                sec = (self._emit_section(cfg_id, name, name,
-                                          self._sec_type(v), None, local_fid, stats)
-                       if isinstance(v, (dict, list)) else _default())
-                self._walk(cfg_id, v, name, name, root_key_id, 1, sec,
-                           i, local_fid, stats)
+                sec = (
+                    self._emit_section(
+                        cfg_id, name, name, self._sec_type(v), None, local_fid, stats
+                    )
+                    if isinstance(v, (dict, list))
+                    else _default()
+                )
+                self._walk(
+                    cfg_id, v, name, name, root_key_id, 1, sec, i, local_fid, stats
+                )
         # scalar root: already captured by the root key/value pair
 
-    def _walk(self, cfg_id: int, node: Any, name: str, path: str,
-              parent_key_id: int, depth: int, section_id: Optional[int],
-              list_index: Optional[int], local_fid: int,
-              stats: Dict[str, int]) -> None:
+    def _walk(
+        self,
+        cfg_id: int,
+        node: Any,
+        name: str,
+        path: str,
+        parent_key_id: int,
+        depth: int,
+        section_id: Optional[int],
+        list_index: Optional[int],
+        local_fid: int,
+        stats: Dict[str, int],
+    ) -> None:
         if self._budget <= 0:
             return
         self._budget -= 1
-        key_id = self._emit_key(cfg_id, section_id, name, path, parent_key_id,
-                                depth, node, local_fid, stats)
-        self._emit_value(cfg_id, key_id, parent_key_id, section_id, node,
-                         list_index, local_fid, stats)
+        key_id = self._emit_key(
+            cfg_id, section_id, name, path, parent_key_id, depth, node, local_fid, stats
+        )
+        self._emit_value(
+            cfg_id,
+            key_id,
+            parent_key_id,
+            section_id,
+            node,
+            list_index,
+            local_fid,
+            stats,
+        )
 
         if isinstance(node, dict):
             for k, v in node.items():
                 if self._budget <= 0:
                     break
-                self._walk(cfg_id, v, str(k), f"{path}.{k}", key_id, depth + 1,
-                           section_id, None, local_fid, stats)
+                self._walk(
+                    cfg_id,
+                    v,
+                    str(k),
+                    f"{path}.{k}",
+                    key_id,
+                    depth + 1,
+                    section_id,
+                    None,
+                    local_fid,
+                    stats,
+                )
         elif isinstance(node, list):
             for i, v in enumerate(node):
                 if self._budget <= 0:
                     break
-                self._walk(cfg_id, v, f"[{i}]", f"{path}[{i}]", key_id,
-                           depth + 1, section_id, i, local_fid, stats)
+                self._walk(
+                    cfg_id,
+                    v,
+                    f"[{i}]",
+                    f"{path}[{i}]",
+                    key_id,
+                    depth + 1,
+                    section_id,
+                    i,
+                    local_fid,
+                    stats,
+                )
 
-    def _emit_section(self, cfg_id: int, name: str, path: str, sec_type: str,
-                      parent_section_id: Optional[int], local_fid: int,
-                      stats: Dict[str, int]) -> int:
+    def _emit_section(
+        self,
+        cfg_id: int,
+        name: str,
+        path: str,
+        sec_type: str,
+        parent_section_id: Optional[int],
+        local_fid: int,
+        stats: Dict[str, int],
+    ) -> int:
         section_id = self._next("section")
-        self.config_sections_table.append({
-            "section_id": section_id,
-            "config_file_id": cfg_id,
-            "section_name": self._as_text(name),
-            "section_path": self._as_text(path),
-            "section_type": sec_type,
-            "parent_section_id": parent_section_id,
-            "key_count": 0,   # filled in as keys attach to this section
-            "notes": None,
-            "file_id": local_fid,
-        })
+        self.config_sections_table.append(
+            {
+                "section_id": section_id,
+                "config_file_id": cfg_id,
+                "section_name": self._as_text(name),
+                "section_path": self._as_text(path),
+                "section_type": sec_type,
+                "parent_section_id": parent_section_id,
+                "key_count": 0,  # filled in as keys attach to this section
+                "notes": None,
+                "file_id": local_fid,
+            }
+        )
         stats["sections"] += 1
         self._section_rows[section_id] = self.config_sections_table[-1]
         return section_id
 
-    def _emit_key(self, cfg_id: int, section_id: Optional[int], name: str,
-                  path: str, parent_key_id: Optional[int], depth: int,
-                  node: Any, local_fid: int, stats: Dict[str, int]) -> int:
+    def _emit_key(
+        self,
+        cfg_id: int,
+        section_id: Optional[int],
+        name: str,
+        path: str,
+        parent_key_id: Optional[int],
+        depth: int,
+        node: Any,
+        local_fid: int,
+        stats: Dict[str, int],
+    ) -> int:
         key_id = self._next("key")
-        self.config_value_keys_table.append({
-            "config_value_key_id": key_id,
-            "config_file_id": cfg_id,
-            "section_id": section_id,
-            "config_value_key_name": self._as_text(name),
-            "key_path": self._as_text(path),
-            "config_value_parent_key_id": parent_key_id,
-            "depth": depth,
-            "node_type": self._node_type(node),
-            "child_count": self._child_count(node),
-            "file_id": local_fid,
-        })
+        self.config_value_keys_table.append(
+            {
+                "config_value_key_id": key_id,
+                "config_file_id": cfg_id,
+                "section_id": section_id,
+                "config_value_key_name": self._as_text(name),
+                "key_path": self._as_text(path),
+                "config_value_parent_key_id": parent_key_id,
+                "depth": depth,
+                "node_type": self._node_type(node),
+                "child_count": self._child_count(node),
+                "file_id": local_fid,
+            }
+        )
         stats["keys"] += 1
         if depth > stats["max_depth"]:
             stats["max_depth"] = depth
@@ -306,28 +401,39 @@ class ConfigAnalyzer:
                 row["key_count"] += 1
         return key_id
 
-    def _emit_value(self, cfg_id: int, key_id: int,
-                    parent_key_id: Optional[int], section_id: Optional[int],
-                    node: Any, list_index: Optional[int], local_fid: int,
-                    stats: Dict[str, int]) -> int:
+    def _emit_value(
+        self,
+        cfg_id: int,
+        key_id: int,
+        parent_key_id: Optional[int],
+        section_id: Optional[int],
+        node: Any,
+        list_index: Optional[int],
+        local_fid: int,
+        stats: Dict[str, int],
+    ) -> int:
         value_id = self._next("value")
         is_leaf = not isinstance(node, (dict, list))
-        self.config_values_table.append({
-            "config_value_id": value_id,
-            "config_value_key_id": key_id,
-            "config_file_id": cfg_id,
-            "section_id": section_id,
-            "config_value_parent_key_id": parent_key_id,
-            "config_value_type": self._value_type(node),
-            "scalar_value": self._scalar_text(node) if is_leaf else None,
-            "list_index": list_index,
-            "is_leaf": 1 if is_leaf else 0,
-            "file_id": local_fid,
-        })
+        self.config_values_table.append(
+            {
+                "config_value_id": value_id,
+                "config_value_key_id": key_id,
+                "config_file_id": cfg_id,
+                "section_id": section_id,
+                "config_value_parent_key_id": parent_key_id,
+                "config_value_type": self._value_type(node),
+                "scalar_value": self._scalar_text(node) if is_leaf else None,
+                "list_index": list_index,
+                "is_leaf": 1 if is_leaf else 0,
+                "file_id": local_fid,
+            }
+        )
         stats["values"] += 1
         return value_id
 
-    def _emit_property(self, cfg_id: int, entry: Any, local_fid: int) -> bool:  # noqa: E301
+    def _emit_property(
+        self, cfg_id: int, entry: Any, local_fid: int
+    ) -> bool:  # noqa: E301
         if not (isinstance(entry, (list, tuple)) and len(entry) == 3):
             return False
         group_name, name, value = entry
@@ -345,15 +451,17 @@ class ConfigAnalyzer:
             pv, vtype = str(value), "str"
         if pv is None:
             return False
-        self.config_properties_table.append({
-            "property_id": self._next("property"),
-            "config_file_id": cfg_id,
-            "property_name": str(name)[:256],
-            "property_value": pv[:2048],
-            "value_type": vtype,
-            "group_name": str(group_name)[:128],
-            "file_id": local_fid,
-        })
+        self.config_properties_table.append(
+            {
+                "property_id": self._next("property"),
+                "config_file_id": cfg_id,
+                "property_name": str(name)[:256],
+                "property_value": pv[:2048],
+                "value_type": vtype,
+                "group_name": str(group_name)[:128],
+                "file_id": local_fid,
+            }
+        )
         return True
 
     # ------------------------------------------------------------------
@@ -451,7 +559,9 @@ class ConfigAnalyzer:
     # ==================================================================
     def link_repository(
         self,
-        repository_tables: Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]],
+        repository_tables: Tuple[
+            List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]
+        ],
         analyzed_file_paths: Optional[List[Union[str, Path]]] = None,
     ) -> List[Dict[str, Any]]:
         folders, extensions, files = repository_tables
@@ -467,7 +577,9 @@ class ConfigAnalyzer:
             deepest = location[-1] if location else 1
             folder_path = folder_by_id.get(deepest, ".")
             fname = f["file_name"] + (f".{ext}" if ext else "")
-            relpath = fname if folder_path in (".", "", None) else f"{folder_path}/{fname}"
+            relpath = (
+                fname if folder_path in (".", "", None) else f"{folder_path}/{fname}"
+            )
             repo_by_relpath.setdefault(relpath, f["file_id"])
             repo_by_basename.setdefault(Path(relpath).name, []).append(f["file_id"])
 
@@ -501,10 +613,14 @@ class ConfigAnalyzer:
                 repo_id = local_to_repo.get(row.get("file_id"))
                 row["file_id"] = repo_id
                 if repo_id is not None:
-                    self.config_file_index.append({
-                        "cfi_id": self._next("cfi"), "file_id": repo_id,
-                        "entity_kind": kind, "entity_id": row[id_key],
-                    })
+                    self.config_file_index.append(
+                        {
+                            "cfi_id": self._next("cfi"),
+                            "file_id": repo_id,
+                            "entity_kind": kind,
+                            "entity_id": row[id_key],
+                        }
+                    )
         return self.config_file_index
 
     # ==================================================================

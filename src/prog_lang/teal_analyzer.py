@@ -15,7 +15,7 @@
 # — they are subroutine entry points / jump targets — so they become functions;
 # the `#pragma` directive is recorded as a module variable.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -28,8 +28,9 @@ class TealAnalyzer(RegexCodeAnalyzer):
 
     _PRAGMA = re.compile(r"^[ \t]*#pragma\s+(.+)$", re.MULTILINE)
     # a label:  optional leading ws, identifier, ':'  and nothing else of note
-    _LABEL = re.compile(r"^[ \t]*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(?://.*)?$",
-                        re.MULTILINE)
+    _LABEL = re.compile(
+        r"^[ \t]*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(?://.*)?$", re.MULTILINE
+    )
 
     def _register_types(self, file_id, text, path):
         pass

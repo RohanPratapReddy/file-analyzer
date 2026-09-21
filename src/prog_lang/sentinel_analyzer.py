@@ -10,7 +10,7 @@
 #
 # Comments are '//', '#' and '/* */'; strings use '"' and '`'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -23,7 +23,7 @@ class SentinelAnalyzer(RegexCodeAnalyzer):
     BLOCK_COMMENTS = (("/*", "*/"),)
     STRING_DELIMS = ('"', "`")
 
-    _IMPORT = re.compile(r'(?m)^\s*import\s+"([^"]+)"(?:\s+as\s+(' + _ID + r'))?')
+    _IMPORT = re.compile(r'(?m)^\s*import\s+"([^"]+)"(?:\s+as\s+(' + _ID + r"))?")
     _PARAM = re.compile(r"(?m)^\s*param\s+(" + _ID + r")\b")
     # `name = func(args) { ... }`
     _FUNC = re.compile(r"(?m)^\s*(" + _ID + r")\s*=\s*func\s*\(([^)]*)\)")
@@ -49,13 +49,11 @@ class SentinelAnalyzer(RegexCodeAnalyzer):
             name = m.group(1)
             defined.add(name)
             args = self._simple_args(m.group(2))
-            self._add_function(file_id, name, args, [],
-                               description="sentinel func")
+            self._add_function(file_id, name, args, [], description="sentinel func")
         for m in self._RULE.finditer(clean):
             name = m.group(1)
             defined.add(name)
-            self._add_function(file_id, name, [], [],
-                               description="sentinel rule")
+            self._add_function(file_id, name, [], [], description="sentinel rule")
 
         for m in self._PARAM.finditer(clean):
             name = m.group(1)

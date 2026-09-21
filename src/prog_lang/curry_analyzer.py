@@ -14,7 +14,7 @@
 #   perm []     = []                                   -> function
 #   solve x | x > 0 = ...                               -> function (guarded)
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -22,12 +22,12 @@ class CurryAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "curry"
     EXTENSIONS = (".curry",)
     LINE_COMMENTS = ("--",)
-    BLOCK_COMMENTS = ()          # nested {- -} handled below
+    BLOCK_COMMENTS = ()  # nested {- -} handled below
     STRING_DELIMS = ('"',)
 
     _IMPORT = re.compile(
-        r"^import\s+(?:qualified\s+)?([\w.]+)(?:.*?\bas\s+([\w.]+))?",
-        re.MULTILINE)
+        r"^import\s+(?:qualified\s+)?([\w.]+)(?:.*?\bas\s+([\w.]+))?", re.MULTILINE
+    )
     _DATA = re.compile(r"^(?:data|newtype)\s+([A-Z]\w*)", re.MULTILINE)
     _TYPESYN = re.compile(r"^type\s+([A-Z]\w*)", re.MULTILINE)
     _CLASS = re.compile(r"^class\s+(?:.*?=>\s*)?([A-Z]\w*)", re.MULTILINE)
@@ -38,22 +38,35 @@ class CurryAnalyzer(RegexCodeAnalyzer):
         out, i, n, depth = [], 0, len(text), 0
         while i < n:
             if depth == 0 and text[i] == '"':
-                out.append('"'); i += 1
+                out.append('"')
+                i += 1
                 while i < n:
-                    c = text[i]; out.append(c)
+                    c = text[i]
+                    out.append(c)
                     if c == "\\" and i + 1 < n:
-                        out.append(text[i + 1]); i += 2; continue
+                        out.append(text[i + 1])
+                        i += 2
+                        continue
                     i += 1
                     if c == '"':
                         break
                 continue
-            if text[i:i + 2] == "{-":
-                depth += 1; out.append("  "); i += 2; continue
-            if text[i:i + 2] == "-}" and depth > 0:
-                depth -= 1; out.append("  "); i += 2; continue
+            if text[i : i + 2] == "{-":
+                depth += 1
+                out.append("  ")
+                i += 2
+                continue
+            if text[i : i + 2] == "-}" and depth > 0:
+                depth -= 1
+                out.append("  ")
+                i += 2
+                continue
             if depth > 0:
-                out.append("\n" if text[i] == "\n" else " "); i += 1; continue
-            out.append(text[i]); i += 1
+                out.append("\n" if text[i] == "\n" else " ")
+                i += 1
+                continue
+            out.append(text[i])
+            i += 1
         return "".join(out)
 
     def _clean(self, text):
@@ -65,7 +78,7 @@ class CurryAnalyzer(RegexCodeAnalyzer):
             return ""
         base = self._indent_of(text[decl_start:nl])
         out = []
-        for line in text[nl + 1:].splitlines(keepends=True):
+        for line in text[nl + 1 :].splitlines(keepends=True):
             if line.strip() and self._indent_of(line) <= base:
                 break
             out.append(line)
@@ -88,7 +101,7 @@ class CurryAnalyzer(RegexCodeAnalyzer):
         for m in self._DATA.finditer(text):
             name = m.group(1)
             line_end = text.find("\n", m.end())
-            head = text[m.end():line_end if line_end != -1 else len(text)]
+            head = text[m.end() : line_end if line_end != -1 else len(text)]
             cons = []
             if "=" in head:
                 for part in head.split("=", 1)[1].split("|"):
@@ -106,30 +119,60 @@ class CurryAnalyzer(RegexCodeAnalyzer):
             body = self._indent_body(text, m.start())
             methods = []
             for mm in re.finditer(r"^\s+([a-z_]\w*'?)\s*::", body, re.MULTILINE):
-                methods.append(self._add_function(
-                    file_id, mm.group(1), [], [],
-                    class_id=self._class_registry.get(name),
-                    description="curry class member"))
-            self._add_class(file_id, name, description="curry class",
-                            method_ids=methods)
+                methods.append(
+                    self._add_function(
+                        file_id,
+                        mm.group(1),
+                        [],
+                        [],
+                        class_id=self._class_registry.get(name),
+                        description="curry class member",
+                    )
+                )
+            self._add_class(
+                file_id, name, description="curry class", method_ids=methods
+            )
 
         signatures = {}
         for m in self._SIG.finditer(text):
             signatures.setdefault(m.group(1), m.group(2).strip())
 
-        reserved = {"module", "import", "data", "newtype", "type", "class",
-                    "instance", "where", "let", "in", "if", "then", "else",
-                    "case", "of", "do", "infixl", "infixr", "infix", "qualified"}
+        reserved = {
+            "module",
+            "import",
+            "data",
+            "newtype",
+            "type",
+            "class",
+            "instance",
+            "where",
+            "let",
+            "in",
+            "if",
+            "then",
+            "else",
+            "case",
+            "of",
+            "do",
+            "infixl",
+            "infixr",
+            "infix",
+            "qualified",
+        }
         emitted = set()
         for m in self._DEF.finditer(text):
             name, params = m.group(1), m.group(2).strip()
             if name in emitted or name in reserved:
                 continue
             emitted.add(name)
-            pnames = [p for p in re.split(r"\s+", params)
-                      if re.match(r"^[a-z_]\w*'?$", p)]
-            out_ids = ([self._add_output(signatures[name].split("->")[-1].strip())]
-                       if name in signatures and "->" in signatures[name] else [])
+            pnames = [
+                p for p in re.split(r"\s+", params) if re.match(r"^[a-z_]\w*'?$", p)
+            ]
+            out_ids = (
+                [self._add_output(signatures[name].split("->")[-1].strip())]
+                if name in signatures and "->" in signatures[name]
+                else []
+            )
             if pnames:
                 arg_ids = [self._add_arg(p) for p in pnames]
                 self._add_function(file_id, name, arg_ids, out_ids)

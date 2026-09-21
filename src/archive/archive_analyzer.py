@@ -97,21 +97,42 @@ class ArchiveAnalyzer:
 
     # Zip-bomb / runaway guards.
     MAX_MEMBERS = 100_000
-    MAX_EXTRACT_BYTES = 2 * 1024 ** 3  # 2 GiB uncompressed
-    MAX_MEMBER_ROWS = 5_000            # cap rows materialised per archive
+    MAX_EXTRACT_BYTES = 2 * 1024**3  # 2 GiB uncompressed
+    MAX_MEMBER_ROWS = 5_000  # cap rows materialised per archive
     _READ_CHUNK = 1 << 20
-    _SNIFF_BYTES = 512                 # header bytes read for the magic-byte sniff
+    _SNIFF_BYTES = 512  # header bytes read for the magic-byte sniff
 
     # Suffix -> logical codec. These are the spec-guaranteed ZIP containers: their
     # bytes are a PKZIP archive by their own standard, so the fast path skips the
     # sniff. Proprietary/ambiguous "maybe-zip" suffixes are NOT here -- they go
     # through the sniff (which upgrades them to "zip" only if the magic matches).
-    _ZIP_EXTS = frozenset({
-        ".zip", ".epub", ".usdz", ".3mf", ".kmz",
-        ".jar", ".war", ".ear", ".apk", ".whl", ".xpi", ".vsix", ".nupkg",
-        ".asice", ".bdoc", ".bcf", ".dwca", ".siard", ".wacz",
-        ".xdm", ".pk3", ".pdx", ".ufdr",
-    })
+    _ZIP_EXTS = frozenset(
+        {
+            ".zip",
+            ".epub",
+            ".usdz",
+            ".3mf",
+            ".kmz",
+            ".jar",
+            ".war",
+            ".ear",
+            ".apk",
+            ".whl",
+            ".xpi",
+            ".vsix",
+            ".nupkg",
+            ".asice",
+            ".bdoc",
+            ".bcf",
+            ".dwca",
+            ".siard",
+            ".wacz",
+            ".xdm",
+            ".pk3",
+            ".pdx",
+            ".ufdr",
+        }
+    )
     # Single-stream stdlib compression.
     _STREAM_CODEC = {".gz": "gzip", ".bz2": "bzip2", ".xz": "xz", ".lzma": "lzma"}
     # Single-stream optional-library compression (codec is returned regardless of
@@ -120,11 +141,17 @@ class ArchiveAnalyzer:
     _OPT_STREAM_CODEC = {".br": "brotli", ".lz4": "lz4", ".sz": "snappy"}
     # Compound tar suffixes (checked longest-first) -> tarfile mode / needs-zstd.
     _TAR_SUFFIXES: Tuple[Tuple[str, str], ...] = (
-        (".tar.gz", "r:gz"), (".tgz", "r:gz"), (".mbz", "r:gz"),
-        (".tar.bz2", "r:bz2"), (".tbz2", "r:bz2"), (".tbz", "r:bz2"),
-        (".tar.xz", "r:xz"), (".txz", "r:xz"),
+        (".tar.gz", "r:gz"),
+        (".tgz", "r:gz"),
+        (".mbz", "r:gz"),
+        (".tar.bz2", "r:bz2"),
+        (".tbz2", "r:bz2"),
+        (".tbz", "r:bz2"),
+        (".tar.xz", "r:xz"),
+        (".txz", "r:xz"),
         (".tar.lzma", "r:xz"),
-        (".tar.zst", "zst"), (".tzst", "zst"),
+        (".tar.zst", "zst"),
+        (".tzst", "zst"),
         (".webdataset", "r:"),
         (".tar", "r:"),
     )
@@ -192,16 +219,26 @@ class ArchiveAnalyzer:
     }
     # Friendly archive_format labels for suffixes that carry a real codec.
     _FRIENDLY: Dict[str, str] = {
-        ".7z": "7-Zip archive", ".rar": "RAR archive",
-        ".br": "Brotli-compressed file", ".lz4": "LZ4-compressed file",
-        ".sz": "Snappy-compressed file", ".zst": "Zstandard-compressed file",
-        ".zstd": "Zstandard-compressed file", ".mbz": "Moodle course backup",
-        ".webdataset": "WebDataset shard", ".siard": "SIARD database archive",
-        ".dwca": "Darwin Core Archive", ".wacz": "Web Archive Collection Zipped",
-        ".pk3": "Quake III package", ".pdx": "Packaged ODX container",
-        ".ufdr": "Cellebrite UFED report", ".xdm": "IHE XDM package",
-        ".asice": "ASiC-E container", ".bdoc": "BDOC signature container",
-        ".bcf": "BCF issue file", ".zipx": "extended ZIP archive",
+        ".7z": "7-Zip archive",
+        ".rar": "RAR archive",
+        ".br": "Brotli-compressed file",
+        ".lz4": "LZ4-compressed file",
+        ".sz": "Snappy-compressed file",
+        ".zst": "Zstandard-compressed file",
+        ".zstd": "Zstandard-compressed file",
+        ".mbz": "Moodle course backup",
+        ".webdataset": "WebDataset shard",
+        ".siard": "SIARD database archive",
+        ".dwca": "Darwin Core Archive",
+        ".wacz": "Web Archive Collection Zipped",
+        ".pk3": "Quake III package",
+        ".pdx": "Packaged ODX container",
+        ".ufdr": "Cellebrite UFED report",
+        ".xdm": "IHE XDM package",
+        ".asice": "ASiC-E container",
+        ".bdoc": "BDOC signature container",
+        ".bcf": "BCF issue file",
+        ".zipx": "extended ZIP archive",
     }
 
     def __init__(self, engine: Any, archive_files: List[Dict[str, Any]]):
@@ -242,15 +279,29 @@ class ArchiveAnalyzer:
             path = Path(loc)
             try:
                 self._process_one(fid, path)
-            except Exception as err:  # noqa: BLE001 - one bad archive must not sink the run
+            except (
+                Exception
+            ) as err:  # noqa: BLE001 - one bad archive must not sink the run
                 self._aid += 1
-                self._archive_rows.append(self._archive_row(
-                    fid, path, archive_format=self._format_label(path),
-                    member_count=0, extracted_size=0, extractable=False,
-                    status="error", sub_database=None, sub_file_count=None,
-                    sub_shard_summary=None, notes=f"{type(err).__name__}: {err}",
-                ))
-        return {"archive_index": self._archive_rows, "archive_members": self._member_rows}
+                self._archive_rows.append(
+                    self._archive_row(
+                        fid,
+                        path,
+                        archive_format=self._format_label(path),
+                        member_count=0,
+                        extracted_size=0,
+                        extractable=False,
+                        status="error",
+                        sub_database=None,
+                        sub_file_count=None,
+                        sub_shard_summary=None,
+                        notes=f"{type(err).__name__}: {err}",
+                    )
+                )
+        return {
+            "archive_index": self._archive_rows,
+            "archive_members": self._member_rows,
+        }
 
     # ------------------------------------------------------------------
     def _process_one(self, fid: Optional[int], path: Path) -> None:
@@ -259,25 +310,44 @@ class ArchiveAnalyzer:
         fmt = self._format_label(path)
 
         if not path.exists():
-            self._archive_rows.append(self._archive_row(
-                fid, path, archive_format=fmt, member_count=0, extracted_size=0,
-                extractable=False, status="missing", sub_database=None,
-                sub_file_count=None, sub_shard_summary=None,
-                notes="archive file not found on disk",
-            ))
+            self._archive_rows.append(
+                self._archive_row(
+                    fid,
+                    path,
+                    archive_format=fmt,
+                    member_count=0,
+                    extracted_size=0,
+                    extractable=False,
+                    status="missing",
+                    sub_database=None,
+                    sub_file_count=None,
+                    sub_shard_summary=None,
+                    notes="archive file not found on disk",
+                )
+            )
             return
 
         codec = self._classify(path)
         compressed_size = path.stat().st_size
 
         if codec is None:
-            self._archive_rows.append(self._archive_row(
-                fid, path, archive_format=fmt, member_count=0, extracted_size=0,
-                extractable=False, status="unsupported", sub_database=None,
-                sub_file_count=None, sub_shard_summary=None,
-                notes="no archive codec matched the suffix", aid=aid,
-                compressed_size=compressed_size,
-            ))
+            self._archive_rows.append(
+                self._archive_row(
+                    fid,
+                    path,
+                    archive_format=fmt,
+                    member_count=0,
+                    extracted_size=0,
+                    extractable=False,
+                    status="unsupported",
+                    sub_database=None,
+                    sub_file_count=None,
+                    sub_shard_summary=None,
+                    notes="no archive codec matched the suffix",
+                    aid=aid,
+                    compressed_size=compressed_size,
+                )
+            )
             return
 
         # 1. Census the members (no extraction).
@@ -287,38 +357,68 @@ class ArchiveAnalyzer:
 
         # 2. Decide whether to extract + recurse.
         depth_capped = self.depth >= self.max_depth
-        over_cap = (member_count > self.MAX_MEMBERS) or (extracted_size > self.MAX_EXTRACT_BYTES)
+        over_cap = (member_count > self.MAX_MEMBERS) or (
+            extracted_size > self.MAX_EXTRACT_BYTES
+        )
 
         if not codec_ok:
             status, sub_db, sub_files, sub_summary, note = (
-                "no-codec", None, None, None, census_note or f"{codec} codec unavailable")
+                "no-codec",
+                None,
+                None,
+                None,
+                census_note or f"{codec} codec unavailable",
+            )
         elif depth_capped:
             status, sub_db, sub_files, sub_summary, note = (
-                "depth-capped", None, None, None,
-                f"archive recursion depth {self.depth} >= max {self.max_depth}")
+                "depth-capped",
+                None,
+                None,
+                None,
+                f"archive recursion depth {self.depth} >= max {self.max_depth}",
+            )
         elif over_cap:
             status, sub_db, sub_files, sub_summary, note = (
-                "truncated", None, None, None,
-                f"exceeds guard (members={member_count}, bytes={extracted_size})")
+                "truncated",
+                None,
+                None,
+                None,
+                f"exceeds guard (members={member_count}, bytes={extracted_size})",
+            )
         else:
             status, sub_db, sub_files, sub_summary, note = self._extract_and_recurse(
-                aid, fid, path, codec, members)
+                aid, fid, path, codec, members
+            )
             if census_note:
                 note = f"{census_note}; {note}" if note else census_note
 
-        self._archive_rows.append(self._archive_row(
-            fid, path, archive_format=fmt, member_count=member_count,
-            extracted_size=extracted_size, extractable=codec_ok, status=status,
-            sub_database=sub_db, sub_file_count=sub_files,
-            sub_shard_summary=sub_summary, notes=note, aid=aid,
-            compressed_size=compressed_size,
-        ))
+        self._archive_rows.append(
+            self._archive_row(
+                fid,
+                path,
+                archive_format=fmt,
+                member_count=member_count,
+                extracted_size=extracted_size,
+                extractable=codec_ok,
+                status=status,
+                sub_database=sub_db,
+                sub_file_count=sub_files,
+                sub_shard_summary=sub_summary,
+                notes=note,
+                aid=aid,
+                compressed_size=compressed_size,
+            )
+        )
 
     # ------------------------------------------------------------------
     # Extraction + nested recursion
     # ------------------------------------------------------------------
     def _extract_and_recurse(
-        self, aid: int, fid: Optional[int], path: Path, codec: str,
+        self,
+        aid: int,
+        fid: Optional[int],
+        path: Path,
+        codec: str,
         members: List[Dict[str, Any]],
     ) -> Tuple[str, Optional[str], Optional[int], Optional[str], str]:
         work = self.sandbox_root / f"arc_{fid if fid is not None else aid}"
@@ -329,7 +429,13 @@ class ArchiveAnalyzer:
         try:
             self._extract(path, codec, extract_dir, members)
         except Exception as err:  # noqa: BLE001
-            return ("error", None, None, None, f"extract failed: {type(err).__name__}: {err}")
+            return (
+                "error",
+                None,
+                None,
+                None,
+                f"extract failed: {type(err).__name__}: {err}",
+            )
 
         # Anything actually written?
         if not any(p.is_file() for p in extract_dir.rglob("*")):
@@ -378,14 +484,27 @@ class ArchiveAnalyzer:
         try:
             summary = nested.run()
         except Exception as err:  # noqa: BLE001
-            return ("error", None, None, None, f"nested analysis failed: {type(err).__name__}: {err}")
+            return (
+                "error",
+                None,
+                None,
+                None,
+                f"nested analysis failed: {type(err).__name__}: {err}",
+            )
 
         sub_summary = json.dumps(summary.get("shards", {}), sort_keys=True)
-        return ("extracted", str(sub_db.resolve()), int(summary.get("file_count", 0) or 0),
-                sub_summary, f"nested {summary.get('file_count', 0)} files, "
-                             f"{summary.get('import_linkages', 0)} linkages")
+        return (
+            "extracted",
+            str(sub_db.resolve()),
+            int(summary.get("file_count", 0) or 0),
+            sub_summary,
+            f"nested {summary.get('file_count', 0)} files, "
+            f"{summary.get('import_linkages', 0)} linkages",
+        )
 
-    def _extract(self, path: Path, codec: str, dest: Path, members: List[Dict[str, Any]]) -> None:
+    def _extract(
+        self, path: Path, codec: str, dest: Path, members: List[Dict[str, Any]]
+    ) -> None:
         if codec == "zip":
             with zipfile.ZipFile(path) as zf:
                 zf.extractall(dest)  # stdlib sanitises member names (no traversal)
@@ -423,7 +542,12 @@ class ArchiveAnalyzer:
             tf.extractall(dest)
 
     def _stream_decompress(self, path: Path, codec: str, dest: Path) -> None:
-        openers = {"gzip": gzip.open, "bzip2": bz2.open, "xz": lzma.open, "lzma": lzma.open}
+        openers = {
+            "gzip": gzip.open,
+            "bzip2": bz2.open,
+            "xz": lzma.open,
+            "lzma": lzma.open,
+        }
         out = dest / self._inner_name(path)
         written = 0
         with openers[codec](path, "rb") as src, open(out, "wb") as dst:
@@ -491,11 +615,18 @@ class ArchiveAnalyzer:
     # Member census
     # ------------------------------------------------------------------
     def _list_members(
-        self, path: Path, codec: str,
+        self,
+        path: Path,
+        codec: str,
     ) -> Tuple[List[Dict[str, Any]], int, Optional[str], bool]:
         """Return ``(members, total_uncompressed, note, codec_ok)``."""
         if codec.startswith("nocodec:"):
-            return ([], 0, f"{codec.split(':', 1)[1]}: no extractor available here", False)
+            return (
+                [],
+                0,
+                f"{codec.split(':', 1)[1]}: no extractor available here",
+                False,
+            )
         if codec == "zip":
             return self._list_zip(path)
         if codec.startswith("tar:") and codec != "tar:zst":
@@ -520,9 +651,20 @@ class ArchiveAnalyzer:
         if codec == "zstd":
             if _zstd is None:
                 return ([], 0, "zstandard unavailable", False)
-            return ([{"path": self._inner_name(path), "kind": "file",
-                      "size": None, "compressed": path.stat().st_size, "modified": None}],
-                    0, None, True)
+            return (
+                [
+                    {
+                        "path": self._inner_name(path),
+                        "kind": "file",
+                        "size": None,
+                        "compressed": path.stat().st_size,
+                        "modified": None,
+                    }
+                ],
+                0,
+                None,
+                True,
+            )
         if codec == "7z":
             return self._list_7z(path)
         if codec == "rar":
@@ -536,13 +678,15 @@ class ArchiveAnalyzer:
                 is_dir = zi.is_dir()
                 if not is_dir:
                     total += zi.file_size
-                members.append({
-                    "path": zi.filename,
-                    "kind": "dir" if is_dir else "file",
-                    "size": zi.file_size,
-                    "compressed": zi.compress_size,
-                    "modified": self._zip_mtime(zi.date_time),
-                })
+                members.append(
+                    {
+                        "path": zi.filename,
+                        "kind": "dir" if is_dir else "file",
+                        "size": zi.file_size,
+                        "compressed": zi.compress_size,
+                        "modified": self._zip_mtime(zi.date_time),
+                    }
+                )
         return members, total, None, True
 
     def _list_tar(self, path: Path, mode: str):
@@ -552,20 +696,36 @@ class ArchiveAnalyzer:
                 is_dir = m.isdir()
                 if m.isfile():
                     total += m.size
-                members.append({
-                    "path": m.name,
-                    "kind": "dir" if is_dir else ("file" if m.isfile() else "special"),
-                    "size": m.size if m.isfile() else 0,
-                    "compressed": None,
-                    "modified": self._epoch_mtime(m.mtime),
-                })
+                members.append(
+                    {
+                        "path": m.name,
+                        "kind": (
+                            "dir" if is_dir else ("file" if m.isfile() else "special")
+                        ),
+                        "size": m.size if m.isfile() else 0,
+                        "compressed": None,
+                        "modified": self._epoch_mtime(m.mtime),
+                    }
+                )
         return members, total, None, True
 
     def _list_stream(self, path: Path, codec: str):
         # Single-stream: one logical member. Size is only known by decompressing,
         # which the extract step does under the guard; the census stays cheap.
-        return ([{"path": self._inner_name(path), "kind": "file", "size": None,
-                  "compressed": path.stat().st_size, "modified": None}], 0, None, True)
+        return (
+            [
+                {
+                    "path": self._inner_name(path),
+                    "kind": "file",
+                    "size": None,
+                    "compressed": path.stat().st_size,
+                    "modified": None,
+                }
+            ],
+            0,
+            None,
+            True,
+        )
 
     def _list_7z(self, path: Path):
         if _py7zr is None:
@@ -582,17 +742,26 @@ class ArchiveAnalyzer:
                     size = getattr(fi, "uncompressed", None)
                     if not is_dir and isinstance(size, int):
                         total += size
-                    members.append({
-                        "path": getattr(fi, "filename", None),
-                        "kind": "dir" if is_dir else "file",
-                        "size": None if is_dir else size,
-                        "compressed": getattr(fi, "compressed", None),
-                        "modified": self._fmt_dt(getattr(fi, "creationtime", None)),
-                    })
+                    members.append(
+                        {
+                            "path": getattr(fi, "filename", None),
+                            "kind": "dir" if is_dir else "file",
+                            "size": None if is_dir else size,
+                            "compressed": getattr(fi, "compressed", None),
+                            "modified": self._fmt_dt(getattr(fi, "creationtime", None)),
+                        }
+                    )
             else:
                 for name in z.getnames():
-                    members.append({"path": name, "kind": "file", "size": None,
-                                    "compressed": None, "modified": None})
+                    members.append(
+                        {
+                            "path": name,
+                            "kind": "file",
+                            "size": None,
+                            "compressed": None,
+                            "modified": None,
+                        }
+                    )
         return members, total, None, True
 
     def _list_rar(self, path: Path):
@@ -606,13 +775,15 @@ class ArchiveAnalyzer:
                     size = int(getattr(ri, "file_size", 0) or 0)
                     if not is_dir:
                         total += size
-                    members.append({
-                        "path": getattr(ri, "filename", None),
-                        "kind": "dir" if is_dir else "file",
-                        "size": None if is_dir else size,
-                        "compressed": getattr(ri, "compress_size", None),
-                        "modified": self._rar_mtime(getattr(ri, "date_time", None)),
-                    })
+                    members.append(
+                        {
+                            "path": getattr(ri, "filename", None),
+                            "kind": "dir" if is_dir else "file",
+                            "size": None if is_dir else size,
+                            "compressed": getattr(ri, "compress_size", None),
+                            "modified": self._rar_mtime(getattr(ri, "date_time", None)),
+                        }
+                    )
         except Exception as err:  # noqa: BLE001 - unrar backend may be missing
             return ([], 0, f"rar census failed ({type(err).__name__})", False)
         return members, total, None, True
@@ -620,33 +791,56 @@ class ArchiveAnalyzer:
     # ------------------------------------------------------------------
     # Row builders
     # ------------------------------------------------------------------
-    def _emit_member_rows(self, aid: int, fid: Optional[int], members: List[Dict[str, Any]]) -> None:
+    def _emit_member_rows(
+        self, aid: int, fid: Optional[int], members: List[Dict[str, Any]]
+    ) -> None:
         capped = members[: self.MAX_MEMBER_ROWS]
         for m in capped:
             self._mid += 1
             mpath = m.get("path")
-            self._member_rows.append({
-                "member_id": self._mid,
-                "archive_id": aid,
-                "member_path": mpath,
-                "member_kind": m.get("kind"),
-                "member_size": m.get("size"),
-                "compressed_size": m.get("compressed"),
-                "modified": m.get("modified"),
-                "analyzer_class": (resolve_analyzer(mpath) if (mpath and m.get("kind") == "file") else None),
-                "file_id": fid,
-            })
+            self._member_rows.append(
+                {
+                    "member_id": self._mid,
+                    "archive_id": aid,
+                    "member_path": mpath,
+                    "member_kind": m.get("kind"),
+                    "member_size": m.get("size"),
+                    "compressed_size": m.get("compressed"),
+                    "modified": m.get("modified"),
+                    "analyzer_class": (
+                        resolve_analyzer(mpath)
+                        if (mpath and m.get("kind") == "file")
+                        else None
+                    ),
+                    "file_id": fid,
+                }
+            )
 
     def _archive_row(
-        self, fid, path, *, archive_format, member_count, extracted_size,
-        extractable, status, sub_database, sub_file_count, sub_shard_summary,
-        notes, aid=None, compressed_size=None,
+        self,
+        fid,
+        path,
+        *,
+        archive_format,
+        member_count,
+        extracted_size,
+        extractable,
+        status,
+        sub_database,
+        sub_file_count,
+        sub_shard_summary,
+        notes,
+        aid=None,
+        compressed_size=None,
     ) -> Dict[str, Any]:
         if aid is None:
             aid = self._aid
         try:
-            csize = compressed_size if compressed_size is not None else (
-                path.stat().st_size if path.exists() else None)
+            csize = (
+                compressed_size
+                if compressed_size is not None
+                else (path.stat().st_size if path.exists() else None)
+            )
         except OSError:
             csize = None
         return {
@@ -753,8 +947,11 @@ class ArchiveAnalyzer:
             if low.endswith(suf):
                 return suf.lstrip(".")
         ext = Path(low).suffix
-        friendly = (self._FRIENDLY.get(ext) or self._NOCODEC_FORMATS.get(ext)
-                    or self._SPLIT_PARTS.get(ext))
+        friendly = (
+            self._FRIENDLY.get(ext)
+            or self._NOCODEC_FORMATS.get(ext)
+            or self._SPLIT_PARTS.get(ext)
+        )
         if friendly:
             return friendly
         return ext.lstrip(".") or "unknown"
@@ -763,8 +960,20 @@ class ArchiveAnalyzer:
     def _inner_name(path: Path) -> str:
         # Strip exactly the single-stream compression suffix; keep the inner name.
         name = path.name
-        for suf in (".gz", ".bz2", ".xz", ".lzma", ".zst", ".zstd",
-                    ".br", ".lz4", ".sz", ".z", ".lz", ".tpz"):
+        for suf in (
+            ".gz",
+            ".bz2",
+            ".xz",
+            ".lzma",
+            ".zst",
+            ".zstd",
+            ".br",
+            ".lz4",
+            ".sz",
+            ".z",
+            ".lz",
+            ".tpz",
+        ):
             if name.lower().endswith(suf):
                 inner = name[: -len(suf)]
                 return Path(inner).name or "payload"
@@ -791,7 +1000,9 @@ class ArchiveAnalyzer:
     @staticmethod
     def _epoch_mtime(mtime) -> Optional[str]:
         try:
-            return datetime.fromtimestamp(int(mtime), tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+            return datetime.fromtimestamp(int(mtime), tz=timezone.utc).strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
         except Exception:  # noqa: BLE001
             return None
 

@@ -16,7 +16,7 @@
 # NOTE: '!' is a legal suffix in mutating word names (push!, set-nth!), so the
 # generic comment stripper cannot be used -- comments are stripped token-aware.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _WORD = r"[^\s]+"
@@ -25,7 +25,7 @@ _WORD = r"[^\s]+"
 class FactorAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "factor"
     EXTENSIONS = (".factor",)
-    LINE_COMMENTS = ()      # handled token-aware in _clean
+    LINE_COMMENTS = ()  # handled token-aware in _clean
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ('"',)
 
@@ -34,10 +34,9 @@ class FactorAnalyzer(RegexCodeAnalyzer):
     _COLON = re.compile(r"(?:^|\s)(::|:)\s+(\S+)\s+(.*?)\s+;", re.DOTALL)
     _GENERIC = re.compile(r"(?:^|\s)(?:GENERIC:|GENERIC#:|HOOK:)\s+(\S+)")
     _TUPLE = re.compile(r"(?:^|\s)TUPLE:\s+(\S+)(.*?)\s+;", re.DOTALL)
-    _TUPLE_OPEN = re.compile(r"(?:^|\s)TUPLE:\s+(\S+)([^;]*)$")   # unterminated
+    _TUPLE_OPEN = re.compile(r"(?:^|\s)TUPLE:\s+(\S+)([^;]*)$")  # unterminated
     _METHOD = re.compile(r"(?:^|\s)M:\s+(\S+)\s+(\S+)")
-    _VARWORD = re.compile(
-        r"(?:^|\s)(SYMBOL:|CONSTANT:|SYMBOLS:|C:|VALUE:)\s+(\S+)")
+    _VARWORD = re.compile(r"(?:^|\s)(SYMBOL:|CONSTANT:|SYMBOLS:|C:|VALUE:)\s+(\S+)")
 
     def _clean(self, text):
         """Strip Factor '!' / '#!' line comments token-aware, preserving newlines.
@@ -46,10 +45,10 @@ class FactorAnalyzer(RegexCodeAnalyzer):
         syntactically indistinguishable from an inline ``( comment )``; strings
         are copied verbatim."""
         out, i, n = [], 0, len(text)
-        at_tok_start = True   # True when the previous char was whitespace / start
+        at_tok_start = True  # True when the previous char was whitespace / start
         while i < n:
             ch = text[i]
-            if ch == '"':          # copy string literal verbatim
+            if ch == '"':  # copy string literal verbatim
                 out.append(ch)
                 i += 1
                 while i < n:
@@ -105,21 +104,25 @@ class FactorAnalyzer(RegexCodeAnalyzer):
 
         # generic words
         for m in self._GENERIC.finditer(text):
-            self._add_function(file_id, m.group(1), [], [], description="factor generic")
+            self._add_function(
+                file_id, m.group(1), [], [], description="factor generic"
+            )
 
         # colon definitions -> words; parse ( in -- out ) if the effect survives
         for m in self._COLON.finditer(text):
             name = m.group(2)
             arg_ids, out_ids = self._stack_effect(text, m.end(2))
-            self._add_function(file_id, name, arg_ids, out_ids,
-                               description="factor word")
+            self._add_function(
+                file_id, name, arg_ids, out_ids, description="factor word"
+            )
 
         # M: methods -> attach to the class named after M:
         for m in self._METHOD.finditer(text):
             owner, word = m.group(1), m.group(2)
             cid = self._class_registry.get(owner)
-            self._add_function(file_id, word, [], [], class_id=cid,
-                               description="factor method")
+            self._add_function(
+                file_id, word, [], [], class_id=cid, description="factor method"
+            )
 
     # ------------------------------------------------------------------
     def _emit_tuple(self, file_id, name, rest):
@@ -137,8 +140,13 @@ class FactorAnalyzer(RegexCodeAnalyzer):
             if slot in ("{", "}", "<") or slot.startswith("{"):
                 continue
             attrs.append(self._add_arg(slot, "slot"))
-        self._add_class(file_id, name, description="factor tuple",
-                        parent_ids=parents, attr_ids=attrs)
+        self._add_class(
+            file_id,
+            name,
+            description="factor tuple",
+            parent_ids=parents,
+            attr_ids=attrs,
+        )
 
     def _stack_effect(self, text, name_end):
         """The stack effect '( in -- out )' immediately follows the word name.

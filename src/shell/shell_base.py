@@ -21,8 +21,7 @@
 # the REAL syntax of their own command language, exactly like the prog_lang
 # regex analyzers.
 import re
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from ..prog_lang.regex_base import RegexCodeAnalyzer
 
@@ -66,13 +65,18 @@ class ShellScriptBase(RegexCodeAnalyzer):
 
     def _add_alias(self, file_id: int, name: str, value: Optional[str] = None) -> int:
         """A shell alias / abbreviation -> variable(scope="alias")."""
-        return self._add_variable(file_id, name, (value or "").strip()[:120] or None,
-                                   scope="alias")
+        return self._add_variable(
+            file_id, name, (value or "").strip()[:120] or None, scope="alias"
+        )
 
-    def _add_shell_function(self, file_id: int, name: str,
-                            params: Optional[List[str]] = None,
-                            description: Optional[str] = None,
-                            class_id: Optional[int] = None) -> int:
+    def _add_shell_function(
+        self,
+        file_id: int,
+        name: str,
+        params: Optional[List[str]] = None,
+        description: Optional[str] = None,
+        class_id: Optional[int] = None,
+    ) -> int:
         """A function / procedure / handler -> function, with positional or
         named parameters recorded as args."""
         arg_ids = []
@@ -80,8 +84,9 @@ class ShellScriptBase(RegexCodeAnalyzer):
             p = p.strip()
             if p:
                 arg_ids.append(self._add_arg(p))
-        return self._add_function(file_id, name, arg_ids=arg_ids,
-                                  class_id=class_id, description=description)
+        return self._add_function(
+            file_id, name, arg_ids=arg_ids, class_id=class_id, description=description
+        )
 
     def _record_shebang(self, file_id: int, text: str) -> Optional[str]:
         """Record the ``#!`` interpreter line (if any) as module introspection
@@ -97,10 +102,15 @@ class ShellScriptBase(RegexCodeAnalyzer):
         if interp.rsplit("/", 1)[-1] == "env" and args:
             real = args.split()[0]
         self.record_introspection_metadata(
-            file_id=file_id, entity_id=file_id, entity_type="module",
+            file_id=file_id,
+            entity_id=file_id,
+            entity_type="module",
             inspection_source=self.introspection_source,
-            structural_properties={"shebang": interp, "interpreter": real,
-                                   "shebang_args": args or None},
+            structural_properties={
+                "shebang": interp,
+                "interpreter": real,
+                "shebang_args": args or None,
+            },
         )
         return real
 
@@ -109,7 +119,9 @@ class ShellScriptBase(RegexCodeAnalyzer):
         cleaned = {k: v for k, v in props.items() if v is not None}
         if cleaned:
             self.record_introspection_metadata(
-                file_id=file_id, entity_id=file_id, entity_type="module",
+                file_id=file_id,
+                entity_id=file_id,
+                entity_type="module",
                 inspection_source=self.introspection_source,
                 structural_properties=cleaned,
             )

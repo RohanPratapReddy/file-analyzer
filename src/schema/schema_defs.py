@@ -18,7 +18,6 @@
 #   Kubernetes CRD (.crd)  Kaitai Struct (.ksy)  Xcode String Catalog (.xcstrings)
 import json
 import re
-from pathlib import Path
 
 try:  # PyYAML is preferred; a compact block-YAML fallback keeps us dependency-safe
     import yaml as _yaml
@@ -124,12 +123,17 @@ def _mini_yaml(text):
                     else:
                         d[key.strip()] = parse_block(ind + 3)
                     # continuation lines of this mapping item
-                    while pos[0] < len(lines) and indent(lines[pos[0]]) > cur_indent \
-                            and not lines[pos[0]].lstrip().startswith("- "):
+                    while (
+                        pos[0] < len(lines)
+                        and indent(lines[pos[0]]) > cur_indent
+                        and not lines[pos[0]].lstrip().startswith("- ")
+                    ):
                         k2, _, v2 = lines[pos[0]].lstrip().partition(":")
                         pos[0] += 1
                         v2 = v2.strip()
-                        d[k2.strip()] = _flow_or_scalar(v2) if v2 else parse_block(ind + 3)
+                        d[k2.strip()] = (
+                            _flow_or_scalar(v2) if v2 else parse_block(ind + 3)
+                        )
                     container.append(d)
                 else:
                     container.append(_flow_or_scalar(item))
@@ -138,7 +142,7 @@ def _mini_yaml(text):
                     pos[0] += 1
                     continue
                 key, _, val = body.partition(":")
-                key = key.strip().strip('"\'')
+                key = key.strip().strip("\"'")
                 val = val.strip()
                 pos[0] += 1
                 if val:
@@ -158,7 +162,7 @@ def _mini_yaml(text):
             for part in _split_commas(inner):
                 if ":" in part:
                     k, _, vv = part.partition(":")
-                    d[k.strip().strip('"\'')] = _scalar(vv)
+                    d[k.strip().strip("\"'")] = _scalar(vv)
             return d
         if v in ("|", ">", "|-", ">-", "|+", ">+"):
             return ""  # block scalar body is dropped in the fallback
@@ -211,15 +215,19 @@ class SchemaDefinitionEngines:
     # =====================================================================
     _IDL_CONTAINER = re.compile(
         r"\b(interface|dictionary|struct|exception|valuetype|union)\s+"
-        r"(\w+)\s*(?::\s*([\w:,\s]+?))?\s*\{", re.MULTILINE)
+        r"(\w+)\s*(?::\s*([\w:,\s]+?))?\s*\{",
+        re.MULTILINE,
+    )
     _IDL_ENUM = re.compile(r"\benum\s+(\w+)\s*\{([^}]*)\}")
     _IDL_TYPEDEF = re.compile(r"\btypedef\s+([\w:<>,\s\[\]]+?)\s+(\w+)\s*;")
     _IDL_MODULE = re.compile(r"\bmodule\s+(\w+)\s*\{")
     _IDL_ATTR = re.compile(
-        r"(?:readonly\s+)?attribute\s+([\w:<>?,\s\[\]]+?)\s+(\w+)\s*;")
+        r"(?:readonly\s+)?attribute\s+([\w:<>?,\s\[\]]+?)\s+(\w+)\s*;"
+    )
     _IDL_CONST = re.compile(r"\bconst\s+([\w:]+)\s+(\w+)\s*=\s*([^;]+);")
     _IDL_METHOD = re.compile(
-        r"(?:^|\n)\s*(?:static\s+)?([\w:<>?,\s\[\]]+?)\s+(\w+)\s*\(([^)]*)\)\s*;")
+        r"(?:^|\n)\s*(?:static\s+)?([\w:<>?,\s\[\]]+?)\s+(\w+)\s*\(([^)]*)\)\s*;"
+    )
 
     def _parse_idl_family(self, text, engine, file_id):
         t = self._strip_slashes(text)
@@ -232,8 +240,9 @@ class SchemaDefinitionEngines:
             vals = [v.strip().strip('"') for v in m.group(2).split(",") if v.strip()]
             self._emit_type(m.group(1), "enum", None, vals, None, file_id)
         for m in self._IDL_TYPEDEF.finditer(t):
-            self._emit_type(m.group(2), "typedef", m.group(1).strip(), None,
-                            None, file_id)
+            self._emit_type(
+                m.group(2), "typedef", m.group(1).strip(), None, None, file_id
+            )
         for m in self._IDL_CONTAINER.finditer(t):
             kind, name, bases = m.group(1), m.group(2), m.group(3)
             inner, _ = self._extract_braced(t, t.index("{", m.start()))
@@ -241,15 +250,20 @@ class SchemaDefinitionEngines:
                 inner = ""
             row = self._emit_table(name, engine, ns, kind, file_id)
             for am in self._IDL_ATTR.finditer(inner):
-                self._emit_column(row, am.group(2), am.group(1).strip(),
-                                  file_id, keys="attribute")
+                self._emit_column(
+                    row, am.group(2), am.group(1).strip(), file_id, keys="attribute"
+                )
             for cm in self._IDL_CONST.finditer(inner):
-                self._emit_column(row, cm.group(2), cm.group(1),
-                                  file_id, keys="const",
-                                  value=cm.group(3).strip())
+                self._emit_column(
+                    row,
+                    cm.group(2),
+                    cm.group(1),
+                    file_id,
+                    keys="const",
+                    value=cm.group(3).strip(),
+                )
             # plain struct fields  "Type name;"  (not attribute/const/method)
-            for fm in re.finditer(r"(?:^|\n)\s*([\w:<>,\s\[\]]+?)\s+(\w+)\s*;",
-                                  inner):
+            for fm in re.finditer(r"(?:^|\n)\s*([\w:<>,\s\[\]]+?)\s+(\w+)\s*;", inner):
                 seg = fm.group(0)
                 if "attribute" in seg or "const" in seg:
                     continue
@@ -263,8 +277,15 @@ class SchemaDefinitionEngines:
                 ret, mname, args = mm2.group(1).strip(), mm2.group(2), mm2.group(3)
                 if ret in ("attribute", "const", "readonly"):
                     continue
-                self._emit_method(mname, "operation", ret, engine,
-                                  args.strip() or None, row["table_id"], file_id)
+                self._emit_method(
+                    mname,
+                    "operation",
+                    ret,
+                    engine,
+                    args.strip() or None,
+                    row["table_id"],
+                    file_id,
+                )
 
     # =====================================================================
     # Smithy IDL   (.smithy)
@@ -272,10 +293,14 @@ class SchemaDefinitionEngines:
     _SMITHY_NS = re.compile(r"^\s*namespace\s+([\w.]+)", re.MULTILINE)
     _SMITHY_SHAPE = re.compile(
         r"^\s*(structure|union|list|map|set|enum|intEnum|operation|service|"
-        r"resource)\s+(\w+)\s*(?:with\s*\[[^\]]*\]\s*)?\{", re.MULTILINE)
+        r"resource)\s+(\w+)\s*(?:with\s*\[[^\]]*\]\s*)?\{",
+        re.MULTILINE,
+    )
     _SMITHY_SIMPLE = re.compile(
         r"^\s*(string|integer|long|short|byte|float|double|boolean|blob|"
-        r"timestamp|document|bigInteger|bigDecimal)\s+(\w+)\s*$", re.MULTILINE)
+        r"timestamp|document|bigInteger|bigDecimal)\s+(\w+)\s*$",
+        re.MULTILINE,
+    )
 
     def _parse_smithy(self, text, engine, file_id):
         t = self._strip_slashes(text)
@@ -298,10 +323,10 @@ class SchemaDefinitionEngines:
             if kind in ("operation", "service", "resource"):
                 # members like input:/output:/operations:[] -> record on method
                 sig = ", ".join(
-                    f"{k}={v.strip()}" for k, v in
-                    re.findall(r"(\w+)\s*:\s*([^\n,]+)", inner))
-                self._emit_method(name, kind, None, engine, sig or None,
-                                  None, file_id)
+                    f"{k}={v.strip()}"
+                    for k, v in re.findall(r"(\w+)\s*:\s*([^\n,]+)", inner)
+                )
+                self._emit_method(name, kind, None, engine, sig or None, None, file_id)
                 continue
             row = self._emit_table(name, engine, ns, kind, file_id)
             for fm in re.finditer(r"(\w+)\s*:\s*([\w.$#]+)", inner):
@@ -317,18 +342,22 @@ class SchemaDefinitionEngines:
             name = m.group(1)
             start = m.end()
             # capture up to the next rule head or EOF
-            nxt = re.search(r"^\s*[\w$@.-]+\s*(?:=|/=|//=)\s*", t[start:],
-                            re.MULTILINE)
-            body = t[start:start + nxt.start()] if nxt else t[start:]
+            nxt = re.search(r"^\s*[\w$@.-]+\s*(?:=|/=|//=)\s*", t[start:], re.MULTILINE)
+            body = t[start : start + nxt.start()] if nxt else t[start:]
             body = body.strip()
             if body.startswith("{"):
                 inner, _ = self._extract_braced(body, 0)
                 inner = inner or ""
                 row = self._emit_table(name, engine, None, "map", file_id)
                 for fm in re.finditer(
-                        r"(?:\?\s*)?([\w\"$@.-]+)\s*:\s*([^,\n]+)", inner):
-                    self._emit_column(row, fm.group(1).strip('"'),
-                                      fm.group(2).strip().rstrip(","), file_id)
+                    r"(?:\?\s*)?([\w\"$@.-]+)\s*:\s*([^,\n]+)", inner
+                ):
+                    self._emit_column(
+                        row,
+                        fm.group(1).strip('"'),
+                        fm.group(2).strip().rstrip(","),
+                        file_id,
+                    )
             else:
                 base = body.split("\n")[0][:120] or None
                 self._emit_type(name, "rule", base, None, None, file_id)
@@ -337,19 +366,23 @@ class SchemaDefinitionEngines:
     # DBML   (.dbml)
     # =====================================================================
     _DBML_TABLE = re.compile(
-        r"\bTable\s+([\w.\"]+)\s*(?:as\s+\w+\s*)?\{", re.IGNORECASE)
+        r"\bTable\s+([\w.\"]+)\s*(?:as\s+\w+\s*)?\{", re.IGNORECASE
+    )
     _DBML_ENUM = re.compile(r"\bEnum\s+([\w.\"]+)\s*\{([^}]*)\}", re.IGNORECASE)
     _DBML_REF = re.compile(
-        r"\bRef\s*\w*\s*:\s*([\w.\"]+)\s*([<>-])\s*([\w.\"]+)", re.IGNORECASE)
+        r"\bRef\s*\w*\s*:\s*([\w.\"]+)\s*([<>-])\s*([\w.\"]+)", re.IGNORECASE
+    )
 
     def _parse_dbml(self, text, engine, file_id):
         t = re.sub(r"//[^\n]*", "", text)
         t = re.sub(r"/\*.*?\*/", "", t, flags=re.DOTALL)
         for m in self._DBML_ENUM.finditer(t):
-            vals = [v.strip().strip('"') for v in
-                    re.split(r"[\n,]", m.group(2)) if v.strip()]
-            self._emit_type(m.group(1).strip('"'), "enum", None, vals,
-                            None, file_id)
+            vals = [
+                v.strip().strip('"')
+                for v in re.split(r"[\n,]", m.group(2))
+                if v.strip()
+            ]
+            self._emit_type(m.group(1).strip('"'), "enum", None, vals, None, file_id)
         for m in self._DBML_TABLE.finditer(t):
             name = m.group(1).strip('"')
             inner, _ = self._extract_braced(t, t.index("{", m.start()))
@@ -374,24 +407,41 @@ class SchemaDefinitionEngines:
                     tgt = rm.group(1).strip('"').split(".")
                     ref_t = tgt[0]
                     ref_c = tgt[1] if len(tgt) > 1 else None
-                self._emit_column(row, cm.group(1).strip('"'), cm.group(2),
-                                  file_id, keys=keys,
-                                  nullable="not null" not in settings,
-                                  ref_table=ref_t, ref_col=ref_c)
+                self._emit_column(
+                    row,
+                    cm.group(1).strip('"'),
+                    cm.group(2),
+                    file_id,
+                    keys=keys,
+                    nullable="not null" not in settings,
+                    ref_table=ref_t,
+                    ref_col=ref_c,
+                )
         for m in self._DBML_REF.finditer(t):
             left = m.group(1).strip('"').split(".")
             right = m.group(3).strip('"').split(".")
             self._emit_relation_key(left, right, engine, file_id)
 
     def _emit_relation_key(self, left, right, engine, file_id):
-        tbl = self._resolve_table_id(left[0]) if hasattr(self, "_resolve_table_id") else None
-        self.schema_keys_table.append({
-            "key_id": self._next("key"), "key_name": None, "key_type": "foreign",
-            "table_id": tbl, "column_ids": [],
-            "referenced_table": right[0],
-            "referenced_columns": right[1:] if len(right) > 1 else [],
-            "on_delete": None, "on_update": None, "file_id": file_id,
-        })
+        tbl = (
+            self._resolve_table_id(left[0])
+            if hasattr(self, "_resolve_table_id")
+            else None
+        )
+        self.schema_keys_table.append(
+            {
+                "key_id": self._next("key"),
+                "key_name": None,
+                "key_type": "foreign",
+                "table_id": tbl,
+                "column_ids": [],
+                "referenced_table": right[0],
+                "referenced_columns": right[1:] if len(right) > 1 else [],
+                "on_delete": None,
+                "on_update": None,
+                "file_id": file_id,
+            }
+        )
 
     # =====================================================================
     # YANG   (.yang)
@@ -403,22 +453,34 @@ class SchemaDefinitionEngines:
         for m in re.finditer(r"\btypedef\s+([\w.-]+)\s*\{", t):
             inner, _ = self._extract_braced(t, t.index("{", m.start()))
             base = re.search(r"\btype\s+([\w:.-]+)", inner or "")
-            self._emit_type(m.group(1), "typedef",
-                            base.group(1) if base else None, None, None, file_id)
-        for m in re.finditer(r"(?<![\w-])(container|list|grouping)\s+([\w.-]+)\s*\{", t):
+            self._emit_type(
+                m.group(1),
+                "typedef",
+                base.group(1) if base else None,
+                None,
+                None,
+                file_id,
+            )
+        for m in re.finditer(
+            r"(?<![\w-])(container|list|grouping)\s+([\w.-]+)\s*\{", t
+        ):
             kind, name = m.group(1), m.group(2)
             inner, _ = self._extract_braced(t, t.index("{", m.start()))
             inner = inner or ""
             row = self._emit_table(name, engine, ns, kind, file_id)
-            for lm in re.finditer(r"\b(leaf|leaf-list)\s+([\w.-]+)\s*\{([^{}]*)\}",
-                                  inner):
+            for lm in re.finditer(
+                r"\b(leaf|leaf-list)\s+([\w.-]+)\s*\{([^{}]*)\}", inner
+            ):
                 ty = re.search(r"\btype\s+([\w:.-]+)", lm.group(3))
-                self._emit_column(row, lm.group(2),
-                                  ty.group(1) if ty else None, file_id,
-                                  keys="list" if lm.group(1) == "leaf-list" else None)
+                self._emit_column(
+                    row,
+                    lm.group(2),
+                    ty.group(1) if ty else None,
+                    file_id,
+                    keys="list" if lm.group(1) == "leaf-list" else None,
+                )
         for m in re.finditer(r"\b(rpc|notification|action)\s+([\w.-]+)\s*[\{;]", t):
-            self._emit_method(m.group(2), m.group(1), None, engine, None,
-                              None, file_id)
+            self._emit_method(m.group(2), m.group(1), None, engine, None, None, file_id)
 
     # =====================================================================
     # SNMP MIB / ASN.1   (.mib)
@@ -430,16 +492,21 @@ class SchemaDefinitionEngines:
         # SEQUENCE types -> tables
         for m in re.finditer(r"\b([\w-]+)\s*::=\s*SEQUENCE\s*\{([^}]*)\}", t):
             row = self._emit_table(m.group(1), engine, ns, "sequence", file_id)
-            for fm in re.finditer(r"([\w-]+)\s+([\w-]+(?:\s*\([^)]*\))?)",
-                                  m.group(2)):
+            for fm in re.finditer(r"([\w-]+)\s+([\w-]+(?:\s*\([^)]*\))?)", m.group(2)):
                 self._emit_column(row, fm.group(1), fm.group(2).strip(), file_id)
         # OBJECT-TYPE definitions -> managed objects (types w/ syntax)
         for m in re.finditer(
-                r"\b([\w-]+)\s+OBJECT-TYPE\b(.*?)::=\s*\{([^}]*)\}", t, re.DOTALL):
+            r"\b([\w-]+)\s+OBJECT-TYPE\b(.*?)::=\s*\{([^}]*)\}", t, re.DOTALL
+        ):
             syn = re.search(r"SYNTAX\s+([\w-]+(?:\s*\([^)]*\))?)", m.group(2))
-            self._emit_type(m.group(1), "object-type",
-                            syn.group(1).strip() if syn else None, None,
-                            None, file_id)
+            self._emit_type(
+                m.group(1),
+                "object-type",
+                syn.group(1).strip() if syn else None,
+                None,
+                None,
+                file_id,
+            )
 
     # =====================================================================
     # ROS message / service   (.msg / .srv)
@@ -460,9 +527,14 @@ class SchemaDefinitionEngines:
         name = name or "Message"
         row = self._emit_table(name, engine, None, "message", file_id)
         for ty, fld, const in self._ros_fields(text):
-            self._emit_column(row, fld, ty, file_id,
-                              keys="const" if const is not None else None,
-                              value=const)
+            self._emit_column(
+                row,
+                fld,
+                ty,
+                file_id,
+                keys="const" if const is not None else None,
+                value=const,
+            )
         return row
 
     def _parse_ros_srv(self, text, engine, file_id, name=None):
@@ -480,8 +552,8 @@ class SchemaDefinitionEngines:
         t = re.sub(r"#[^\n]*", "", text)
         # each shape: <subject> ... a sh:NodeShape ... up to statement-terminating .
         for m in re.finditer(
-                r"([:\w]+)\s+((?:[^.;]|;[^\n])*?a\s+sh:NodeShape[^.]*?)\.",
-                t, re.DOTALL):
+            r"([:\w]+)\s+((?:[^.;]|;[^\n])*?a\s+sh:NodeShape[^.]*?)\.", t, re.DOTALL
+        ):
             subj, body = m.group(1), m.group(2)
             tgt = re.search(r"sh:targetClass\s+([:\w]+)", body)
             name = _local(tgt.group(1)) if tgt else _local(subj)
@@ -492,10 +564,14 @@ class SchemaDefinitionEngines:
                 dt = re.search(r"sh:(?:datatype|class)\s+([:\w]+)", seg)
                 mincount = re.search(r"sh:minCount\s+(\d+)", seg)
                 keys = "required" if (mincount and mincount.group(1) != "0") else None
-                self._emit_column(row, pname,
-                                  _local(dt.group(1)) if dt else None, file_id,
-                                  keys=keys,
-                                  nullable=not (mincount and mincount.group(1) != "0"))
+                self._emit_column(
+                    row,
+                    pname,
+                    _local(dt.group(1)) if dt else None,
+                    file_id,
+                    keys=keys,
+                    nullable=not (mincount and mincount.group(1) != "0"),
+                )
 
     # =====================================================================
     # EBNF grammar   (.ebnf)
@@ -505,8 +581,9 @@ class SchemaDefinitionEngines:
         # split into productions terminated by ';' when present, else by lines
         chunks = re.split(r";\s*", t) if ";" in t else t.splitlines()
         for chunk in chunks:
-            m = re.match(r"\s*[<]?([\w.\- ]+?)[>]?\s*(?:::=|=|:)\s*(.+)",
-                         chunk, re.DOTALL)
+            m = re.match(
+                r"\s*[<]?([\w.\- ]+?)[>]?\s*(?:::=|=|:)\s*(.+)", chunk, re.DOTALL
+            )
             if not m:
                 continue
             name = m.group(1).strip()
@@ -515,8 +592,9 @@ class SchemaDefinitionEngines:
             for r in re.findall(r"[<]?([A-Za-z][\w.\-]*)[>]?", rhs):
                 if r and r not in refs and r != name:
                     refs.append(r)
-            self._emit_type(name, "production", rhs.strip()[:120] or None,
-                            refs, None, file_id)
+            self._emit_type(
+                name, "production", rhs.strip()[:120] or None, refs, None, file_id
+            )
 
     # =====================================================================
     # JSON Schema document   (.jsonschema)
@@ -540,13 +618,13 @@ class SchemaDefinitionEngines:
 
     def _emit_json_object(self, name, schema, engine, file_id, kind):
         if schema.get("enum"):
-            self._emit_type(name, "enum", schema.get("type"),
-                            list(schema["enum"]), None, file_id)
+            self._emit_type(
+                name, "enum", schema.get("type"), list(schema["enum"]), None, file_id
+            )
         props = schema.get("properties")
         if not isinstance(props, dict):
             if schema.get("type") and not schema.get("enum"):
-                self._emit_type(name, "scalar", schema.get("type"), None,
-                                None, file_id)
+                self._emit_type(name, "scalar", schema.get("type"), None, None, file_id)
             return None
         required = set(schema.get("required") or [])
         row = self._emit_table(name, engine, None, kind, file_id)
@@ -559,12 +637,20 @@ class SchemaDefinitionEngines:
                 ptype = "|".join(str(x) for x in ptype)
             fmt = pv.get("format")
             tstr = f"{ptype}:{fmt}" if fmt else ptype
-            self._emit_column(row, pn, tstr, file_id,
-                              keys="required" if pn in required else None,
-                              nullable=pn not in required,
-                              default=_json_default(pv),
-                              value=("|".join(map(str, pv["enum"]))
-                                     if isinstance(pv.get("enum"), list) else None))
+            self._emit_column(
+                row,
+                pn,
+                tstr,
+                file_id,
+                keys="required" if pn in required else None,
+                nullable=pn not in required,
+                default=_json_default(pv),
+                value=(
+                    "|".join(map(str, pv["enum"]))
+                    if isinstance(pv.get("enum"), list)
+                    else None
+                ),
+            )
         return row
 
     # =====================================================================
@@ -594,14 +680,28 @@ class SchemaDefinitionEngines:
                 if not isinstance(ops, dict):
                     continue
                 for verb, op in ops.items():
-                    if verb.lower() not in ("get", "post", "put", "delete",
-                                            "patch", "head", "options"):
+                    if verb.lower() not in (
+                        "get",
+                        "post",
+                        "put",
+                        "delete",
+                        "patch",
+                        "head",
+                        "options",
+                    ):
                         continue
-                    opid = (op.get("operationId")
-                            if isinstance(op, dict) else None) \
-                        or f"{verb.upper()} {route}"
-                    self._emit_method(opid, "operation", None, engine,
-                                      f"{verb.upper()} {route}", None, file_id)
+                    opid = (
+                        op.get("operationId") if isinstance(op, dict) else None
+                    ) or f"{verb.upper()} {route}"
+                    self._emit_method(
+                        opid,
+                        "operation",
+                        None,
+                        engine,
+                        f"{verb.upper()} {route}",
+                        None,
+                        file_id,
+                    )
 
     # =====================================================================
     # RAML   (.raml)
@@ -619,21 +719,39 @@ class SchemaDefinitionEngines:
                     row = self._emit_table(tn, engine, ns, "type", file_id)
                     for pn, pv in tv["properties"].items():
                         pt = pv.get("type") if isinstance(pv, dict) else pv
-                        self._emit_column(row, pn.rstrip("?"),
-                                          pt if isinstance(pt, str) else None,
-                                          file_id,
-                                          nullable=pn.endswith("?"))
+                        self._emit_column(
+                            row,
+                            pn.rstrip("?"),
+                            pt if isinstance(pt, str) else None,
+                            file_id,
+                            nullable=pn.endswith("?"),
+                        )
                 else:
-                    self._emit_type(tn, "type",
-                                    tv.get("type") if isinstance(tv, dict) else
-                                    (tv if isinstance(tv, str) else None),
-                                    None, None, file_id)
+                    self._emit_type(
+                        tn,
+                        "type",
+                        (
+                            tv.get("type")
+                            if isinstance(tv, dict)
+                            else (tv if isinstance(tv, str) else None)
+                        ),
+                        None,
+                        None,
+                        file_id,
+                    )
         for key, val in doc.items():
             if key.startswith("/") and isinstance(val, dict):
                 for verb in ("get", "post", "put", "delete", "patch"):
                     if verb in val:
-                        self._emit_method(f"{verb.upper()} {key}", "operation",
-                                          None, engine, None, None, file_id)
+                        self._emit_method(
+                            f"{verb.upper()} {key}",
+                            "operation",
+                            None,
+                            engine,
+                            None,
+                            None,
+                            file_id,
+                        )
 
     # =====================================================================
     # Kubernetes CRD   (.crd)
@@ -652,12 +770,17 @@ class SchemaDefinitionEngines:
             versions = spec.get("versions")
             if isinstance(versions, list) and versions:
                 v0 = versions[0]
-                schema = (((v0.get("schema") or {}).get("openAPIV3Schema"))
-                          if isinstance(v0, dict) else None)
+                schema = (
+                    ((v0.get("schema") or {}).get("openAPIV3Schema"))
+                    if isinstance(v0, dict)
+                    else None
+                )
             if schema is None:  # v1beta1
-                schema = ((spec.get("validation") or {}).get("openAPIV3Schema"))
+                schema = (spec.get("validation") or {}).get("openAPIV3Schema")
             row = self._emit_table(kind, engine, group, "custom-resource", file_id)
-            props = (schema or {}).get("properties") if isinstance(schema, dict) else None
+            props = (
+                (schema or {}).get("properties") if isinstance(schema, dict) else None
+            )
             if isinstance(props, dict):
                 for pn, pv in props.items():
                     pt = pv.get("type") if isinstance(pv, dict) else None
@@ -683,8 +806,7 @@ class SchemaDefinitionEngines:
         if isinstance(enums, dict):
             for en, ev in enums.items():
                 vals = list(ev.values()) if isinstance(ev, dict) else []
-                self._emit_type(en, "enum", None,
-                                [str(x) for x in vals], None, file_id)
+                self._emit_type(en, "enum", None, [str(x) for x in vals], None, file_id)
 
     def _emit_ksy_type(self, name, node, engine, file_id):
         seq = node.get("seq")
@@ -695,13 +817,18 @@ class SchemaDefinitionEngines:
         if isinstance(seq, list):
             for fld in seq:
                 if isinstance(fld, dict):
-                    self._emit_column(row, str(fld.get("id", "?")),
-                                      _ksy_type(fld), file_id)
+                    self._emit_column(
+                        row, str(fld.get("id", "?")), _ksy_type(fld), file_id
+                    )
         if isinstance(insts, dict):
             for iname, iv in insts.items():
-                self._emit_column(row, iname,
-                                  _ksy_type(iv) if isinstance(iv, dict) else None,
-                                  file_id, keys="instance")
+                self._emit_column(
+                    row,
+                    iname,
+                    _ksy_type(iv) if isinstance(iv, dict) else None,
+                    file_id,
+                    keys="instance",
+                )
 
     # =====================================================================
     # Xcode String Catalog   (.xcstrings)
@@ -717,15 +844,20 @@ class SchemaDefinitionEngines:
         strings = doc.get("strings")
         if not isinstance(strings, dict):
             return
-        row = self._emit_table("StringCatalog", engine, src, "string-catalog",
-                               file_id)
+        row = self._emit_table("StringCatalog", engine, src, "string-catalog", file_id)
         for key, entry in strings.items():
             comment = entry.get("comment") if isinstance(entry, dict) else None
-            locs = (entry.get("localizations")
-                    if isinstance(entry, dict) else None) or {}
-            self._emit_column(row, key or "(base)", "localized-string", file_id,
-                              value=comment,
-                              default=(",".join(sorted(locs)) if locs else None))
+            locs = (
+                entry.get("localizations") if isinstance(entry, dict) else None
+            ) or {}
+            self._emit_column(
+                row,
+                key or "(base)",
+                "localized-string",
+                file_id,
+                value=comment,
+                default=(",".join(sorted(locs)) if locs else None),
+            )
 
 
 def _json_default(schema):

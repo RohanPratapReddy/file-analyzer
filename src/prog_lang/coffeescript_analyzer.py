@@ -10,7 +10,7 @@
 #   count = 0                             -> top-level variable
 # Literate CoffeeScript keeps only indented (>=4 col / tab) lines as code.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -21,13 +21,11 @@ class CoffeeScriptAnalyzer(RegexCodeAnalyzer):
     BLOCK_COMMENTS = (("###", "###"),)
 
     _REQUIRE = re.compile(
-        r"^(?:\{([^}]*)\}|([A-Za-z_$][\w$]*))\s*=\s*require\s*\(?\s*['\"]([^'\"]+)['\"]")
-    _CLASS = re.compile(
-        r"^class\s+([A-Za-z_$][\w$.]*)(?:\s+extends\s+([\w$.]+))?")
-    _METHOD = re.compile(
-        r"^([A-Za-z_$@][\w$]*)\s*:\s*(?:\(([^)]*)\))?\s*[-=]>")
-    _FUNC = re.compile(
-        r"^([A-Za-z_$][\w$.]*)\s*[:=]\s*(?:\(([^)]*)\))?\s*[-=]>")
+        r"^(?:\{([^}]*)\}|([A-Za-z_$][\w$]*))\s*=\s*require\s*\(?\s*['\"]([^'\"]+)['\"]"
+    )
+    _CLASS = re.compile(r"^class\s+([A-Za-z_$][\w$.]*)(?:\s+extends\s+([\w$.]+))?")
+    _METHOD = re.compile(r"^([A-Za-z_$@][\w$]*)\s*:\s*(?:\(([^)]*)\))?\s*[-=]>")
+    _FUNC = re.compile(r"^([A-Za-z_$][\w$.]*)\s*[:=]\s*(?:\(([^)]*)\))?\s*[-=]>")
     _VAR = re.compile(r"^([A-Za-z_$][\w$]*)\s*=\s*(.+?)\s*$")
 
     def _litcode(self, text):
@@ -40,7 +38,7 @@ class CoffeeScriptAnalyzer(RegexCodeAnalyzer):
             elif line.startswith("    "):
                 out.append(line[4:])
             else:
-                out.append("")   # prose -> blank
+                out.append("")  # prose -> blank
         return "\n".join(out)
 
     def _prep(self, text, path):
@@ -55,7 +53,7 @@ class CoffeeScriptAnalyzer(RegexCodeAnalyzer):
     def _extract_entities(self, file_id, text, path):
         text = self._prep(text, path)
         classes = []
-        scopes = []   # stack of {is_class, header_indent, ...}
+        scopes = []  # stack of {is_class, header_indent, ...}
 
         for raw in text.splitlines():
             if not raw.strip():
@@ -82,8 +80,14 @@ class CoffeeScriptAnalyzer(RegexCodeAnalyzer):
                     p = cm.group(2).split(".")[-1]
                     if p in self._class_registry:
                         parents.append(self._class_registry[p])
-                entry = {"name": name, "parents": parents, "methods": [],
-                         "attrs": [], "header_indent": ind, "is_class": True}
+                entry = {
+                    "name": name,
+                    "parents": parents,
+                    "methods": [],
+                    "attrs": [],
+                    "header_indent": ind,
+                    "is_class": True,
+                }
                 classes.append(entry)
                 scopes.append(entry)
                 continue
@@ -93,9 +97,15 @@ class CoffeeScriptAnalyzer(RegexCodeAnalyzer):
                 if mm:
                     arg_ids = self._params(mm.group(2) or "")
                     fid = self._add_function(
-                        file_id, mm.group(1).lstrip("@"), arg_ids, [],
+                        file_id,
+                        mm.group(1).lstrip("@"),
+                        arg_ids,
+                        [],
                         class_id=self._class_registry.get(cur_class["name"]),
-                        description="constructor" if mm.group(1) == "constructor" else None)
+                        description=(
+                            "constructor" if mm.group(1) == "constructor" else None
+                        ),
+                    )
                     cur_class["methods"].append(fid)
                     scopes.append({"is_class": False, "header_indent": ind})
                     continue
@@ -114,9 +124,14 @@ class CoffeeScriptAnalyzer(RegexCodeAnalyzer):
                     continue
 
         for c in classes:
-            self._add_class(file_id, c["name"], description="coffeescript class",
-                            parent_ids=c["parents"], method_ids=c["methods"],
-                            attr_ids=c["attrs"])
+            self._add_class(
+                file_id,
+                c["name"],
+                description="coffeescript class",
+                parent_ids=c["parents"],
+                method_ids=c["methods"],
+                attr_ids=c["attrs"],
+            )
 
     def _params(self, params):
         arg_ids = []

@@ -34,6 +34,21 @@ agent = ["mcp[cli]>=1.2,<2"]
 Homepage = "https://github.com/RohanPratapReddy/file-analyzer"
 Repository = "https://github.com/RohanPratapReddy/file-analyzer"
 
+# Code style is enforced in CI (`black --check` / `isort --check`). Pin the same
+# tool versions here and in .github/workflows/python-app.yml so a local run and
+# the runner agree byte-for-byte. isort's "black" profile makes the two agree on
+# import wrapping.
+# target-version caps at py310 to match the CI runner (actions/setup-python
+# 3.10): black skips its AST-equivalence safety check when the running Python is
+# older than a listed target, and the emitted style is identical for py39-py310.
+[tool.black]
+line-length = 88
+target-version = ["py39", "py310"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
 [project.scripts]
 # Invoke from anywhere, no `python -m` and no specific cwd:
 #     file-analyzer /path/to/repo --out ./artifacts --quiet

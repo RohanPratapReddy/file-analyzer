@@ -14,41 +14,48 @@
 #   DATA gv_count TYPE i.                                     -> variable (top level)
 #   TYPE-POOLS abap.                                          -> import
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
 class AbapAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "abap"
     EXTENSIONS = (".abap",)
-    LINE_COMMENTS = ('"',)          # inline comment; full-line '*' handled in _clean
+    LINE_COMMENTS = ('"',)  # inline comment; full-line '*' handled in _clean
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ("'", "`")
 
     _CLASS = re.compile(
         r"^\s*CLASS\s+([A-Za-z_]\w*)\s+DEFINITION"
         r"(?:.*?INHERITING\s+FROM\s+([A-Za-z_]\w*))?",
-        re.IGNORECASE | re.DOTALL)
+        re.IGNORECASE | re.DOTALL,
+    )
     _INTERFACE = re.compile(r"^\s*INTERFACE\s+([A-Za-z_]\w*)", re.IGNORECASE)
     _END_CLASS = re.compile(r"^\s*END(?:CLASS|INTERFACE)\b", re.IGNORECASE)
-    _CLASS_IMPL = re.compile(r"^\s*CLASS\s+([A-Za-z_]\w*)\s+IMPLEMENTATION", re.IGNORECASE)
+    _CLASS_IMPL = re.compile(
+        r"^\s*CLASS\s+([A-Za-z_]\w*)\s+IMPLEMENTATION", re.IGNORECASE
+    )
     _METHODS = re.compile(r"^\s*(?:CLASS-)?METHODS?\s+([A-Za-z_]\w*)", re.IGNORECASE)
-    _METHOD_IMPL = re.compile(r"^\s*METHOD\s+([A-Za-z_]\w*~)?([A-Za-z_]\w*)", re.IGNORECASE)
+    _METHOD_IMPL = re.compile(
+        r"^\s*METHOD\s+([A-Za-z_]\w*~)?([A-Za-z_]\w*)", re.IGNORECASE
+    )
     _FORM = re.compile(r"^\s*FORM\s+([A-Za-z_]\w*)", re.IGNORECASE)
     _FUNCTION = re.compile(r"^\s*FUNCTION\s+([A-Za-z_/]\w*)", re.IGNORECASE)
-    _DATA = re.compile(
-        r"^\s*(?:CLASS-)?DATA\s*:?\s+([A-Za-z_]\w*)", re.IGNORECASE)
+    _DATA = re.compile(r"^\s*(?:CLASS-)?DATA\s*:?\s+([A-Za-z_]\w*)", re.IGNORECASE)
     _CONST = re.compile(r"^\s*CONSTANTS\s*:?\s+([A-Za-z_]\w*)", re.IGNORECASE)
-    _TYPEPOOL = re.compile(r"^\s*TYPE-POOLS?\s+([A-Za-z_/]\w*)",
-                           re.IGNORECASE | re.MULTILINE)
-    _IMPORTING = re.compile(r"\bIMPORTING\b(.*?)(?:\bEXPORTING\b|\bCHANGING\b|"
-                            r"\bRETURNING\b|\bRAISING\b|\bEXCEPTIONS\b|\.|$)",
-                            re.IGNORECASE | re.DOTALL)
+    _TYPEPOOL = re.compile(
+        r"^\s*TYPE-POOLS?\s+([A-Za-z_/]\w*)", re.IGNORECASE | re.MULTILINE
+    )
+    _IMPORTING = re.compile(
+        r"\bIMPORTING\b(.*?)(?:\bEXPORTING\b|\bCHANGING\b|"
+        r"\bRETURNING\b|\bRAISING\b|\bEXCEPTIONS\b|\.|$)",
+        re.IGNORECASE | re.DOTALL,
+    )
 
     def _clean(self, text):
         out = []
         for line in text.splitlines():
-            if line[:1] == "*":            # column-1 full-line comment
+            if line[:1] == "*":  # column-1 full-line comment
                 out.append("")
             else:
                 out.append(line)
@@ -69,7 +76,7 @@ class AbapAnalyzer(RegexCodeAnalyzer):
         for m in self._TYPEPOOL.finditer(text):
             self._add_import(file_id, m.group(1), m.group(1))
 
-        seen_methods = set()      # (class_id, method_name) already emitted
+        seen_methods = set()  # (class_id, method_name) already emitted
         i = 0
         while i < n:
             line = lines[i]
@@ -95,8 +102,14 @@ class AbapAnalyzer(RegexCodeAnalyzer):
                             k += 1
                             stmt += " " + lines[k]
                         arg_ids = self._importing_args(stmt)
-                        fid = self._add_function(file_id, mm.group(1), arg_ids, [],
-                                                 class_id=cid, description="abap method")
+                        fid = self._add_function(
+                            file_id,
+                            mm.group(1),
+                            arg_ids,
+                            [],
+                            class_id=cid,
+                            description="abap method",
+                        )
                         methods.append(fid)
                         seen_methods.add((cid, mm.group(1).lower()))
                     else:
@@ -104,9 +117,14 @@ class AbapAnalyzer(RegexCodeAnalyzer):
                         if dm:
                             attrs.append(self._add_arg(dm.group(1)))
                     i += 1
-                self._add_class(file_id, name,
-                                description="abap interface" if is_iface else "abap class",
-                                parent_ids=parents, method_ids=methods, attr_ids=attrs)
+                self._add_class(
+                    file_id,
+                    name,
+                    description="abap interface" if is_iface else "abap class",
+                    parent_ids=parents,
+                    method_ids=methods,
+                    attr_ids=attrs,
+                )
                 i += 1
                 continue
 
@@ -116,13 +134,21 @@ class AbapAnalyzer(RegexCodeAnalyzer):
                 cname = impl.group(1)
                 cid = self._class_registry.get(cname)
                 i += 1
-                while i < n and not re.match(r"^\s*ENDCLASS\b", lines[i], re.IGNORECASE):
+                while i < n and not re.match(
+                    r"^\s*ENDCLASS\b", lines[i], re.IGNORECASE
+                ):
                     mi = self._METHOD_IMPL.match(lines[i])
                     if mi:
                         mname = mi.group(2)
                         if (cid, mname.lower()) not in seen_methods:
-                            self._add_function(file_id, mname, [], [], class_id=cid,
-                                               description="abap method impl")
+                            self._add_function(
+                                file_id,
+                                mname,
+                                [],
+                                [],
+                                class_id=cid,
+                                description="abap method impl",
+                            )
                             seen_methods.add((cid, mname.lower()))
                     i += 1
                 i += 1
@@ -131,12 +157,16 @@ class AbapAnalyzer(RegexCodeAnalyzer):
             # ---- top-level routines / data (outside any class) ----
             fm = self._FORM.match(line)
             if fm:
-                self._add_function(file_id, fm.group(1), [], [], description="abap form")
+                self._add_function(
+                    file_id, fm.group(1), [], [], description="abap form"
+                )
                 i += 1
                 continue
             fn = self._FUNCTION.match(line)
             if fn:
-                self._add_function(file_id, fn.group(1), [], [], description="abap function")
+                self._add_function(
+                    file_id, fn.group(1), [], [], description="abap function"
+                )
                 i += 1
                 continue
             dm = self._DATA.match(line) or self._CONST.match(line)
@@ -152,7 +182,10 @@ class AbapAnalyzer(RegexCodeAnalyzer):
         if not im:
             return arg_ids
         seg = im.group(1)
-        for pm in re.finditer(r"(?:VALUE\()?([A-Za-z_]\w*)\)?\s+TYPE\s+([A-Za-z_/]\w*)",
-                              seg, re.IGNORECASE):
+        for pm in re.finditer(
+            r"(?:VALUE\()?([A-Za-z_]\w*)\)?\s+TYPE\s+([A-Za-z_/]\w*)",
+            seg,
+            re.IGNORECASE,
+        ):
             arg_ids.append(self._add_arg(pm.group(1), pm.group(2)))
         return arg_ids

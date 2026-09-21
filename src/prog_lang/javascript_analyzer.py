@@ -1,26 +1,17 @@
 # Auto-extracted from code_analyzer.py (verbatim class body).
-import os
-import csv
-import json
-import re
-import ast
-import dis
-import inspect
-import traceback
-import subprocess
-import sqlite3
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
 from .tree_sitter_base import BaseTreeSitterAnalyzer
+
 
 class _SingleChild:
     """Tiny adapter so a single AST node can be fed to an ``_extract_entities``
     method that iterates ``root_node.children`` (used to unwrap ``export`` and to
     delegate one node to a superclass extractor)."""
+
     __slots__ = ("children",)
 
     def __init__(self, node):
         self.children = [node]
+
 
 class JavaScriptAnalyzer(BaseTreeSitterAnalyzer):
     """
@@ -31,15 +22,19 @@ class JavaScriptAnalyzer(BaseTreeSitterAnalyzer):
     extends chain, methods and fields.
     """
 
-    _FUNC_VALUE_TYPES = ("arrow_function", "function", "function_expression",
-                         "generator_function")
+    _FUNC_VALUE_TYPES = (
+        "arrow_function",
+        "function",
+        "function_expression",
+        "generator_function",
+    )
 
     def __init__(self, lang_key="javascript", extensions=None, **kwargs):
         super().__init__(
             lang_key=lang_key,
             extensions=extensions or [".js", ".jsx", ".mjs"],
             introspection_source="Reflect + Object.getOwnPropertyDescriptor + console.trace",
-            **kwargs
+            **kwargs,
         )
 
     def _register_types(self, root_node, source: bytes):
@@ -60,15 +55,26 @@ class JavaScriptAnalyzer(BaseTreeSitterAnalyzer):
             elif p.type in ("required_parameter", "optional_parameter"):
                 pat = p.child_by_field_name("pattern") or p.child_by_field_name("name")
                 tnode = p.child_by_field_name("type")
-                ttext = self._node_text(tnode, source).lstrip(":").strip() if tnode else None
-                arg_ids.append(self._ts_add_arg(
-                    self._node_text(pat, source) if pat else "arg", ttext))
+                ttext = (
+                    self._node_text(tnode, source).lstrip(":").strip()
+                    if tnode
+                    else None
+                )
+                arg_ids.append(
+                    self._ts_add_arg(
+                        self._node_text(pat, source) if pat else "arg", ttext
+                    )
+                )
             elif p.type == "assignment_pattern":
                 left = p.child_by_field_name("left")
                 right = p.child_by_field_name("right")
-                arg_ids.append(self._ts_add_arg(
-                    self._node_text(left, source) if left else "arg", None,
-                    self._node_text(right, source) if right else None))
+                arg_ids.append(
+                    self._ts_add_arg(
+                        self._node_text(left, source) if left else "arg",
+                        None,
+                        self._node_text(right, source) if right else None,
+                    )
+                )
             elif p.type in ("rest_pattern", "object_pattern", "array_pattern"):
                 arg_ids.append(self._ts_add_arg(self._node_text(p, source)))
         return arg_ids
@@ -77,7 +83,9 @@ class JavaScriptAnalyzer(BaseTreeSitterAnalyzer):
         """TS return type annotation, if present, becomes a single output row."""
         rt = node.child_by_field_name("return_type")
         if rt:
-            return [self._ts_add_output(self._node_text(rt, source).lstrip(":").strip())]
+            return [
+                self._ts_add_output(self._node_text(rt, source).lstrip(":").strip())
+            ]
         return []
 
     def _extract_entities(self, file_id: int, root_node, source: bytes):
@@ -96,8 +104,12 @@ class JavaScriptAnalyzer(BaseTreeSitterAnalyzer):
                 decl = child.child_by_field_name("declaration")
                 if decl is None:
                     for c in child.named_children:
-                        if c.type in ("class_declaration", "function_declaration",
-                                      "lexical_declaration", "variable_declaration"):
+                        if c.type in (
+                            "class_declaration",
+                            "function_declaration",
+                            "lexical_declaration",
+                            "variable_declaration",
+                        ):
                             decl = c
                             break
                 if decl is not None:
@@ -110,21 +122,33 @@ class JavaScriptAnalyzer(BaseTreeSitterAnalyzer):
         default entry point (e.g. a k6 VU function, an EdgeWorker handler).
         There is no name to bind, so record it under the name `default`."""
         for c in export_node.named_children:
-            if c.type in ("function_expression", "arrow_function",
-                          "generator_function", "async_function"):
+            if c.type in (
+                "function_expression",
+                "arrow_function",
+                "generator_function",
+                "async_function",
+            ):
                 arg_ids = self._js_params(c.child_by_field_name("parameters"), source)
                 out_ids = self._js_return_type(c, source)
-                self._ts_add_function(file_id, "default", arg_ids, out_ids,
-                                      description="default export function")
+                self._ts_add_function(
+                    file_id,
+                    "default",
+                    arg_ids,
+                    out_ids,
+                    description="default export function",
+                )
                 return
             if c.type in ("class", "class_expression"):
-                self._ts_add_class(file_id, "default",
-                                   description="default export class")
+                self._ts_add_class(
+                    file_id, "default", description="default export class"
+                )
                 return
 
     def _js_import(self, file_id, node, source: bytes):
         src_node = node.child_by_field_name("source")
-        source_str = self._node_text(src_node, source).strip('"\'') if src_node else "module"
+        source_str = (
+            self._node_text(src_node, source).strip("\"'") if src_node else "module"
+        )
         clause = None
         for c in node.named_children:
             if c.type == "import_clause":
@@ -138,8 +162,12 @@ class JavaScriptAnalyzer(BaseTreeSitterAnalyzer):
                 self._ts_add_import(file_id, self._node_text(c, source), source_str)
             elif c.type == "namespace_import":  # import * as ns
                 ident = c.named_children[-1] if c.named_children else None
-                self._ts_add_import(file_id, self._node_text(ident, source) if ident else "*",
-                                    source_str, alias="*")
+                self._ts_add_import(
+                    file_id,
+                    self._node_text(ident, source) if ident else "*",
+                    source_str,
+                    alias="*",
+                )
             elif c.type == "named_imports":
                 for spec in c.named_children:
                     if spec.type == "import_specifier":
@@ -147,10 +175,16 @@ class JavaScriptAnalyzer(BaseTreeSitterAnalyzer):
                         alias_n = spec.child_by_field_name("alias")
                         self._ts_add_import(
                             file_id,
-                            self._node_text(alias_n, source) if alias_n else (
-                                self._node_text(name_n, source) if name_n else "?"),
+                            (
+                                self._node_text(alias_n, source)
+                                if alias_n
+                                else (
+                                    self._node_text(name_n, source) if name_n else "?"
+                                )
+                            ),
                             source_str,
-                            alias=self._node_text(alias_n, source) if alias_n else None)
+                            alias=self._node_text(alias_n, source) if alias_n else None,
+                        )
 
     def _js_declaration(self, file_id, node, source: bytes):
         for decl in node.named_children:
@@ -160,13 +194,18 @@ class JavaScriptAnalyzer(BaseTreeSitterAnalyzer):
             name = self._node_text(name_node, source) if name_node else "anon"
             value = decl.child_by_field_name("value")
             if value is not None and value.type in self._FUNC_VALUE_TYPES:
-                arg_ids = self._js_params(value.child_by_field_name("parameters"), source)
+                arg_ids = self._js_params(
+                    value.child_by_field_name("parameters"), source
+                )
                 out_ids = self._js_return_type(value, source)
                 self._ts_add_function(file_id, name, arg_ids, out_ids)
             else:
-                self._ts_add_variable(file_id, name,
-                                      self._node_text(value, source) if value else None,
-                                      scope="module")
+                self._ts_add_variable(
+                    file_id,
+                    name,
+                    self._node_text(value, source) if value else None,
+                    scope="module",
+                )
 
     def _js_function(self, file_id, node, source: bytes, class_id=None):
         name_node = node.child_by_field_name("name")
@@ -198,19 +237,37 @@ class JavaScriptAnalyzer(BaseTreeSitterAnalyzer):
                 if member.type == "method_definition":
                     mname_n = member.child_by_field_name("name")
                     mname = self._node_text(mname_n, source) if mname_n else "method"
-                    arg_ids = self._js_params(member.child_by_field_name("parameters"), source)
+                    arg_ids = self._js_params(
+                        member.child_by_field_name("parameters"), source
+                    )
                     out_ids = self._js_return_type(member, source)
                     method_ids.append(
-                        self._ts_add_function(file_id, mname, arg_ids, out_ids, class_id=cls_id))
+                        self._ts_add_function(
+                            file_id, mname, arg_ids, out_ids, class_id=cls_id
+                        )
+                    )
                 elif member.type in ("field_definition", "public_field_definition"):
                     fn_n = member.child_by_field_name("name")
                     tnode = member.child_by_field_name("type")
-                    ttext = self._node_text(tnode, source).lstrip(":").strip() if tnode else None
-                    attr_ids.append(self._ts_add_arg(
-                        self._node_text(fn_n, source) if fn_n else "field", ttext))
+                    ttext = (
+                        self._node_text(tnode, source).lstrip(":").strip()
+                        if tnode
+                        else None
+                    )
+                    attr_ids.append(
+                        self._ts_add_arg(
+                            self._node_text(fn_n, source) if fn_n else "field", ttext
+                        )
+                    )
 
-        self._ts_add_class(file_id, name, description=f"{self.lang_key} class",
-                           parent_ids=parent_ids, method_ids=method_ids, attr_ids=attr_ids)
+        self._ts_add_class(
+            file_id,
+            name,
+            description=f"{self.lang_key} class",
+            parent_ids=parent_ids,
+            method_ids=method_ids,
+            attr_ids=attr_ids,
+        )
 
     def _collect_heritage_names(self, heritage, source: bytes):
         """extends/implements target names from a class_heritage node (JS + TS)."""
@@ -224,6 +281,7 @@ class JavaScriptAnalyzer(BaseTreeSitterAnalyzer):
                 names.append(self._node_text(c, source))
         return names
 
+
 class TypeScriptAnalyzer(JavaScriptAnalyzer):
     """
     TypeScript on top of the JS engine: adds interface, type-alias and enum
@@ -233,7 +291,9 @@ class TypeScriptAnalyzer(JavaScriptAnalyzer):
 
     def __init__(self, **kwargs):
         super().__init__(lang_key="typescript", extensions=[".ts", ".tsx"], **kwargs)
-        self.introspection_source = "reflect-metadata (design:paramtypes) + ts-morph compile-time AST"
+        self.introspection_source = (
+            "reflect-metadata (design:paramtypes) + ts-morph compile-time AST"
+        )
 
     def _register_types(self, root_node, source: bytes):
         for child in root_node.children:
@@ -243,14 +303,22 @@ class TypeScriptAnalyzer(JavaScriptAnalyzer):
         """Register a type name for stable class_id linkage, unwrapping the
         ambient (`declare ...`) and `export` wrappers that .d.ts files use."""
         t = child.type
-        if t in ("class_declaration", "interface_declaration",
-                 "enum_declaration", "type_alias_declaration",
-                 "internal_module"):
+        if t in (
+            "class_declaration",
+            "interface_declaration",
+            "enum_declaration",
+            "type_alias_declaration",
+            "internal_module",
+        ):
             name_node = child.child_by_field_name("name")
             if name_node:
                 self._ts_register_class(self._node_text(name_node, source))
-        elif t in ("ambient_declaration", "export_statement",
-                   "statement_block", "expression_statement"):
+        elif t in (
+            "ambient_declaration",
+            "export_statement",
+            "statement_block",
+            "expression_statement",
+        ):
             for c in child.named_children:
                 self._ts_register_decl(c, source)
 
@@ -262,8 +330,11 @@ class TypeScriptAnalyzer(JavaScriptAnalyzer):
             elif t == "type_alias_declaration":
                 name_node = child.child_by_field_name("name")
                 if name_node:
-                    self._ts_add_class(file_id, self._node_text(name_node, source),
-                                       description="TypeScript type alias")
+                    self._ts_add_class(
+                        file_id,
+                        self._node_text(name_node, source),
+                        description="TypeScript type alias",
+                    )
             elif t == "enum_declaration":
                 self._ts_enum(file_id, child, source)
             elif t == "ambient_declaration":
@@ -291,7 +362,10 @@ class TypeScriptAnalyzer(JavaScriptAnalyzer):
                 if decl is None:
                     for c in child.named_children:
                         if c.type.endswith("_declaration") or c.type in (
-                                "function_signature", "internal_module", "module"):
+                            "function_signature",
+                            "internal_module",
+                            "module",
+                        ):
                             decl = c
                             break
                 if decl is not None:
@@ -307,8 +381,9 @@ class TypeScriptAnalyzer(JavaScriptAnalyzer):
         direct child (there is no `return_type` field as on real functions)."""
         for c in node.named_children:
             if c.type == "type_annotation":
-                return [self._ts_add_output(
-                    self._node_text(c, source).lstrip(":").strip())]
+                return [
+                    self._ts_add_output(self._node_text(c, source).lstrip(":").strip())
+                ]
         return []
 
     def _ts_function_signature(self, file_id, node, source: bytes):
@@ -328,7 +403,7 @@ class TypeScriptAnalyzer(JavaScriptAnalyzer):
             elif c.type == "statement_block":
                 body = c
         if name:
-            name = name.strip('"\'')          # `declare module "x"` -> x
+            name = name.strip("\"'")  # `declare module "x"` -> x
         if name:
             self._ts_add_class(file_id, name, description="TypeScript namespace")
         if body is not None:
@@ -347,18 +422,35 @@ class TypeScriptAnalyzer(JavaScriptAnalyzer):
                 if member.type == "method_signature":
                     mname_n = member.child_by_field_name("name")
                     mname = self._node_text(mname_n, source) if mname_n else "method"
-                    arg_ids = self._js_params(member.child_by_field_name("parameters"), source)
+                    arg_ids = self._js_params(
+                        member.child_by_field_name("parameters"), source
+                    )
                     out_ids = self._js_return_type(member, source)
                     method_ids.append(
-                        self._ts_add_function(file_id, mname, arg_ids, out_ids, class_id=cls_id))
+                        self._ts_add_function(
+                            file_id, mname, arg_ids, out_ids, class_id=cls_id
+                        )
+                    )
                 elif member.type == "property_signature":
                     fn_n = member.child_by_field_name("name")
                     tnode = member.child_by_field_name("type")
-                    ttext = self._node_text(tnode, source).lstrip(":").strip() if tnode else None
-                    attr_ids.append(self._ts_add_arg(
-                        self._node_text(fn_n, source) if fn_n else "prop", ttext))
-        self._ts_add_class(file_id, name, description="TypeScript interface",
-                           method_ids=method_ids, attr_ids=attr_ids)
+                    ttext = (
+                        self._node_text(tnode, source).lstrip(":").strip()
+                        if tnode
+                        else None
+                    )
+                    attr_ids.append(
+                        self._ts_add_arg(
+                            self._node_text(fn_n, source) if fn_n else "prop", ttext
+                        )
+                    )
+        self._ts_add_class(
+            file_id,
+            name,
+            description="TypeScript interface",
+            method_ids=method_ids,
+            attr_ids=attr_ids,
+        )
 
     def _ts_enum(self, file_id, node, source: bytes):
         name_node = node.child_by_field_name("name")
@@ -370,8 +462,14 @@ class TypeScriptAnalyzer(JavaScriptAnalyzer):
                 if member.type in ("property_identifier", "enum_assignment"):
                     if member.type == "enum_assignment":
                         nm = member.child_by_field_name("name")
-                        label = self._node_text(nm, source) if nm else self._node_text(member, source)
+                        label = (
+                            self._node_text(nm, source)
+                            if nm
+                            else self._node_text(member, source)
+                        )
                     else:
                         label = self._node_text(member, source)
                     attr_ids.append(self._ts_add_arg(label, "EnumMember"))
-        self._ts_add_class(file_id, name, description="TypeScript enum", attr_ids=attr_ids)
+        self._ts_add_class(
+            file_id, name, description="TypeScript enum", attr_ids=attr_ids
+        )

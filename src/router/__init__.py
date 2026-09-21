@@ -8,14 +8,14 @@ unit is ``worker`` (invoked as a subprocess by each plane); ``planes`` orchestra
 the two planes.
 """
 
+from .planes import PlaneError, RouterPlanes
 from .routing import (
     ANALYZER_CLASSES,
-    resolve_analyzer,
-    reconstruct_paths,
     build_mapping,
     group_into_shards,
+    reconstruct_paths,
+    resolve_analyzer,
 )
-from .planes import RouterPlanes, PlaneError
 
 __all__ = [
     "ANALYZER_CLASSES",

@@ -20,12 +20,24 @@
 #
 # Comments are '//' and '/* */'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _KEYWORDS = {
-    "if", "for", "while", "switch", "return", "else", "do", "case",
-    "sizeof", "new", "delete", "catch", "typedef", "template",
+    "if",
+    "for",
+    "while",
+    "switch",
+    "return",
+    "else",
+    "do",
+    "case",
+    "sizeof",
+    "new",
+    "delete",
+    "catch",
+    "typedef",
+    "template",
 }
 
 
@@ -42,15 +54,19 @@ class MQLAnalyzer(RegexCodeAnalyzer):
     _DEFINE = re.compile(r"^[ \t]*#\s*define\s+([A-Za-z_]\w*)", re.MULTILINE)
     _INPUT = re.compile(
         r"^[ \t]*(?:input|sinput|extern)\s+(?:const\s+)?"
-        r"[A-Za-z_][\w:]*\s+([A-Za-z_]\w*)", re.MULTILINE)
+        r"[A-Za-z_][\w:]*\s+([A-Za-z_]\w*)",
+        re.MULTILINE,
+    )
     _CLASS = re.compile(
-        r"^[ \t]*(?:class|struct|interface|union)\s+([A-Za-z_]\w*)",
-        re.MULTILINE)
+        r"^[ \t]*(?:class|struct|interface|union)\s+([A-Za-z_]\w*)", re.MULTILINE
+    )
     _ENUM = re.compile(r"^[ \t]*enum\s+([A-Za-z_]\w*)", re.MULTILINE)
     _FUNC = re.compile(
         r"^[ \t]*(?:static\s+|virtual\s+|const\s+)*"
         r"[A-Za-z_][\w:<>\*&\s]*?[\s\*&:]([A-Za-z_]\w*)\s*\(([^;{}]*)\)\s*"
-        r"(?:const\s*)?\{", re.MULTILINE)
+        r"(?:const\s*)?\{",
+        re.MULTILINE,
+    )
 
     def _args(self, blob):
         ids = []
@@ -94,5 +110,6 @@ class MQLAnalyzer(RegexCodeAnalyzer):
             name = m.group(1)
             if name in _KEYWORDS:
                 continue
-            self._add_function(file_id, name, self._args(m.group(2)), [],
-                               description="mql function")
+            self._add_function(
+                file_id, name, self._args(m.group(2)), [], description="mql function"
+            )

@@ -12,7 +12,7 @@
 #       make                                              -> routine
 #           do ... end
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -25,7 +25,8 @@ class EiffelAnalyzer(RegexCodeAnalyzer):
 
     _CLASS = re.compile(
         r"^\s*(?:deferred\s+|expanded\s+|frozen\s+)*class\s+([A-Z][A-Z0-9_]*)",
-        re.MULTILINE)
+        re.MULTILINE,
+    )
     _INHERIT = re.compile(r"^\s*inherit\b", re.IGNORECASE)
     _FEATURE = re.compile(r"^\s*feature\b", re.IGNORECASE)
     # a feature (routine or attribute) declared at feature-body indentation:
@@ -36,20 +37,68 @@ class EiffelAnalyzer(RegexCodeAnalyzer):
     _FEAT_DECL = re.compile(
         r"^\s{1,}([a-z]\w*(?:\s*,\s*[a-z]\w*)*)\s*"
         r"(?:\(([^)]*)\))?"
-        r"(?:\s*:\s*([A-Za-z][\w \[\],]*?))?\s*$")
-    _KEYWORDS = {"do", "end", "then", "else", "elseif", "if", "from", "until",
-                 "loop", "inspect", "when", "require", "ensure", "local", "check",
-                 "rescue", "retry", "invariant", "variant", "across", "as", "and",
-                 "or", "not", "implies", "xor", "create", "result", "current",
-                 "deferred", "once", "external", "alias", "attribute", "obsolete",
-                 "note", "class", "inherit", "feature", "convert", "redefine",
-                 "rename", "export", "undefine", "select", "old", "true", "false",
-                 "void", "precursor", "agent", "debug"}
+        r"(?:\s*:\s*([A-Za-z][\w \[\],]*?))?\s*$"
+    )
+    _KEYWORDS = {
+        "do",
+        "end",
+        "then",
+        "else",
+        "elseif",
+        "if",
+        "from",
+        "until",
+        "loop",
+        "inspect",
+        "when",
+        "require",
+        "ensure",
+        "local",
+        "check",
+        "rescue",
+        "retry",
+        "invariant",
+        "variant",
+        "across",
+        "as",
+        "and",
+        "or",
+        "not",
+        "implies",
+        "xor",
+        "create",
+        "result",
+        "current",
+        "deferred",
+        "once",
+        "external",
+        "alias",
+        "attribute",
+        "obsolete",
+        "note",
+        "class",
+        "inherit",
+        "feature",
+        "convert",
+        "redefine",
+        "rename",
+        "export",
+        "undefine",
+        "select",
+        "old",
+        "true",
+        "false",
+        "void",
+        "precursor",
+        "agent",
+        "debug",
+    }
 
     # keywords that open a block requiring a matching `end`
     _BLOCK_OPEN = re.compile(
         r"\b(do|deferred|once|external|attribute|if|from|inspect|check|debug)\b",
-        re.IGNORECASE)
+        re.IGNORECASE,
+    )
     _END_TOK = re.compile(r"\bend\b", re.IGNORECASE)
 
     @staticmethod
@@ -137,18 +186,22 @@ class EiffelAnalyzer(RegexCodeAnalyzer):
                             j += 1
                             continue
                         low = lj.lower()
-                        if re.match(r"(do|deferred|once|external|obsolete|"
-                                    r"require|local)\b", low):
+                        if re.match(
+                            r"(do|deferred|once|external|obsolete|" r"require|local)\b",
+                            low,
+                        ):
                             is_routine = True
                             break
                         if re.match(r"attribute\b", low):
-                            is_attr_body = True   # attribute with a body clause
+                            is_attr_body = True  # attribute with a body clause
                             break
                         # next feature declaration or a clause terminator ends
                         # this declaration without a routine body -> attribute.
-                        if (self._FEAT_DECL.match(lines[j]) or
-                                re.match(r"\s*(feature|end|invariant|note)\b",
-                                         lines[j], re.IGNORECASE)):
+                        if self._FEAT_DECL.match(lines[j]) or re.match(
+                            r"\s*(feature|end|invariant|note)\b",
+                            lines[j],
+                            re.IGNORECASE,
+                        ):
                             break
                         j += 1
                     if is_routine and not is_attr_body:
@@ -161,19 +214,34 @@ class EiffelAnalyzer(RegexCodeAnalyzer):
                                     arg_ids.append(self._add_arg(an.strip(), atype))
                         out_ids = [self._add_output(ret.strip())] if ret else []
                         for nm in names:
-                            methods.append(self._add_function(
-                                file_id, nm, arg_ids, out_ids, class_id=cid,
-                                description="eiffel routine"))
+                            methods.append(
+                                self._add_function(
+                                    file_id,
+                                    nm,
+                                    arg_ids,
+                                    out_ids,
+                                    class_id=cid,
+                                    description="eiffel routine",
+                                )
+                            )
                         # skip the routine body so locals aren't read as features
                         i = self._skip_routine_body(lines, i + 1, n)
                         continue
                     else:
                         for nm in names:
-                            attrs.append(self._add_arg(nm, ret.strip() if ret else None))
+                            attrs.append(
+                                self._add_arg(nm, ret.strip() if ret else None)
+                            )
                 i += 1
                 continue
 
             i += 1
 
-        self._add_class(file_id, cname, description="eiffel class",
-                        parent_ids=parents, method_ids=methods, attr_ids=attrs)
+        self._add_class(
+            file_id,
+            cname,
+            description="eiffel class",
+            parent_ids=parents,
+            method_ids=methods,
+            attr_ids=attrs,
+        )

@@ -1,16 +1,9 @@
 # Auto-extracted from code_analyzer.py (verbatim class body).
-import os
 import csv
 import json
-import re
-import ast
-import dis
-import inspect
-import traceback
-import subprocess
-import sqlite3
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
+
 
 class BaseCodeAnalyzer:
     """
@@ -20,11 +13,11 @@ class BaseCodeAnalyzer:
     """
 
     def __init__(
-            self,
-            file_paths: Optional[List[Union[str, Path]]] = None,
-            dump_file_path: str = "code_analysis.json",
-            dump_file_type: str = "json",
-            language_name: str = "generic"
+        self,
+        file_paths: Optional[List[Union[str, Path]]] = None,
+        dump_file_path: str = "code_analysis.json",
+        dump_file_type: str = "json",
+        language_name: str = "generic",
     ):
         self.file_paths = [Path(p).resolve() for p in (file_paths or [])]
         self.dump_file_path = dump_file_path
@@ -40,7 +33,9 @@ class BaseCodeAnalyzer:
             {"kind_id": 6, "kind_name": "arg/parameter"},
             {"kind_id": 7, "kind_name": "introspection_metadata"},
         ]
-        self.kind_lookup = {item["kind_name"]: item["kind_id"] for item in self.kind_reference}
+        self.kind_lookup = {
+            item["kind_name"]: item["kind_id"] for item in self.kind_reference
+        }
 
         # Relational Stores
         self.symbol_index: List[Dict[str, Any]] = []
@@ -86,12 +81,14 @@ class BaseCodeAnalyzer:
     def _record_symbol(self, file_id: int, kind_name: str, target_id: int):
         sym_id = self._symbol_counter
         self._symbol_counter += 1
-        self.symbol_index.append({
-            "symbol_id": sym_id,
-            "file_id": file_id,
-            "kind_id": self.kind_lookup.get(kind_name, 0),
-            "target_entity_id": target_id,
-        })
+        self.symbol_index.append(
+            {
+                "symbol_id": sym_id,
+                "file_id": file_id,
+                "kind_id": self.kind_lookup.get(kind_name, 0),
+                "target_entity_id": target_id,
+            }
+        )
 
     def record_introspection_metadata(
         self,
@@ -102,22 +99,26 @@ class BaseCodeAnalyzer:
         bytecode_or_ast_dump: Optional[str] = None,
         runtime_decorators_or_attributes: Optional[Dict[str, Any]] = None,
         callstack_or_frame_trace: Optional[str] = None,
-        structural_properties: Optional[Dict[str, Any]] = None
+        structural_properties: Optional[Dict[str, Any]] = None,
     ):
         """Records rich introspection information directly linked to an analyzed entity."""
         m_id = self._metadata_counter
         self._metadata_counter += 1
-        self.introspection_metadata_table.append({
-            "metadata_id": m_id,
-            "entity_id": entity_id,
-            "entity_type": entity_type,
-            "language": self.language_name,
-            "inspection_source": inspection_source,
-            "bytecode_or_ast_dump": bytecode_or_ast_dump,
-            "runtime_decorators_or_attributes": json.dumps(runtime_decorators_or_attributes or {}),
-            "callstack_or_frame_trace": callstack_or_frame_trace,
-            "structural_properties": json.dumps(structural_properties or {})
-        })
+        self.introspection_metadata_table.append(
+            {
+                "metadata_id": m_id,
+                "entity_id": entity_id,
+                "entity_type": entity_type,
+                "language": self.language_name,
+                "inspection_source": inspection_source,
+                "bytecode_or_ast_dump": bytecode_or_ast_dump,
+                "runtime_decorators_or_attributes": json.dumps(
+                    runtime_decorators_or_attributes or {}
+                ),
+                "callstack_or_frame_trace": callstack_or_frame_trace,
+                "structural_properties": json.dumps(structural_properties or {}),
+            }
+        )
         self._record_symbol(file_id, "introspection_metadata", m_id)
 
     def _build_temp_kind_details_table(self):
@@ -130,15 +131,63 @@ class BaseCodeAnalyzer:
         self._temp_kind_counter = 1
 
         categories = [
-            ("variables", "variable", [v["variable_id"] for v in self.variables_table if not v.get("is_imported")]),
-            ("imported_variables", "variable", [v["variable_id"] for v in self.variables_table if v.get("is_imported")]),
-            ("functions", "function", [f["function_id"] for f in self.functions_table if not f.get("is_imported")]),
-            ("imported_functions", "function", [f["function_id"] for f in self.functions_table if f.get("is_imported")]),
-            ("classes", "class", [c["class_id"] for c in self.classes_table if not c.get("is_imported")]),
-            ("imported_classes", "class", [c["class_id"] for c in self.classes_table if c.get("is_imported")]),
+            (
+                "variables",
+                "variable",
+                [
+                    v["variable_id"]
+                    for v in self.variables_table
+                    if not v.get("is_imported")
+                ],
+            ),
+            (
+                "imported_variables",
+                "variable",
+                [
+                    v["variable_id"]
+                    for v in self.variables_table
+                    if v.get("is_imported")
+                ],
+            ),
+            (
+                "functions",
+                "function",
+                [
+                    f["function_id"]
+                    for f in self.functions_table
+                    if not f.get("is_imported")
+                ],
+            ),
+            (
+                "imported_functions",
+                "function",
+                [
+                    f["function_id"]
+                    for f in self.functions_table
+                    if f.get("is_imported")
+                ],
+            ),
+            (
+                "classes",
+                "class",
+                [c["class_id"] for c in self.classes_table if not c.get("is_imported")],
+            ),
+            (
+                "imported_classes",
+                "class",
+                [c["class_id"] for c in self.classes_table if c.get("is_imported")],
+            ),
             ("arguments", "arg", [a["args_id"] for a in self.args_table]),
-            ("weights_and_buffers", "tensor_member", [m["member_id"] for m in self.tensor_members_table]),
-            ("introspection_metadata", "metadata", [m["metadata_id"] for m in self.introspection_metadata_table]),
+            (
+                "weights_and_buffers",
+                "tensor_member",
+                [m["member_id"] for m in self.tensor_members_table],
+            ),
+            (
+                "introspection_metadata",
+                "metadata",
+                [m["metadata_id"] for m in self.introspection_metadata_table],
+            ),
         ]
 
         # Generate Mermaid Flowchart edges representing relational links (computed once).
@@ -181,7 +230,9 @@ class BaseCodeAnalyzer:
 
         # Map entities to their introspection metadata
         for meta in self.introspection_metadata_table:
-            edges.add(f"    {meta['entity_id']}{meta['entity_type']} --> {meta['metadata_id']}metadata")
+            edges.add(
+                f"    {meta['entity_id']}{meta['entity_type']} --> {meta['metadata_id']}metadata"
+            )
 
         for kind_name, kind_type, target_ids in categories:
             if not target_ids and "imported" in kind_name:
@@ -189,22 +240,34 @@ class BaseCodeAnalyzer:
 
             mermaid_lines = ["```mermaid", "flowchart TD"]
             if edges:
-                mermaid_lines.extend(sorted(list(edges))[:45])  # Cap for optimal scannability
+                mermaid_lines.extend(
+                    sorted(list(edges))[:45]
+                )  # Cap for optimal scannability
             else:
                 mermaid_lines.append("    None[No Pipeline Linkages Available]")
             mermaid_lines.append("```")
 
-            self.temp_kind_details.append({
-                "temp_kind_id": self._temp_kind_counter,
-                "kind_type": kind_type,
-                "kind_name": kind_name,
-                "kind_function_ids": [fid for fid in target_ids if kind_type == "function"],
-                "kind_args_ids": [aid for aid in target_ids if kind_type == "arg"],
-                "kind_class_ids": [cid for cid in target_ids if kind_type == "class"],
-                "kind_variables_ids": [vid for vid in target_ids if kind_type == "variable"],
-                "kind_tensor_member_ids": [mid for mid in target_ids if kind_type == "tensor_member"],
-                "pipeline_flowchart": "\n".join(mermaid_lines)
-            })
+            self.temp_kind_details.append(
+                {
+                    "temp_kind_id": self._temp_kind_counter,
+                    "kind_type": kind_type,
+                    "kind_name": kind_name,
+                    "kind_function_ids": [
+                        fid for fid in target_ids if kind_type == "function"
+                    ],
+                    "kind_args_ids": [aid for aid in target_ids if kind_type == "arg"],
+                    "kind_class_ids": [
+                        cid for cid in target_ids if kind_type == "class"
+                    ],
+                    "kind_variables_ids": [
+                        vid for vid in target_ids if kind_type == "variable"
+                    ],
+                    "kind_tensor_member_ids": [
+                        mid for mid in target_ids if kind_type == "tensor_member"
+                    ],
+                    "pipeline_flowchart": "\n".join(mermaid_lines),
+                }
+            )
             self._temp_kind_counter += 1
 
     def export(self):
@@ -223,6 +286,7 @@ class BaseCodeAnalyzer:
 
         elif dump_type in ["yml", "yaml"]:
             import yaml
+
             with open(out_path, "w", encoding="utf-8") as f:
                 yaml.dump(tables, f, sort_keys=False)
             print(f"Exported code analysis to YAML: {out_path}")
@@ -238,16 +302,27 @@ class BaseCodeAnalyzer:
                     continue
                 file_dest = base_dir / f"{base_name}_{tbl_name}.{ext}"
                 with open(file_dest, "w", newline="", encoding="utf-8") as f:
-                    writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()), delimiter=delimiter)
+                    writer = csv.DictWriter(
+                        f, fieldnames=list(rows[0].keys()), delimiter=delimiter
+                    )
                     writer.writeheader()
                     writer.writerows(rows)
             print(f"Exported tables to {ext.upper()} in {base_dir}")
 
         elif dump_type == "xlsx":
             import pandas as pd
+
             with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
                 for tbl_name, rows in tables.items():
                     # Flatten list/dict values for Excel cells
-                    cleaned = [{k: (str(v) if isinstance(v, (list, dict)) else v) for k, v in r.items()} for r in rows]
-                    pd.DataFrame(cleaned).to_excel(writer, sheet_name=tbl_name[:31], index=False)
+                    cleaned = [
+                        {
+                            k: (str(v) if isinstance(v, (list, dict)) else v)
+                            for k, v in r.items()
+                        }
+                        for r in rows
+                    ]
+                    pd.DataFrame(cleaned).to_excel(
+                        writer, sheet_name=tbl_name[:31], index=False
+                    )
             print(f"Exported analysis to Excel: {out_path}")

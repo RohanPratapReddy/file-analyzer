@@ -12,7 +12,7 @@
 #   PI :: 3.14159                              -> constant variable
 #   speed := 5     /  hp: int = 100            -> variable
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _TYPE_KW = ("struct", "enum", "union", "bit_set", "bit_field")
@@ -23,19 +23,24 @@ class OdinAnalyzer(RegexCodeAnalyzer):
     EXTENSIONS = (".odin",)
 
     _IMPORT = re.compile(
-        r'^[ \t]*(?:@\s*\([^)]*\)\s*)*'          # optional @(require) etc. attrs
-        r'(?:foreign\s+import|import)\s+'
-        r'(?:([A-Za-z_]\w*)\s+)?"([^"]+)"', re.MULTILINE)
+        r"^[ \t]*(?:@\s*\([^)]*\)\s*)*"  # optional @(require) etc. attrs
+        r"(?:foreign\s+import|import)\s+"
+        r'(?:([A-Za-z_]\w*)\s+)?"([^"]+)"',
+        re.MULTILINE,
+    )
     _DECL = re.compile(r"(^|\n)[ \t]*([A-Za-z_]\w*)\s*::\s*")
     _VAR = re.compile(
-        r"(^|\n)[ \t]*([A-Za-z_]\w*)\s*(?::\s*([^=\n]+?)\s*)?(:=|=)\s*([^\n]+)")
+        r"(^|\n)[ \t]*([A-Za-z_]\w*)\s*(?::\s*([^=\n]+?)\s*)?(:=|=)\s*([^\n]+)"
+    )
 
     def _register_types(self, file_id, text, path):
         text = self._strip_comments(text)
         for m in self._DECL.finditer(text):
-            after = text[m.end():m.end() + 40].lstrip()
+            after = text[m.end() : m.end() + 40].lstrip()
             for kw in _TYPE_KW:
-                if after.startswith(kw) and (len(after) == len(kw) or not after[len(kw)].isalnum()):
+                if after.startswith(kw) and (
+                    len(after) == len(kw) or not after[len(kw)].isalnum()
+                ):
                     self._register_class(m.group(2))
                     break
 
@@ -60,7 +65,9 @@ class OdinAnalyzer(RegexCodeAnalyzer):
 
             handled = False
             for kw in _TYPE_KW:
-                if stripped.startswith(kw) and (len(stripped) == len(kw) or not stripped[len(kw)].isalnum()):
+                if stripped.startswith(kw) and (
+                    len(stripped) == len(kw) or not stripped[len(kw)].isalnum()
+                ):
                     self._parse_type(file_id, text, pos + lead, name, kw)
                     handled = True
                     break
@@ -77,15 +84,19 @@ class OdinAnalyzer(RegexCodeAnalyzer):
             if any(a <= m.start(2) < b for a, b in proc_spans):
                 continue
             name, vtype, val = m.group(2), m.group(3), m.group(5)
-            self._add_variable(file_id, name, val.strip(),
-                               scope="module" if vtype is None else "module")
+            self._add_variable(
+                file_id,
+                name,
+                val.strip(),
+                scope="module" if vtype is None else "module",
+            )
 
     def _parse_proc(self, file_id, text, pos, name, proc_spans):
         popen = text.find("(", pos)
         if popen == -1:
             return
         pclose = self._find_matching(text, popen, "(", ")")
-        params = text[popen + 1:pclose - 1]
+        params = text[popen + 1 : pclose - 1]
         rest = text[pclose:]
         ret = None
         rm = re.match(r"\s*->\s*([^{]+?)\s*(?:\{|---|\Z)", rest)
@@ -106,7 +117,7 @@ class OdinAnalyzer(RegexCodeAnalyzer):
             self._add_class(file_id, name, description=f"odin {kw}")
             return
         bclose = self._find_matching(text, bopen)
-        body = text[bopen + 1:bclose - 1]
+        body = text[bopen + 1 : bclose - 1]
         attr_ids = []
         if kw in ("struct", "bit_field"):
             for field in self._split_top_level(body):

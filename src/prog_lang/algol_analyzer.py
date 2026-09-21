@@ -13,34 +13,45 @@
 #
 # Comments: 'comment ... ;', 'co ... co', '# ... #'; strings '"'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z][A-Za-z0-9_]*"
 # ALGOL 60 lower-case + ALGOL 68 upper-case primitive types
-_TYPE = (r"(?:integer|real|boolean|string|char|complex|bits|bytes|"
-         r"long\s+real|long\s+int|short\s+int|"
-         r"INT|REAL|BOOL|CHAR|STRING|COMPL|BITS|BYTES|VOID|"
-         r"LONG\s+REAL|LONG\s+INT|REF\s+" + _ID + r")")
+_TYPE = (
+    r"(?:integer|real|boolean|string|char|complex|bits|bytes|"
+    r"long\s+real|long\s+int|short\s+int|"
+    r"INT|REAL|BOOL|CHAR|STRING|COMPL|BITS|BYTES|VOID|"
+    r"LONG\s+REAL|LONG\s+INT|REF\s+" + _ID + r")"
+)
 
 
 class AlgolAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "algol"
     EXTENSIONS = (".algol", ".alg", ".a68")
     LINE_COMMENTS = ()
-    BLOCK_COMMENTS = ()          # custom cleaner below
+    BLOCK_COMMENTS = ()  # custom cleaner below
     STRING_DELIMS = ('"',)
 
     # ALGOL 60:  [type] procedure NAME (params) ;   /  procedure NAME ;
-    _PROC60 = re.compile(r"(?i)(?:^|;|\bbegin\b)\s*(?:(" + _TYPE +
-                         r")\s+)?procedure\s+(" + _ID + r")\s*(\([^)]*\))?")
+    _PROC60 = re.compile(
+        r"(?i)(?:^|;|\bbegin\b)\s*(?:("
+        + _TYPE
+        + r")\s+)?procedure\s+("
+        + _ID
+        + r")\s*(\([^)]*\))?"
+    )
     # ALGOL 68:  PROC NAME = (params) RETTYPE :   /  PROC NAME = RETTYPE :
     # RETTYPE may be a primitive (_TYPE) or a user-declared MODE (identifier).
-    _PROC68 = re.compile(r"(?i)\bPROC\s+(" + _ID + r")\s*=\s*"
-                         r"(\([^)]*\))?\s*((?:" + _TYPE + r")|" + _ID + r")?\s*:")
+    _PROC68 = re.compile(
+        r"(?i)\bPROC\s+(" + _ID + r")\s*=\s*"
+        r"(\([^)]*\))?\s*((?:" + _TYPE + r")|" + _ID + r")?\s*:"
+    )
     _MODE = re.compile(r"(?i)\bMODE\s+(" + _ID + r")\s*=")
-    _DECL = re.compile(r"(?im)(?:^|;|\bbegin\b)\s*(" + _TYPE + r")\s+"
-                       r"(" + _ID + r"(?:\s*,\s*" + _ID + r")*)\s*(?=[;:=])")
+    _DECL = re.compile(
+        r"(?im)(?:^|;|\bbegin\b)\s*(" + _TYPE + r")\s+"
+        r"(" + _ID + r"(?:\s*,\s*" + _ID + r")*)\s*(?=[;:=])"
+    )
 
     def _clean(self, text):
         # strip `comment ... ;`  and  `co ... co`  and  `# ... #`
@@ -68,8 +79,7 @@ class AlgolAnalyzer(RegexCodeAnalyzer):
             seen_fn.add(name)
             args = self._paren_args(m.group(3))
             outs = [self._add_output(m.group(1))] if m.group(1) else []
-            self._add_function(file_id, name, args, outs,
-                               description="algol procedure")
+            self._add_function(file_id, name, args, outs, description="algol procedure")
         for m in self._PROC68.finditer(clean):
             name = m.group(1)
             if name in seen_fn:
@@ -77,8 +87,7 @@ class AlgolAnalyzer(RegexCodeAnalyzer):
             seen_fn.add(name)
             args = self._paren_args(m.group(2))
             outs = [self._add_output(m.group(3))] if m.group(3) else []
-            self._add_function(file_id, name, args, outs,
-                               description="algol68 proc")
+            self._add_function(file_id, name, args, outs, description="algol68 proc")
 
         seen_var = set()
         for m in self._DECL.finditer(clean):

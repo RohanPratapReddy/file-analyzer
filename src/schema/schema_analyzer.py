@@ -1,18 +1,11 @@
 # Auto-extracted from code_analyzer.py (verbatim class body).
-import os
-import csv
 import json
 import re
-import ast
-import dis
-import inspect
-import traceback
-import subprocess
-import sqlite3
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from .schema_defs import SchemaDefinitionEngines
+
 
 class SchemaAnalyzer(SchemaDefinitionEngines):
     """
@@ -91,22 +84,22 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
 
     # Residual schema-definition-language families, each with a real per-format
     # engine implemented in ``schema_defs.SchemaDefinitionEngines``.
-    WEBIDL_EXTS = {".webidl", ".idl"}      # Web IDL + CORBA/COM IDL (shared grammar)
-    SMITHY_EXTS = {".smithy"}              # AWS Smithy IDL
-    CDDL_EXTS = {".cddl"}                  # Concise Data Definition Language (CBOR)
-    DBML_EXTS = {".dbml"}                  # Database Markup Language
-    YANG_EXTS = {".yang"}                  # YANG network data model
-    MIB_EXTS = {".mib"}                    # SNMP MIB / ASN.1
-    ROS_MSG_EXTS = {".msg"}               # ROS message definition
-    ROS_SRV_EXTS = {".srv"}               # ROS service definition
-    SHACL_EXTS = {".shacl"}               # SHACL shapes (Turtle/RDF)
-    EBNF_EXTS = {".ebnf"}                 # EBNF grammar
+    WEBIDL_EXTS = {".webidl", ".idl"}  # Web IDL + CORBA/COM IDL (shared grammar)
+    SMITHY_EXTS = {".smithy"}  # AWS Smithy IDL
+    CDDL_EXTS = {".cddl"}  # Concise Data Definition Language (CBOR)
+    DBML_EXTS = {".dbml"}  # Database Markup Language
+    YANG_EXTS = {".yang"}  # YANG network data model
+    MIB_EXTS = {".mib"}  # SNMP MIB / ASN.1
+    ROS_MSG_EXTS = {".msg"}  # ROS message definition
+    ROS_SRV_EXTS = {".srv"}  # ROS service definition
+    SHACL_EXTS = {".shacl"}  # SHACL shapes (Turtle/RDF)
+    EBNF_EXTS = {".ebnf"}  # EBNF grammar
     JSONSCHEMA_DOC_EXTS = {".jsonschema"}  # JSON Schema document
     OPENAPI_EXTS = {".openapi", ".swagger"}  # OpenAPI / Swagger spec
-    RAML_EXTS = {".raml"}                 # RAML API spec
-    CRD_EXTS = {".crd"}                   # Kubernetes CustomResourceDefinition
-    KSY_EXTS = {".ksy"}                   # Kaitai Struct
-    XCSTRINGS_EXTS = {".xcstrings"}       # Xcode String Catalog
+    RAML_EXTS = {".raml"}  # RAML API spec
+    CRD_EXTS = {".crd"}  # Kubernetes CustomResourceDefinition
+    KSY_EXTS = {".ksy"}  # Kaitai Struct
+    XCSTRINGS_EXTS = {".xcstrings"}  # Xcode String Catalog
 
     # entity-kind labels used in schema_file_index.
     KIND_DATABASE = "database"
@@ -130,8 +123,15 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
         r"character\s+large\s+object",
     ]
 
-    _CONSTRAINT_LEADERS = ("CONSTRAINT", "PRIMARY", "FOREIGN", "UNIQUE",
-                           "CHECK", "EXCLUDE", "PARTITION")
+    _CONSTRAINT_LEADERS = (
+        "CONSTRAINT",
+        "PRIMARY",
+        "FOREIGN",
+        "UNIQUE",
+        "CHECK",
+        "EXCLUDE",
+        "PARTITION",
+    )
 
     def __init__(
         self,
@@ -155,10 +155,21 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
         self.schema_file_index: List[Dict[str, Any]] = []
 
         # per-kind id counters
-        self._ids = {k: 0 for k in (
-            "database", "table", "column", "key", "constraint",
-            "trigger", "method", "type", "index", "sfi",
-        )}
+        self._ids = {
+            k: 0
+            for k in (
+                "database",
+                "table",
+                "column",
+                "key",
+                "constraint",
+                "trigger",
+                "method",
+                "type",
+                "index",
+                "sfi",
+            )
+        }
 
     # ------------------------------------------------------------------
     # id helpers
@@ -213,11 +224,9 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
                 elif engine == "mib":
                     self._parse_mib(text, engine, local_fid)
                 elif engine == "ros_msg":
-                    self._parse_ros_msg(text, engine, local_fid,
-                                        name=Path(path).stem)
+                    self._parse_ros_msg(text, engine, local_fid, name=Path(path).stem)
                 elif engine == "ros_srv":
-                    self._parse_ros_srv(text, engine, local_fid,
-                                        name=Path(path).stem)
+                    self._parse_ros_srv(text, engine, local_fid, name=Path(path).stem)
                 elif engine == "shacl":
                     self._parse_shacl(text, engine, local_fid)
                 elif engine == "ebnf":
@@ -271,12 +280,20 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
         head = text[:4000]
 
         if suffix == ".json":
-            if ("$jsonSchema" in text or "bsonType" in text
-                    or "collMod" in head or "MONGO" in upper_path):
+            if (
+                "$jsonSchema" in text
+                or "bsonType" in text
+                or "collMod" in head
+                or "MONGO" in upper_path
+            ):
                 return "mongodb"
             # An Avro schema stored with a .json extension.
-            if ('"type"' in text and '"record"' in text and '"fields"' in text
-                    and '"$schema"' not in text):
+            if (
+                '"type"' in text
+                and '"record"' in text
+                and '"fields"' in text
+                and '"$schema"' not in text
+            ):
                 return "avro"
             # A generic JSON Schema (has "properties"/"type": "object").
             if '"properties"' in text and ('"type"' in text or "$schema" in text):
@@ -284,7 +301,11 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             return None
 
         if suffix == ".md":
-            if "keyspace" in name or "/REDIS-DB/" in upper_path or "REDIS" in upper_path:
+            if (
+                "keyspace" in name
+                or "/REDIS-DB/" in upper_path
+                or "REDIS" in upper_path
+            ):
                 if "Key pattern" in text or "| Key" in text:
                     return "redis"
             return None
@@ -364,19 +385,26 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             up = head.upper()
             if not up.startswith("CREATE") and not up.startswith("ALTER"):
                 continue
-            if re.match(r"CREATE\s+(?:GLOBAL\s+|LOCAL\s+)?(?:TEMP\w*\s+|UNLOGGED\s+)?TABLE\b", up):
+            if re.match(
+                r"CREATE\s+(?:GLOBAL\s+|LOCAL\s+)?(?:TEMP\w*\s+|UNLOGGED\s+)?TABLE\b",
+                up,
+            ):
                 self._sql_table(head, engine, file_id)
             elif re.match(r"CREATE\s+TYPE\b", up):
                 self._sql_type(head, engine, file_id)
             elif re.match(r"CREATE\s+DOMAIN\b", up):
                 self._sql_domain(head, engine, file_id)
-            elif re.match(r"CREATE\s+(?:OR\s+REPLACE\s+)?(?:FUNCTION|PROCEDURE|AGGREGATE)\b", up):
+            elif re.match(
+                r"CREATE\s+(?:OR\s+REPLACE\s+)?(?:FUNCTION|PROCEDURE|AGGREGATE)\b", up
+            ):
                 self._sql_method(head, engine, file_id)
             elif re.match(r"CREATE\s+(?:OR\s+REPLACE\s+|CONSTRAINT\s+)?TRIGGER\b", up):
                 self._sql_trigger(head, engine, file_id)
             elif re.match(r"CREATE\s+(?:UNIQUE\s+)?INDEX\b", up):
                 self._sql_index(head, engine, file_id)
-            elif re.match(r"CREATE\s+(?:OR\s+REPLACE\s+)?(?:MATERIALIZED\s+)?VIEW\b", up):
+            elif re.match(
+                r"CREATE\s+(?:OR\s+REPLACE\s+)?(?:MATERIALIZED\s+)?VIEW\b", up
+            ):
                 self._sql_view(head, engine, file_id)
             elif re.match(r"ALTER\s+TABLE\b", up):
                 self._sql_alter_table(head, engine, file_id)
@@ -386,7 +414,9 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
         m = re.match(
             r"CREATE\s+(?:GLOBAL\s+|LOCAL\s+)?(?:TEMP\w*\s+|UNLOGGED\s+)?TABLE\s+"
             r"(?:IF\s+NOT\s+EXISTS\s+)?(?P<name>" + self._NAME + r")\s*\(",
-            st, re.I | re.S)
+            st,
+            re.I | re.S,
+        )
         if not m:
             return
         qualified = self._clean_ident(m.group("name"))
@@ -409,7 +439,8 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             first = item.split(None, 1)[0].upper().strip('("`')
             if first in self._CONSTRAINT_LEADERS:
                 krows, crows = self._parse_table_constraint(
-                    item, table_id, name_to_colid, file_id)
+                    item, table_id, name_to_colid, file_id
+                )
                 for kr in krows:
                     self.schema_keys_table.append(kr)
                     key_ids.append(kr["key_id"])
@@ -419,7 +450,8 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             else:
                 ordinal += 1
                 crow, con_rows, key_rows = self._parse_column(
-                    item, table_id, file_id, ordinal, engine)
+                    item, table_id, file_id, ordinal, engine
+                )
                 if crow is None:
                     continue
                 col_ids.append(crow["column_id"])
@@ -431,23 +463,26 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
                     self.schema_keys_table.append(kr)
                     key_ids.append(kr["key_id"])
 
-        self.schema_tables_table.append({
-            "table_id": table_id,
-            "table_name": tname,
-            "qualified_name": qualified,
-            "db_engine": engine,
-            "namespace": namespace,
-            "table_kind": "table",
-            "columns_ids": col_ids,
-            "key_ids": key_ids,
-            "constraint_ids": constraint_ids,
-            "trigger_ids": [],
-            "index_ids": [],
-            "file_id": file_id,
-        })
+        self.schema_tables_table.append(
+            {
+                "table_id": table_id,
+                "table_name": tname,
+                "qualified_name": qualified,
+                "db_engine": engine,
+                "namespace": namespace,
+                "table_kind": "table",
+                "columns_ids": col_ids,
+                "key_ids": key_ids,
+                "constraint_ids": constraint_ids,
+                "trigger_ids": [],
+                "index_ids": [],
+                "file_id": file_id,
+            }
+        )
 
-    def _parse_column(self, item: str, table_id: int, file_id: int,
-                      ordinal: int, engine: str):
+    def _parse_column(
+        self, item: str, table_id: int, file_id: int, ordinal: int, engine: str
+    ):
         """Return (column_row|None, [constraint_rows], [key_rows])."""
         m = re.match(r"\s*(?P<name>" + self._NAME + r")\s+(?P<rest>.*)$", item, re.S)
         if not m:
@@ -474,35 +509,54 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
         if is_pk:
             keys.append("PK")
             kid = self._next("key")
-            key_rows.append({
-                "key_id": kid, "key_name": None, "key_type": "PRIMARY KEY",
-                "table_id": table_id, "column_ids": [col_id],
-                "referenced_table": None, "referenced_columns": [],
-                "on_delete": None, "on_update": None, "file_id": file_id,
-            })
+            key_rows.append(
+                {
+                    "key_id": kid,
+                    "key_name": None,
+                    "key_type": "PRIMARY KEY",
+                    "table_id": table_id,
+                    "column_ids": [col_id],
+                    "referenced_table": None,
+                    "referenced_columns": [],
+                    "on_delete": None,
+                    "on_update": None,
+                    "file_id": file_id,
+                }
+            )
 
         # inline REFERENCES => foreign key
         rm = re.search(
             r"\bREFERENCES\s+(?P<rt>" + self._NAME + r")\s*(?:\(\s*(?P<rc>[^)]*)\))?",
-            rest_after, re.I | re.S)
+            rest_after,
+            re.I | re.S,
+        )
         if rm:
             references_table = self._clean_ident(rm.group("rt"))
             references_column = None
             ref_cols: List[str] = []
             if rm.group("rc"):
-                ref_cols = [self._clean_ident(c) for c in rm.group("rc").split(",") if c.strip()]
+                ref_cols = [
+                    self._clean_ident(c) for c in rm.group("rc").split(",") if c.strip()
+                ]
                 references_column = ref_cols[0] if ref_cols else None
             keys.append("FK")
             od = self._find_referential_action(rest_after, "DELETE")
             ou = self._find_referential_action(rest_after, "UPDATE")
             kid = self._next("key")
-            key_rows.append({
-                "key_id": kid, "key_name": None, "key_type": "FOREIGN KEY",
-                "table_id": table_id, "column_ids": [col_id],
-                "referenced_table": references_table,
-                "referenced_columns": ref_cols,
-                "on_delete": od, "on_update": ou, "file_id": file_id,
-            })
+            key_rows.append(
+                {
+                    "key_id": kid,
+                    "key_name": None,
+                    "key_type": "FOREIGN KEY",
+                    "table_id": table_id,
+                    "column_ids": [col_id],
+                    "referenced_table": references_table,
+                    "referenced_columns": ref_cols,
+                    "on_delete": od,
+                    "on_update": ou,
+                    "file_id": file_id,
+                }
+            )
 
         if re.search(r"\bUNIQUE\b", upper) and "UNIQUE" not in keys:
             keys.append("UNIQUE")
@@ -517,20 +571,31 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
         if cm:
             expr, _ = self._extract_balanced(rest_after, cm.end() - 1)
             cid = self._next("constraint")
-            con_rows.append({
-                "constraint_id": cid, "constraint_name": None,
-                "constraint_type": "CHECK", "table_id": table_id,
-                "column_ids": [col_id], "expression": (expr or "").strip(),
-                "file_id": file_id,
-            })
+            con_rows.append(
+                {
+                    "constraint_id": cid,
+                    "constraint_name": None,
+                    "constraint_type": "CHECK",
+                    "table_id": table_id,
+                    "column_ids": [col_id],
+                    "expression": (expr or "").strip(),
+                    "file_id": file_id,
+                }
+            )
 
         if has_not_null and not is_pk:
             cid = self._next("constraint")
-            con_rows.append({
-                "constraint_id": cid, "constraint_name": None,
-                "constraint_type": "NOT NULL", "table_id": table_id,
-                "column_ids": [col_id], "expression": None, "file_id": file_id,
-            })
+            con_rows.append(
+                {
+                    "constraint_id": cid,
+                    "constraint_name": None,
+                    "constraint_type": "NOT NULL",
+                    "table_id": table_id,
+                    "column_ids": [col_id],
+                    "expression": None,
+                    "file_id": file_id,
+                }
+            )
 
         column_row = {
             "column_id": col_id,
@@ -551,13 +616,16 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
         self.schema_columns_table.append(column_row)
         return column_row, con_rows, key_rows
 
-    def _parse_table_constraint(self, item: str, table_id: int,
-                                name_to_colid: Dict[str, int], file_id: int):
+    def _parse_table_constraint(
+        self, item: str, table_id: int, name_to_colid: Dict[str, int], file_id: int
+    ):
         key_rows: List[Dict[str, Any]] = []
         con_rows: List[Dict[str, Any]] = []
         s = item.strip()
         cname = None
-        nm = re.match(r"CONSTRAINT\s+(?P<n>" + self._NAME + r")\s+(?P<rest>.*)$", s, re.I | re.S)
+        nm = re.match(
+            r"CONSTRAINT\s+(?P<n>" + self._NAME + r")\s+(?P<rest>.*)$", s, re.I | re.S
+        )
         if nm:
             cname = self._clean_ident(nm.group("n"))
             s = nm.group("rest").strip()
@@ -579,20 +647,36 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             # Cassandra composite: PRIMARY KEY ((part..), clus..)
             part_ids, clus_ids = self._parse_pk_columns(inner or "", name_to_colid)
             kid = self._next("key")
-            key_rows.append({
-                "key_id": kid, "key_name": cname, "key_type": "PRIMARY KEY",
-                "table_id": table_id, "column_ids": part_ids + clus_ids,
-                "referenced_table": None, "referenced_columns": [],
-                "on_delete": None, "on_update": None, "file_id": file_id,
-            })
+            key_rows.append(
+                {
+                    "key_id": kid,
+                    "key_name": cname,
+                    "key_type": "PRIMARY KEY",
+                    "table_id": table_id,
+                    "column_ids": part_ids + clus_ids,
+                    "referenced_table": None,
+                    "referenced_columns": [],
+                    "on_delete": None,
+                    "on_update": None,
+                    "file_id": file_id,
+                }
+            )
             if clus_ids:  # record clustering separately for CQL
                 kid2 = self._next("key")
-                key_rows.append({
-                    "key_id": kid2, "key_name": cname, "key_type": "CLUSTERING KEY",
-                    "table_id": table_id, "column_ids": clus_ids,
-                    "referenced_table": None, "referenced_columns": [],
-                    "on_delete": None, "on_update": None, "file_id": file_id,
-                })
+                key_rows.append(
+                    {
+                        "key_id": kid2,
+                        "key_name": cname,
+                        "key_type": "CLUSTERING KEY",
+                        "table_id": table_id,
+                        "column_ids": clus_ids,
+                        "referenced_table": None,
+                        "referenced_columns": [],
+                        "on_delete": None,
+                        "on_update": None,
+                        "file_id": file_id,
+                    }
+                )
         elif up.startswith("FOREIGN KEY"):
             pm = re.search(r"FOREIGN\s+KEY\s*\(", s, re.I)
             local_ids: List[int] = []
@@ -601,48 +685,82 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             if pm:
                 inner, end = self._extract_balanced(s, pm.end() - 1)
                 local_ids = cols_from(inner or "")
-                rm = re.search(r"REFERENCES\s+(?P<rt>" + self._NAME + r")\s*(?:\((?P<rc>[^)]*)\))?",
-                               s[end:], re.I | re.S)
+                rm = re.search(
+                    r"REFERENCES\s+(?P<rt>"
+                    + self._NAME
+                    + r")\s*(?:\((?P<rc>[^)]*)\))?",
+                    s[end:],
+                    re.I | re.S,
+                )
                 if rm:
                     ref_table = self._clean_ident(rm.group("rt"))
                     if rm.group("rc"):
-                        ref_cols = [self._clean_ident(c) for c in rm.group("rc").split(",") if c.strip()]
+                        ref_cols = [
+                            self._clean_ident(c)
+                            for c in rm.group("rc").split(",")
+                            if c.strip()
+                        ]
             kid = self._next("key")
-            key_rows.append({
-                "key_id": kid, "key_name": cname, "key_type": "FOREIGN KEY",
-                "table_id": table_id, "column_ids": local_ids,
-                "referenced_table": ref_table, "referenced_columns": ref_cols,
-                "on_delete": self._find_referential_action(s, "DELETE"),
-                "on_update": self._find_referential_action(s, "UPDATE"),
-                "file_id": file_id,
-            })
+            key_rows.append(
+                {
+                    "key_id": kid,
+                    "key_name": cname,
+                    "key_type": "FOREIGN KEY",
+                    "table_id": table_id,
+                    "column_ids": local_ids,
+                    "referenced_table": ref_table,
+                    "referenced_columns": ref_cols,
+                    "on_delete": self._find_referential_action(s, "DELETE"),
+                    "on_update": self._find_referential_action(s, "UPDATE"),
+                    "file_id": file_id,
+                }
+            )
         elif up.startswith("UNIQUE"):
             pm = re.search(r"\(", s)
             inner, _ = self._extract_balanced(s, pm.start()) if pm else (None, None)
             kid = self._next("key")
-            key_rows.append({
-                "key_id": kid, "key_name": cname, "key_type": "UNIQUE",
-                "table_id": table_id, "column_ids": cols_from(inner or ""),
-                "referenced_table": None, "referenced_columns": [],
-                "on_delete": None, "on_update": None, "file_id": file_id,
-            })
+            key_rows.append(
+                {
+                    "key_id": kid,
+                    "key_name": cname,
+                    "key_type": "UNIQUE",
+                    "table_id": table_id,
+                    "column_ids": cols_from(inner or ""),
+                    "referenced_table": None,
+                    "referenced_columns": [],
+                    "on_delete": None,
+                    "on_update": None,
+                    "file_id": file_id,
+                }
+            )
         elif up.startswith("CHECK"):
             pm = re.search(r"\(", s)
             inner, _ = self._extract_balanced(s, pm.start()) if pm else (None, None)
             cid = self._next("constraint")
-            con_rows.append({
-                "constraint_id": cid, "constraint_name": cname,
-                "constraint_type": "CHECK", "table_id": table_id,
-                "column_ids": [], "expression": (inner or "").strip(),
-                "file_id": file_id,
-            })
+            con_rows.append(
+                {
+                    "constraint_id": cid,
+                    "constraint_name": cname,
+                    "constraint_type": "CHECK",
+                    "table_id": table_id,
+                    "column_ids": [],
+                    "expression": (inner or "").strip(),
+                    "file_id": file_id,
+                }
+            )
         elif up.startswith("EXCLUDE"):
             cid = self._next("constraint")
-            con_rows.append({
-                "constraint_id": cid, "constraint_name": cname,
-                "constraint_type": "EXCLUDE", "table_id": table_id,
-                "column_ids": [], "expression": s, "file_id": file_id,
-            })
+            con_rows.append(
+                {
+                    "constraint_id": cid,
+                    "constraint_name": cname,
+                    "constraint_type": "EXCLUDE",
+                    "table_id": table_id,
+                    "column_ids": [],
+                    "expression": s,
+                    "file_id": file_id,
+                }
+            )
         return key_rows, con_rows
 
     def _parse_pk_columns(self, inner: str, name_to_colid: Dict[str, int]):
@@ -672,43 +790,68 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
         return to_ids(parts), to_ids(clustering)
 
     def _sql_type(self, st: str, engine: str, file_id: int) -> None:
-        m = re.match(r"CREATE\s+TYPE\s+(?P<name>" + self._NAME + r")\s+AS\s+ENUM\s*\(",
-                     st, re.I | re.S)
+        m = re.match(
+            r"CREATE\s+TYPE\s+(?P<name>" + self._NAME + r")\s+AS\s+ENUM\s*\(",
+            st,
+            re.I | re.S,
+        )
         if m:
             inner, _ = self._extract_balanced(st, m.end() - 1)
             vals = self._extract_string_list(inner or "")
             qualified = self._clean_ident(m.group("name"))
             _, tname = self._split_qualified(qualified)
-            self.schema_types_table.append({
-                "type_id": self._next("type"), "type_name": tname,
-                "type_category": "ENUM", "base_type": None,
-                "allowed_values": vals, "table_id": None, "file_id": file_id,
-            })
+            self.schema_types_table.append(
+                {
+                    "type_id": self._next("type"),
+                    "type_name": tname,
+                    "type_category": "ENUM",
+                    "base_type": None,
+                    "allowed_values": vals,
+                    "table_id": None,
+                    "file_id": file_id,
+                }
+            )
             return
-        m = re.match(r"CREATE\s+TYPE\s+(?P<name>" + self._NAME + r")\s+AS\s*\(",
-                     st, re.I | re.S)
+        m = re.match(
+            r"CREATE\s+TYPE\s+(?P<name>" + self._NAME + r")\s+AS\s*\(", st, re.I | re.S
+        )
         if m:
             qualified = self._clean_ident(m.group("name"))
             _, tname = self._split_qualified(qualified)
-            self.schema_types_table.append({
-                "type_id": self._next("type"), "type_name": tname,
-                "type_category": "COMPOSITE", "base_type": None,
-                "allowed_values": [], "table_id": None, "file_id": file_id,
-            })
+            self.schema_types_table.append(
+                {
+                    "type_id": self._next("type"),
+                    "type_name": tname,
+                    "type_category": "COMPOSITE",
+                    "base_type": None,
+                    "allowed_values": [],
+                    "table_id": None,
+                    "file_id": file_id,
+                }
+            )
             return
         m = re.match(r"CREATE\s+TYPE\s+(?P<name>" + self._NAME + r")", st, re.I | re.S)
         if m:
             qualified = self._clean_ident(m.group("name"))
             _, tname = self._split_qualified(qualified)
-            self.schema_types_table.append({
-                "type_id": self._next("type"), "type_name": tname,
-                "type_category": "TYPE", "base_type": None,
-                "allowed_values": [], "table_id": None, "file_id": file_id,
-            })
+            self.schema_types_table.append(
+                {
+                    "type_id": self._next("type"),
+                    "type_name": tname,
+                    "type_category": "TYPE",
+                    "base_type": None,
+                    "allowed_values": [],
+                    "table_id": None,
+                    "file_id": file_id,
+                }
+            )
 
     def _sql_domain(self, st: str, engine: str, file_id: int) -> None:
-        m = re.match(r"CREATE\s+DOMAIN\s+(?P<name>" + self._NAME + r")\s+AS\s+(?P<base>.+)$",
-                     st, re.I | re.S)
+        m = re.match(
+            r"CREATE\s+DOMAIN\s+(?P<name>" + self._NAME + r")\s+AS\s+(?P<base>.+)$",
+            st,
+            re.I | re.S,
+        )
         if not m:
             return
         qualified = self._clean_ident(m.group("name"))
@@ -719,17 +862,25 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
         if cm:
             inner, _ = self._extract_balanced(st, cm.end() - 1)
             chk = (inner or "").strip()
-        self.schema_types_table.append({
-            "type_id": self._next("type"), "type_name": tname,
-            "type_category": "DOMAIN", "base_type": base_type,
-            "allowed_values": [chk] if chk else [], "table_id": None,
-            "file_id": file_id,
-        })
+        self.schema_types_table.append(
+            {
+                "type_id": self._next("type"),
+                "type_name": tname,
+                "type_category": "DOMAIN",
+                "base_type": base_type,
+                "allowed_values": [chk] if chk else [],
+                "table_id": None,
+                "file_id": file_id,
+            }
+        )
 
     def _sql_method(self, st: str, engine: str, file_id: int) -> None:
         m = re.match(
             r"CREATE\s+(?:OR\s+REPLACE\s+)?(?P<kind>FUNCTION|PROCEDURE|AGGREGATE)\s+"
-            r"(?P<name>" + self._NAME + r")\s*\(", st, re.I | re.S)
+            r"(?P<name>" + self._NAME + r")\s*\(",
+            st,
+            re.I | re.S,
+        )
         if not m:
             return
         kind = m.group("kind").lower()
@@ -738,30 +889,49 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
         args, end = self._extract_balanced(st, m.end() - 1)
         tail = st[end:] if end else ""
         ret = None
-        rm = re.search(r"\bRETURNS\s+(?P<r>.+?)(?=\s+(?:LANGUAGE|AS|STABLE|VOLATILE|IMMUTABLE|SECURITY|COST|SET|BEGIN|WINDOW|STRICT|PARALLEL)\b|\s*\$|;|$)",
-                       tail, re.I | re.S)
+        rm = re.search(
+            r"\bRETURNS\s+(?P<r>.+?)(?=\s+(?:LANGUAGE|AS|STABLE|VOLATILE|IMMUTABLE|SECURITY|COST|SET|BEGIN|WINDOW|STRICT|PARALLEL)\b|\s*\$|;|$)",
+            tail,
+            re.I | re.S,
+        )
         if rm:
             ret = re.sub(r"\s+", " ", rm.group("r").strip()) or None
         lang = None
         lm = re.search(r"\bLANGUAGE\s+(?P<l>[A-Za-z_][\w]*)", tail, re.I)
         if lm:
             lang = lm.group("l").lower()
-        self.schema_methods_table.append({
-            "method_id": self._next("method"), "method_name": mname,
-            "method_kind": kind, "return_type": ret, "language": lang,
-            "arg_signature": re.sub(r"\s+", " ", (args or "").strip()) or None,
-            "table_id": None, "file_id": file_id,
-        })
+        self.schema_methods_table.append(
+            {
+                "method_id": self._next("method"),
+                "method_name": mname,
+                "method_kind": kind,
+                "return_type": ret,
+                "language": lang,
+                "arg_signature": re.sub(r"\s+", " ", (args or "").strip()) or None,
+                "table_id": None,
+                "file_id": file_id,
+            }
+        )
 
     def _sql_trigger(self, st: str, engine: str, file_id: int) -> None:
         m = re.match(
-            r"CREATE\s+(?:OR\s+REPLACE\s+|CONSTRAINT\s+)?TRIGGER\s+(?P<name>" + self._NAME + r")\s+"
-            r"(?P<timing>BEFORE|AFTER|INSTEAD\s+OF)\s+(?P<events>.+?)\s+ON\s+(?P<table>" + self._NAME + r")",
-            st, re.I | re.S)
+            r"CREATE\s+(?:OR\s+REPLACE\s+|CONSTRAINT\s+)?TRIGGER\s+(?P<name>"
+            + self._NAME
+            + r")\s+"
+            r"(?P<timing>BEFORE|AFTER|INSTEAD\s+OF)\s+(?P<events>.+?)\s+ON\s+(?P<table>"
+            + self._NAME
+            + r")",
+            st,
+            re.I | re.S,
+        )
         if not m:
             return
         tname = self._clean_ident(m.group("name"))
-        events = [e.strip().upper() for e in re.split(r"\bOR\b", m.group("events"), flags=re.I) if e.strip()]
+        events = [
+            e.strip().upper()
+            for e in re.split(r"\bOR\b", m.group("events"), flags=re.I)
+            if e.strip()
+        ]
         events = [re.sub(r"\s+.*$", "", e) for e in events]  # drop "UPDATE OF col"
         level = None
         if re.search(r"FOR\s+EACH\s+ROW", st, re.I):
@@ -770,7 +940,9 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             level = "STATEMENT"
         action = None
         method_id = None
-        am = re.search(r"EXECUTE\s+(?:FUNCTION|PROCEDURE)\s+(?P<fn>" + self._NAME + r")", st, re.I)
+        am = re.search(
+            r"EXECUTE\s+(?:FUNCTION|PROCEDURE)\s+(?P<fn>" + self._NAME + r")", st, re.I
+        )
         if am:
             fnname = self._clean_ident(am.group("fn"))
             action = f"EXECUTE {fnname}"
@@ -779,20 +951,32 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
                 if mrow["method_name"] == bare:
                     method_id = mrow["method_id"]
                     break
-        self.schema_triggers_table.append({
-            "trigger_id": self._next("trigger"), "trigger_name": tname,
-            "table_id": self._resolve_table_id(self._clean_ident(m.group("table"))),
-            "timing": m.group("timing").upper().replace("  ", " "),
-            "events": events, "level": level, "action": action,
-            "method_id": method_id, "file_id": file_id,
-        })
+        self.schema_triggers_table.append(
+            {
+                "trigger_id": self._next("trigger"),
+                "trigger_name": tname,
+                "table_id": self._resolve_table_id(self._clean_ident(m.group("table"))),
+                "timing": m.group("timing").upper().replace("  ", " "),
+                "events": events,
+                "level": level,
+                "action": action,
+                "method_id": method_id,
+                "file_id": file_id,
+            }
+        )
 
     def _sql_index(self, st: str, engine: str, file_id: int) -> None:
         m = re.match(
             r"CREATE\s+(?P<uniq>UNIQUE\s+)?INDEX\s+(?:CONCURRENTLY\s+)?(?:IF\s+NOT\s+EXISTS\s+)?"
-            r"(?P<name>" + self._NAME + r")?\s*ON\s+(?:ONLY\s+)?(?P<table>" + self._NAME + r")\s*"
+            r"(?P<name>"
+            + self._NAME
+            + r")?\s*ON\s+(?:ONLY\s+)?(?P<table>"
+            + self._NAME
+            + r")\s*"
             r"(?:USING\s+(?P<method>\w+)\s*)?\(",
-            st, re.I | re.S)
+            st,
+            re.I | re.S,
+        )
         if not m:
             return
         inner, _ = self._extract_balanced(st, st.index("(", m.end() - 1))
@@ -800,27 +984,39 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
         table_id = self._resolve_table_id(tbl_name)
         col_ids: List[int] = []
         if table_id is not None:
-            colmap = {c["column_name"].lower(): c["column_id"]
-                      for c in self.schema_columns_table if table_id in c["table_ids"]}
+            colmap = {
+                c["column_name"].lower(): c["column_id"]
+                for c in self.schema_columns_table
+                if table_id in c["table_ids"]
+            }
             for part in self._split_top_level(inner or ""):
                 nm = re.match(r"\s*(?P<n>" + self._NAME + r")", part)
                 if nm:
                     cid = colmap.get(self._clean_ident(nm.group("n")).lower())
                     if cid is not None:
                         col_ids.append(cid)
-        self.schema_indexes_table.append({
-            "index_id": self._next("index"),
-            "index_name": self._clean_ident(m.group("name")) if m.group("name") else None,
-            "table_id": table_id, "is_unique": bool(m.group("uniq")),
-            "method": m.group("method").lower() if m.group("method") else None,
-            "column_ids": col_ids, "column_expr": re.sub(r"\s+", " ", (inner or "").strip()),
-            "file_id": file_id,
-        })
+        self.schema_indexes_table.append(
+            {
+                "index_id": self._next("index"),
+                "index_name": (
+                    self._clean_ident(m.group("name")) if m.group("name") else None
+                ),
+                "table_id": table_id,
+                "is_unique": bool(m.group("uniq")),
+                "method": m.group("method").lower() if m.group("method") else None,
+                "column_ids": col_ids,
+                "column_expr": re.sub(r"\s+", " ", (inner or "").strip()),
+                "file_id": file_id,
+            }
+        )
 
     def _sql_view(self, st: str, engine: str, file_id: int) -> None:
         m = re.match(
             r"CREATE\s+(?:OR\s+REPLACE\s+)?(?P<mat>MATERIALIZED\s+)?VIEW\s+"
-            r"(?P<name>" + self._NAME + r")\s*(?:\((?P<cols>[^)]*)\))?", st, re.I | re.S)
+            r"(?P<name>" + self._NAME + r")\s*(?:\((?P<cols>[^)]*)\))?",
+            st,
+            re.I | re.S,
+        )
         if not m:
             return
         qualified = self._clean_ident(m.group("name"))
@@ -834,39 +1030,70 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
                 if nm:
                     ordinal += 1
                     cid = self._next("column")
-                    self.schema_columns_table.append({
-                        "column_id": cid, "column_name": self._clean_ident(nm.group("n")),
-                        "column_type": None, "column_value": None, "keys": None,
-                        "is_nullable": True, "default_value": None,
-                        "references_table": None, "references_column": None,
-                        "ordinal": ordinal, "table_ids": [table_id], "file_id": file_id,
-                    })
+                    self.schema_columns_table.append(
+                        {
+                            "column_id": cid,
+                            "column_name": self._clean_ident(nm.group("n")),
+                            "column_type": None,
+                            "column_value": None,
+                            "keys": None,
+                            "is_nullable": True,
+                            "default_value": None,
+                            "references_table": None,
+                            "references_column": None,
+                            "ordinal": ordinal,
+                            "table_ids": [table_id],
+                            "file_id": file_id,
+                        }
+                    )
                     col_ids.append(cid)
-        self.schema_tables_table.append({
-            "table_id": table_id, "table_name": tname, "qualified_name": qualified,
-            "db_engine": engine, "namespace": namespace,
-            "table_kind": "materialized_view" if m.group("mat") else "view",
-            "columns_ids": col_ids, "key_ids": [], "constraint_ids": [],
-            "trigger_ids": [], "index_ids": [], "file_id": file_id,
-        })
+        self.schema_tables_table.append(
+            {
+                "table_id": table_id,
+                "table_name": tname,
+                "qualified_name": qualified,
+                "db_engine": engine,
+                "namespace": namespace,
+                "table_kind": "materialized_view" if m.group("mat") else "view",
+                "columns_ids": col_ids,
+                "key_ids": [],
+                "constraint_ids": [],
+                "trigger_ids": [],
+                "index_ids": [],
+                "file_id": file_id,
+            }
+        )
 
     def _sql_alter_table(self, st: str, engine: str, file_id: int) -> None:
         """Handle ALTER TABLE ... ADD CONSTRAINT (FK/UNIQUE/CHECK/PK)."""
-        m = re.match(r"ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?(?P<table>" + self._NAME + r")\s+(?P<rest>.*)$",
-                     st, re.I | re.S)
+        m = re.match(
+            r"ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?(?P<table>"
+            + self._NAME
+            + r")\s+(?P<rest>.*)$",
+            st,
+            re.I | re.S,
+        )
         if not m:
             return
         table_id = self._resolve_table_id(self._clean_ident(m.group("table")))
         if table_id is None:
             return
-        name_to_colid = {c["column_name"].lower(): c["column_id"]
-                         for c in self.schema_columns_table if table_id in c["table_ids"]}
+        name_to_colid = {
+            c["column_name"].lower(): c["column_id"]
+            for c in self.schema_columns_table
+            if table_id in c["table_ids"]
+        }
         for add in re.split(r",\s*ADD\s+", m.group("rest"), flags=re.I):
-            am = re.search(r"(?:ADD\s+)?(?P<c>CONSTRAINT\s+.*|PRIMARY\s+KEY.*|FOREIGN\s+KEY.*|UNIQUE.*|CHECK.*)$",
-                           add.strip(), re.I | re.S)
+            am = re.search(
+                r"(?:ADD\s+)?(?P<c>CONSTRAINT\s+.*|PRIMARY\s+KEY.*|FOREIGN\s+KEY.*|UNIQUE.*|CHECK.*)$",
+                add.strip(),
+                re.I | re.S,
+            )
             if not am:
                 continue
-            krows, crows = self._parse_table_constraint(am.group("c"), table_id, name_to_colid, file_id)
+            krows, crows = self._parse_table_constraint(
+                am.group("c"), table_id, name_to_colid, file_id
+            )
             self.schema_keys_table.extend(krows)
             self.schema_constraints_table.extend(crows)
             for row in self.schema_tables_table:
@@ -883,8 +1110,12 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             obj = json.loads(text)
         except json.JSONDecodeError:
             return
-        coll = (obj.get("collMod") or obj.get("collection")
-                or obj.get("$id") or obj.get("title"))
+        coll = (
+            obj.get("collMod")
+            or obj.get("collection")
+            or obj.get("$id")
+            or obj.get("title")
+        )
         schema = None
         validator = obj.get("validator") or {}
         if isinstance(validator, dict) and "$jsonSchema" in validator:
@@ -927,46 +1158,72 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
                 if enum_vals is not None:
                     type_str = "enum"
                     col_value = json.dumps(enum_vals)
-                    self.schema_types_table.append({
-                        "type_id": self._next("type"), "type_name": full,
-                        "type_category": "ENUM", "base_type": None,
-                        "allowed_values": enum_vals, "table_id": table_id,
-                        "file_id": file_id,
-                    })
+                    self.schema_types_table.append(
+                        {
+                            "type_id": self._next("type"),
+                            "type_name": full,
+                            "type_category": "ENUM",
+                            "base_type": None,
+                            "allowed_values": enum_vals,
+                            "table_id": table_id,
+                            "file_id": file_id,
+                        }
+                    )
                 is_required = pname in req
                 keys = []
                 if full == "_id" or pname == "_id":
                     keys.append("PK")
                     kid = self._next("key")
                     key_ids.append(kid)
-                    self.schema_keys_table.append({
-                        "key_id": kid, "key_name": None, "key_type": "PRIMARY KEY",
-                        "table_id": table_id, "column_ids": [], "referenced_table": None,
-                        "referenced_columns": [], "on_delete": None, "on_update": None,
-                        "file_id": file_id,
-                    })
+                    self.schema_keys_table.append(
+                        {
+                            "key_id": kid,
+                            "key_name": None,
+                            "key_type": "PRIMARY KEY",
+                            "table_id": table_id,
+                            "column_ids": [],
+                            "referenced_table": None,
+                            "referenced_columns": [],
+                            "on_delete": None,
+                            "on_update": None,
+                            "file_id": file_id,
+                        }
+                    )
                 counter["ordinal"] += 1
                 cid = self._next("column")
-                self.schema_columns_table.append({
-                    "column_id": cid, "column_name": full, "column_type": type_str,
-                    "column_value": col_value,
-                    "keys": ",".join(keys) if keys else None,
-                    "is_nullable": (not is_required) or nullable,
-                    "default_value": None, "references_table": None,
-                    "references_column": None, "ordinal": counter["ordinal"],
-                    "table_ids": [table_id], "file_id": file_id,
-                })
+                self.schema_columns_table.append(
+                    {
+                        "column_id": cid,
+                        "column_name": full,
+                        "column_type": type_str,
+                        "column_value": col_value,
+                        "keys": ",".join(keys) if keys else None,
+                        "is_nullable": (not is_required) or nullable,
+                        "default_value": None,
+                        "references_table": None,
+                        "references_column": None,
+                        "ordinal": counter["ordinal"],
+                        "table_ids": [table_id],
+                        "file_id": file_id,
+                    }
+                )
                 col_ids.append(cid)
                 if keys and self.schema_keys_table:
                     self.schema_keys_table[-1]["column_ids"] = [cid]
                 if is_required:
                     con_id = self._next("constraint")
                     constraint_ids.append(con_id)
-                    self.schema_constraints_table.append({
-                        "constraint_id": con_id, "constraint_name": None,
-                        "constraint_type": "NOT NULL", "table_id": table_id,
-                        "column_ids": [cid], "expression": None, "file_id": file_id,
-                    })
+                    self.schema_constraints_table.append(
+                        {
+                            "constraint_id": con_id,
+                            "constraint_name": None,
+                            "constraint_type": "NOT NULL",
+                            "table_id": table_id,
+                            "column_ids": [cid],
+                            "expression": None,
+                            "file_id": file_id,
+                        }
+                    )
                 # Recurse into nested object properties.
                 sub = pdef.get("properties")
                 if isinstance(sub, dict):
@@ -979,20 +1236,34 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             if ctl in obj:
                 con_id = self._next("constraint")
                 constraint_ids.append(con_id)
-                self.schema_constraints_table.append({
-                    "constraint_id": con_id, "constraint_name": ctl,
-                    "constraint_type": "VALIDATION", "table_id": table_id,
-                    "column_ids": [], "expression": str(obj[ctl]), "file_id": file_id,
-                })
+                self.schema_constraints_table.append(
+                    {
+                        "constraint_id": con_id,
+                        "constraint_name": ctl,
+                        "constraint_type": "VALIDATION",
+                        "table_id": table_id,
+                        "column_ids": [],
+                        "expression": str(obj[ctl]),
+                        "file_id": file_id,
+                    }
+                )
 
-        self.schema_tables_table.append({
-            "table_id": table_id, "table_name": str(coll),
-            "qualified_name": str(coll), "db_engine": engine,
-            "namespace": None, "table_kind": "collection",
-            "columns_ids": col_ids, "key_ids": key_ids,
-            "constraint_ids": constraint_ids, "trigger_ids": [],
-            "index_ids": [], "file_id": file_id,
-        })
+        self.schema_tables_table.append(
+            {
+                "table_id": table_id,
+                "table_name": str(coll),
+                "qualified_name": str(coll),
+                "db_engine": engine,
+                "namespace": None,
+                "table_kind": "collection",
+                "columns_ids": col_ids,
+                "key_ids": key_ids,
+                "constraint_ids": constraint_ids,
+                "trigger_ids": [],
+                "index_ids": [],
+                "file_id": file_id,
+            }
+        )
 
     # ==================================================================
     # Redis keyspace (markdown) parsing
@@ -1000,7 +1271,9 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
     def _parse_redis(self, text: str, engine: str, file_id: int) -> None:
         # domain name / abbreviation
         domain = None
-        hm = re.search(r"^#\s+(?P<d>[^\n]+?)\s*(?:—|-{1,2}|—)\s*keyspace", text, re.I | re.M)
+        hm = re.search(
+            r"^#\s+(?P<d>[^\n]+?)\s*(?:—|-{1,2}|—)\s*keyspace", text, re.I | re.M
+        )
         if hm:
             domain = hm.group("d").strip()
         abbr = None
@@ -1018,7 +1291,9 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
                 break
         if header_idx is None:
             return
-        headers = [h.strip().lower() for h in lines[header_idx].strip().strip("|").split("|")]
+        headers = [
+            h.strip().lower() for h in lines[header_idx].strip().strip("|").split("|")
+        ]
 
         def col_of(*names):
             for nm in names:
@@ -1048,105 +1323,198 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             key_pattern = cells[i_key].strip("`") if i_key is not None else s
             if not key_pattern or set(key_pattern) <= set("-: "):
                 continue
-            rtype = cells[i_type].strip("` ") if (i_type is not None and i_type < len(cells)) else None
-            ttl = cells[i_ttl].strip("` ") if (i_ttl is not None and i_ttl < len(cells)) else None
-            size = cells[i_size].strip("` ") if (i_size is not None and i_size < len(cells)) else None
+            rtype = (
+                cells[i_type].strip("` ")
+                if (i_type is not None and i_type < len(cells))
+                else None
+            )
+            ttl = (
+                cells[i_ttl].strip("` ")
+                if (i_ttl is not None and i_ttl < len(cells))
+                else None
+            )
+            size = (
+                cells[i_size].strip("` ")
+                if (i_size is not None and i_size < len(cells))
+                else None
+            )
             keys = []
             if re.search(r"\{[^}]+\}", key_pattern):
                 keys.append("SHARD")  # redis hash-tag => shard/partition key
             ordinal += 1
             cid = self._next("column")
-            self.schema_columns_table.append({
-                "column_id": cid, "column_name": key_pattern,
-                "column_type": rtype, "column_value": ttl,
-                "keys": ",".join(keys) if keys else None,
-                "is_nullable": True, "default_value": size,
-                "references_table": None, "references_column": None,
-                "ordinal": ordinal, "table_ids": [table_id], "file_id": file_id,
-            })
+            self.schema_columns_table.append(
+                {
+                    "column_id": cid,
+                    "column_name": key_pattern,
+                    "column_type": rtype,
+                    "column_value": ttl,
+                    "keys": ",".join(keys) if keys else None,
+                    "is_nullable": True,
+                    "default_value": size,
+                    "references_table": None,
+                    "references_column": None,
+                    "ordinal": ordinal,
+                    "table_ids": [table_id],
+                    "file_id": file_id,
+                }
+            )
             col_ids.append(cid)
             if "SHARD" in keys:
                 kid = self._next("key")
                 key_ids.append(kid)
-                self.schema_keys_table.append({
-                    "key_id": kid, "key_name": None, "key_type": "SHARD KEY",
-                    "table_id": table_id, "column_ids": [cid],
-                    "referenced_table": None, "referenced_columns": [],
-                    "on_delete": None, "on_update": None, "file_id": file_id,
-                })
+                self.schema_keys_table.append(
+                    {
+                        "key_id": kid,
+                        "key_name": None,
+                        "key_type": "SHARD KEY",
+                        "table_id": table_id,
+                        "column_ids": [cid],
+                        "referenced_table": None,
+                        "referenced_columns": [],
+                        "on_delete": None,
+                        "on_update": None,
+                        "file_id": file_id,
+                    }
+                )
 
-        self.schema_tables_table.append({
-            "table_id": table_id, "table_name": table_name,
-            "qualified_name": table_name, "db_engine": engine,
-            "namespace": domain, "table_kind": "keyspace",
-            "columns_ids": col_ids, "key_ids": key_ids,
-            "constraint_ids": [], "trigger_ids": [], "index_ids": [],
-            "file_id": file_id,
-        })
+        self.schema_tables_table.append(
+            {
+                "table_id": table_id,
+                "table_name": table_name,
+                "qualified_name": table_name,
+                "db_engine": engine,
+                "namespace": domain,
+                "table_kind": "keyspace",
+                "columns_ids": col_ids,
+                "key_ids": key_ids,
+                "constraint_ids": [],
+                "trigger_ids": [],
+                "index_ids": [],
+                "file_id": file_id,
+            }
+        )
 
     # ==================================================================
     # Shared row emitters for the interface / schema definition languages.
     # They produce EXACTLY the same row shapes as the SQL / Mongo parsers so
     # every engine feeds one uniform set of normalized tables.
     # ==================================================================
-    def _emit_table(self, name: str, engine: str, namespace: Optional[str],
-                    kind: str, file_id: int,
-                    qualified: Optional[str] = None) -> Dict[str, Any]:
+    def _emit_table(
+        self,
+        name: str,
+        engine: str,
+        namespace: Optional[str],
+        kind: str,
+        file_id: int,
+        qualified: Optional[str] = None,
+    ) -> Dict[str, Any]:
         row = {
-            "table_id": self._next("table"), "table_name": name,
-            "qualified_name": qualified or (f"{namespace}.{name}" if namespace else name),
-            "db_engine": engine, "namespace": namespace, "table_kind": kind,
-            "columns_ids": [], "key_ids": [], "constraint_ids": [],
-            "trigger_ids": [], "index_ids": [], "file_id": file_id,
+            "table_id": self._next("table"),
+            "table_name": name,
+            "qualified_name": qualified
+            or (f"{namespace}.{name}" if namespace else name),
+            "db_engine": engine,
+            "namespace": namespace,
+            "table_kind": kind,
+            "columns_ids": [],
+            "key_ids": [],
+            "constraint_ids": [],
+            "trigger_ids": [],
+            "index_ids": [],
+            "file_id": file_id,
         }
         self.schema_tables_table.append(row)
         return row
 
-    def _emit_column(self, table_row: Dict[str, Any], name: str,
-                     type_str: Optional[str], file_id: int, *,
-                     keys: Optional[str] = None, nullable: bool = True,
-                     default: Optional[str] = None, value: Optional[str] = None,
-                     ref_table: Optional[str] = None,
-                     ref_col: Optional[str] = None) -> int:
+    def _emit_column(
+        self,
+        table_row: Dict[str, Any],
+        name: str,
+        type_str: Optional[str],
+        file_id: int,
+        *,
+        keys: Optional[str] = None,
+        nullable: bool = True,
+        default: Optional[str] = None,
+        value: Optional[str] = None,
+        ref_table: Optional[str] = None,
+        ref_col: Optional[str] = None,
+    ) -> int:
         cid = self._next("column")
-        self.schema_columns_table.append({
-            "column_id": cid, "column_name": name, "column_type": type_str,
-            "column_value": value, "keys": keys, "is_nullable": nullable,
-            "default_value": default, "references_table": ref_table,
-            "references_column": ref_col,
-            "ordinal": len(table_row["columns_ids"]) + 1,
-            "table_ids": [table_row["table_id"]], "file_id": file_id,
-        })
+        self.schema_columns_table.append(
+            {
+                "column_id": cid,
+                "column_name": name,
+                "column_type": type_str,
+                "column_value": value,
+                "keys": keys,
+                "is_nullable": nullable,
+                "default_value": default,
+                "references_table": ref_table,
+                "references_column": ref_col,
+                "ordinal": len(table_row["columns_ids"]) + 1,
+                "table_ids": [table_row["table_id"]],
+                "file_id": file_id,
+            }
+        )
         table_row["columns_ids"].append(cid)
         return cid
 
-    def _emit_type(self, name: str, category: str, base: Optional[str],
-                   allowed: Optional[List[Any]], table_id: Optional[int],
-                   file_id: int) -> int:
+    def _emit_type(
+        self,
+        name: str,
+        category: str,
+        base: Optional[str],
+        allowed: Optional[List[Any]],
+        table_id: Optional[int],
+        file_id: int,
+    ) -> int:
         tid = self._next("type")
-        self.schema_types_table.append({
-            "type_id": tid, "type_name": name, "type_category": category,
-            "base_type": base, "allowed_values": allowed or [],
-            "table_id": table_id, "file_id": file_id,
-        })
+        self.schema_types_table.append(
+            {
+                "type_id": tid,
+                "type_name": name,
+                "type_category": category,
+                "base_type": base,
+                "allowed_values": allowed or [],
+                "table_id": table_id,
+                "file_id": file_id,
+            }
+        )
         return tid
 
-    def _emit_method(self, name: str, kind: str, ret: Optional[str],
-                     lang: Optional[str], args: Optional[str],
-                     table_id: Optional[int], file_id: int) -> int:
+    def _emit_method(
+        self,
+        name: str,
+        kind: str,
+        ret: Optional[str],
+        lang: Optional[str],
+        args: Optional[str],
+        table_id: Optional[int],
+        file_id: int,
+    ) -> int:
         mid = self._next("method")
-        self.schema_methods_table.append({
-            "method_id": mid, "method_name": name, "method_kind": kind,
-            "return_type": ret, "language": lang, "arg_signature": args,
-            "table_id": table_id, "file_id": file_id,
-        })
+        self.schema_methods_table.append(
+            {
+                "method_id": mid,
+                "method_name": name,
+                "method_kind": kind,
+                "return_type": ret,
+                "language": lang,
+                "arg_signature": args,
+                "table_id": table_id,
+                "file_id": file_id,
+            }
+        )
         return mid
 
     # ------------------------------------------------------------------
     # generic text-IDL helpers (brace matching / comment stripping / split)
     # ------------------------------------------------------------------
-    def _extract_braced(self, s: str, open_idx: int
-                        ) -> Tuple[Optional[str], Optional[int]]:
+    def _extract_braced(
+        self, s: str, open_idx: int
+    ) -> Tuple[Optional[str], Optional[int]]:
         """Given ``s[open_idx] == '{'`` return (inner_text, index_after_close),
         respecting quoted strings. Comments should be stripped beforehand."""
         if open_idx >= len(s) or s[open_idx] != "{":
@@ -1179,11 +1547,11 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             if c == "}":
                 depth -= 1
                 if depth == 0:
-                    return s[open_idx + 1:i], i + 1
+                    return s[open_idx + 1 : i], i + 1
                 i += 1
                 continue
             i += 1
-        return s[open_idx + 1:], n
+        return s[open_idx + 1 :], n
 
     def _strip_idl_comments(self, text: str, hash_comments: bool = False) -> str:
         """Remove ``//`` line, ``/* */`` block and (optionally) ``#`` line
@@ -1194,7 +1562,7 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
         quote: Optional[str] = None
         while i < n:
             c = text[i]
-            two = text[i:i + 2]
+            two = text[i : i + 2]
             if quote:
                 out.append(c)
                 if c == "\\" and i + 1 < n:
@@ -1227,8 +1595,9 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             i += 1
         return "".join(out)
 
-    def _split_members(self, s: str, seps: str = ",;",
-                       brackets: str = "()[]{}<>") -> List[str]:
+    def _split_members(
+        self, s: str, seps: str = ",;", brackets: str = "()[]{}<>"
+    ) -> List[str]:
         """Split ``s`` on any char in ``seps`` that sits at bracket depth 0
         (brackets given as alternating open/close chars), respecting quotes."""
         opens = brackets[0::2]
@@ -1290,7 +1659,7 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
                 _, after = self._extract_braced(body, m.end() - 1)
                 if after is None:
                     break
-                body = body[:m.start()] + body[after:]
+                body = body[: m.start()] + body[after:]
         return body
 
     # ==================================================================
@@ -1301,8 +1670,14 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
         pm = re.search(r"\bpackage\s+([A-Za-z_][\w\.]*)\s*;", src)
         self._proto_scope(src, engine, file_id, pm.group(1) if pm else None, "")
 
-    def _proto_scope(self, body: str, engine: str, file_id: int,
-                     namespace: Optional[str], prefix: str) -> None:
+    def _proto_scope(
+        self,
+        body: str,
+        engine: str,
+        file_id: int,
+        namespace: Optional[str],
+        prefix: str,
+    ) -> None:
         kw = re.compile(r"\b(message|enum|service)\s+([A-Za-z_]\w*)\s*\{")
         i = 0
         while True:
@@ -1318,32 +1693,50 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
                 vals = re.findall(r"([A-Za-z_]\w*)\s*=\s*-?\d+", inner)
                 self._emit_type(qname, "ENUM", None, vals, None, file_id)
             elif kind == "service":
-                trow = self._emit_table(m.group(2), engine, namespace, "service",
-                                        file_id, qualified=qname)
+                trow = self._emit_table(
+                    m.group(2), engine, namespace, "service", file_id, qualified=qname
+                )
                 for rpc in re.finditer(
                     r"\brpc\s+(\w+)\s*\(\s*(stream\s+)?([\w\.]+)\s*\)\s*"
                     r"returns\s*\(\s*(stream\s+)?([\w\.]+)\s*\)",
-                    inner, re.I):
+                    inner,
+                    re.I,
+                ):
                     args = f"{rpc.group(2) or ''}{rpc.group(3)}".strip()
                     ret = f"{rpc.group(4) or ''}{rpc.group(5)}".strip()
-                    self._emit_method(rpc.group(1), "rpc", ret, "protobuf",
-                                      args, trow["table_id"], file_id)
+                    self._emit_method(
+                        rpc.group(1),
+                        "rpc",
+                        ret,
+                        "protobuf",
+                        args,
+                        trow["table_id"],
+                        file_id,
+                    )
             else:  # message
-                trow = self._emit_table(m.group(2), engine, namespace, "message",
-                                        file_id, qualified=qname)
+                trow = self._emit_table(
+                    m.group(2), engine, namespace, "message", file_id, qualified=qname
+                )
                 cleaned = self._proto_flatten_fields(inner)
                 for stmt in cleaned.split(";"):
                     fm = re.match(
                         r"\s*(?:(repeated|optional|required)\s+)?"
                         r"(?P<type>map\s*<[^>]+>|[A-Za-z_][\w\.]*)\s+"
-                        r"(?P<name>[A-Za-z_]\w*)\s*=\s*\d+", stmt)
+                        r"(?P<name>[A-Za-z_]\w*)\s*=\s*\d+",
+                        stmt,
+                    )
                     if not fm:
                         continue
                     tstr = re.sub(r"\s+", "", fm.group("type"))
                     if fm.group(1) == "repeated":
                         tstr += "[]"
-                    self._emit_column(trow, fm.group("name"), tstr, file_id,
-                                      nullable=(fm.group(1) != "required"))
+                    self._emit_column(
+                        trow,
+                        fm.group("name"),
+                        tstr,
+                        file_id,
+                        nullable=(fm.group(1) != "required"),
+                    )
                 self._proto_scope(inner, engine, file_id, namespace, qname + ".")
 
     def _proto_flatten_fields(self, body: str) -> str:
@@ -1358,7 +1751,7 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             inner, after = self._extract_braced(body, m.end() - 1)
             if after is None:
                 break
-            body = body[:m.start()] + (inner or "") + ";" + body[after:]
+            body = body[: m.start()] + (inner or "") + ";" + body[after:]
         return body
 
     # ==================================================================
@@ -1370,49 +1763,76 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
         ns = nm.group(1) if nm else None
 
         for tm in re.finditer(
-                r"\btypedef\s+(?P<base>[\w\.]+(?:\s*<[^>]+>)?)\s+"
-                r"(?P<name>[A-Za-z_]\w*)", src):
-            self._emit_type(tm.group("name"), "TYPEDEF",
-                            re.sub(r"\s+", "", tm.group("base")), [], None, file_id)
+            r"\btypedef\s+(?P<base>[\w\.]+(?:\s*<[^>]+>)?)\s+"
+            r"(?P<name>[A-Za-z_]\w*)",
+            src,
+        ):
+            self._emit_type(
+                tm.group("name"),
+                "TYPEDEF",
+                re.sub(r"\s+", "", tm.group("base")),
+                [],
+                None,
+                file_id,
+            )
 
         for em in re.finditer(r"\benum\s+([A-Za-z_]\w*)\s*\{", src):
             inner, _ = self._extract_braced(src, em.end() - 1)
-            vals = [v for v in re.findall(r"([A-Za-z_]\w*)\s*(?:=\s*-?\d+)?",
-                                          inner or "") if v]
+            vals = [
+                v
+                for v in re.findall(r"([A-Za-z_]\w*)\s*(?:=\s*-?\d+)?", inner or "")
+                if v
+            ]
             self._emit_type(em.group(1), "ENUM", None, vals, None, file_id)
 
         for sm in re.finditer(r"\b(struct|union|exception)\s+([A-Za-z_]\w*)\s*\{", src):
             inner, _ = self._extract_braced(src, sm.end() - 1)
-            trow = self._emit_table(sm.group(2), engine, ns,
-                                    sm.group(1).lower(), file_id)
+            trow = self._emit_table(
+                sm.group(2), engine, ns, sm.group(1).lower(), file_id
+            )
             for fm in re.finditer(
-                    r"(?P<id>\d+)\s*:\s*(?:(?P<req>required|optional)\s+)?"
-                    r"(?P<type>[\w\.]+(?:\s*<[^>]+>)?)\s+(?P<name>[A-Za-z_]\w*)"
-                    r"(?:\s*=\s*(?P<def>[^,;\n]+))?", inner or ""):
+                r"(?P<id>\d+)\s*:\s*(?:(?P<req>required|optional)\s+)?"
+                r"(?P<type>[\w\.]+(?:\s*<[^>]+>)?)\s+(?P<name>[A-Za-z_]\w*)"
+                r"(?:\s*=\s*(?P<def>[^,;\n]+))?",
+                inner or "",
+            ):
                 self._emit_column(
-                    trow, fm.group("name"), re.sub(r"\s+", "", fm.group("type")),
-                    file_id, nullable=(fm.group("req") != "required"),
-                    default=(fm.group("def").strip() if fm.group("def") else None))
+                    trow,
+                    fm.group("name"),
+                    re.sub(r"\s+", "", fm.group("type")),
+                    file_id,
+                    nullable=(fm.group("req") != "required"),
+                    default=(fm.group("def").strip() if fm.group("def") else None),
+                )
 
         for svc in re.finditer(
-                r"\bservice\s+([A-Za-z_]\w*)(?:\s+extends\s+[\w\.]+)?\s*\{", src):
+            r"\bservice\s+([A-Za-z_]\w*)(?:\s+extends\s+[\w\.]+)?\s*\{", src
+        ):
             inner, _ = self._extract_braced(src, svc.end() - 1)
             trow = self._emit_table(svc.group(1), engine, ns, "service", file_id)
             for fn in re.finditer(
-                    r"(?:(?P<oneway>oneway)\s+)?(?P<ret>void|[\w\.]+(?:\s*<[^>]+>)?)\s+"
-                    r"(?P<name>[A-Za-z_]\w*)\s*\((?P<args>[^)]*)\)", inner or ""):
+                r"(?:(?P<oneway>oneway)\s+)?(?P<ret>void|[\w\.]+(?:\s*<[^>]+>)?)\s+"
+                r"(?P<name>[A-Za-z_]\w*)\s*\((?P<args>[^)]*)\)",
+                inner or "",
+            ):
                 self._emit_method(
                     fn.group("name"),
                     "oneway" if fn.group("oneway") else "function",
-                    re.sub(r"\s+", "", fn.group("ret")), "thrift",
+                    re.sub(r"\s+", "", fn.group("ret")),
+                    "thrift",
                     re.sub(r"\s+", " ", fn.group("args").strip()) or None,
-                    trow["table_id"], file_id)
+                    trow["table_id"],
+                    file_id,
+                )
 
     # ==================================================================
     # GraphQL SDL (.graphql / .gql / .graphqls)
     # ==================================================================
-    _GQL_ROOT = {"Query": "query", "Mutation": "mutation",
-                 "Subscription": "subscription"}
+    _GQL_ROOT = {
+        "Query": "query",
+        "Mutation": "mutation",
+        "Subscription": "subscription",
+    }
 
     def _parse_graphql(self, text: str, engine: str, file_id: int) -> None:
         src = self._strip_idl_comments(text, hash_comments=True)
@@ -1430,42 +1850,63 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             self._emit_type(en.group(1), "ENUM", None, vals, None, file_id)
 
         for dm in re.finditer(
-                r"\bdirective\s+@([A-Za-z_]\w*)\s*(?:\((?P<args>[^)]*)\))?\s+"
-                r"(?:repeatable\s+)?on\b", src):
-            self._emit_method(dm.group(1), "directive", None, "graphql",
-                              re.sub(r"\s+", " ", (dm.group("args") or "").strip())
-                              or None, None, file_id)
+            r"\bdirective\s+@([A-Za-z_]\w*)\s*(?:\((?P<args>[^)]*)\))?\s+"
+            r"(?:repeatable\s+)?on\b",
+            src,
+        ):
+            self._emit_method(
+                dm.group(1),
+                "directive",
+                None,
+                "graphql",
+                re.sub(r"\s+", " ", (dm.group("args") or "").strip()) or None,
+                None,
+                file_id,
+            )
 
         for tm in re.finditer(
-                r"\b(type|input|interface)\s+([A-Za-z_]\w*)"
-                r"(?:\s+implements\s+[\w\s&]+?)?\s*\{", src):
+            r"\b(type|input|interface)\s+([A-Za-z_]\w*)"
+            r"(?:\s+implements\s+[\w\s&]+?)?\s*\{",
+            src,
+        ):
             inner, _ = self._extract_braced(src, tm.end() - 1)
             kind = tm.group(1).lower()
             name = tm.group(2)
-            table_kind = {"type": "object", "input": "input",
-                          "interface": "interface"}[kind]
+            table_kind = {"type": "object", "input": "input", "interface": "interface"}[
+                kind
+            ]
             trow = self._emit_table(name, engine, None, table_kind, file_id)
             is_root = name in self._GQL_ROOT
             for fname, args, ftype in self._graphql_fields(inner or ""):
                 if is_root:
-                    self._emit_method(fname, self._GQL_ROOT[name], ftype,
-                                      "graphql", args, trow["table_id"], file_id)
+                    self._emit_method(
+                        fname,
+                        self._GQL_ROOT[name],
+                        ftype,
+                        "graphql",
+                        args,
+                        trow["table_id"],
+                        file_id,
+                    )
                 else:
-                    self._emit_column(trow, fname, ftype, file_id,
-                                      nullable=not ftype.endswith("!"))
+                    self._emit_column(
+                        trow, fname, ftype, file_id, nullable=not ftype.endswith("!")
+                    )
 
-    def _graphql_fields(self, inner: str
-                        ) -> List[Tuple[str, Optional[str], str]]:
+    def _graphql_fields(self, inner: str) -> List[Tuple[str, Optional[str], str]]:
         fields: List[Tuple[str, Optional[str], str]] = []
         for m in re.finditer(
-                r"([A-Za-z_]\w*)\s*(?:\((?P<args>[^)]*)\))?\s*:\s*"
-                r"(?P<type>[\[\]\w!]+)", inner):
+            r"([A-Za-z_]\w*)\s*(?:\((?P<args>[^)]*)\))?\s*:\s*" r"(?P<type>[\[\]\w!]+)",
+            inner,
+        ):
             args = m.group("args")
-            fields.append((
-                m.group(1),
-                re.sub(r"\s+", " ", args.strip()) if args else None,
-                m.group("type"),
-            ))
+            fields.append(
+                (
+                    m.group(1),
+                    re.sub(r"\s+", " ", args.strip()) if args else None,
+                    m.group("type"),
+                )
+            )
         return fields
 
     # ==================================================================
@@ -1482,38 +1923,63 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             else:
                 self._avro_named(schema, engine, file_id, None)
 
-    def _avro_named(self, schema: Any, engine: str, file_id: int,
-                    ns: Optional[str]) -> Optional[str]:
+    def _avro_named(
+        self, schema: Any, engine: str, file_id: int, ns: Optional[str]
+    ) -> Optional[str]:
         if not isinstance(schema, dict):
             return None
         t = schema.get("type")
         namespace = schema.get("namespace", ns)
         name = schema.get("name")
         if t == "enum":
-            self._emit_type(name or "enum", "ENUM", None,
-                            schema.get("symbols", []) or [], None, file_id)
+            self._emit_type(
+                name or "enum",
+                "ENUM",
+                None,
+                schema.get("symbols", []) or [],
+                None,
+                file_id,
+            )
             return name
         if t == "fixed":
-            self._emit_type(name or "fixed", "FIXED",
-                            f"fixed[{schema.get('size')}]", [], None, file_id)
+            self._emit_type(
+                name or "fixed",
+                "FIXED",
+                f"fixed[{schema.get('size')}]",
+                [],
+                None,
+                file_id,
+            )
             return name
         if t in ("record", "error"):
-            trow = self._emit_table(name or "record", engine, namespace,
-                                    "error" if t == "error" else "record", file_id)
+            trow = self._emit_table(
+                name or "record",
+                engine,
+                namespace,
+                "error" if t == "error" else "record",
+                file_id,
+            )
             for fld in schema.get("fields", []) or []:
                 if not isinstance(fld, dict):
                     continue
-                tstr, nullable, syms = self._avro_type(fld.get("type"), engine,
-                                                       file_id, namespace)
+                tstr, nullable, syms = self._avro_type(
+                    fld.get("type"), engine, file_id, namespace
+                )
                 self._emit_column(
-                    trow, fld.get("name", "?"), tstr, file_id, nullable=nullable,
+                    trow,
+                    fld.get("name", "?"),
+                    tstr,
+                    file_id,
+                    nullable=nullable,
                     default=(json.dumps(fld["default"]) if "default" in fld else None),
-                    value=(json.dumps(syms) if syms else None))
+                    value=(json.dumps(syms) if syms else None),
+                )
             return name
         return None
 
-    def _avro_type(self, t: Any, engine: str, file_id: int, ns: Optional[str]
-                   ) -> Tuple[Optional[str], bool, Optional[List[Any]]]:
+    def _avro_type(
+        self, t: Any, engine: str, file_id: int, ns: Optional[str]
+    ) -> Tuple[Optional[str], bool, Optional[List[Any]]]:
         """Resolve a field type into (type_string, nullable, enum_symbols),
         emitting any named nested record/enum/fixed as its own entity."""
         if isinstance(t, list):  # union
@@ -1547,16 +2013,16 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             return str(tt), False, None
         return str(t), False, None
 
-    def _avro_protocol(self, obj: Dict[str, Any], engine: str,
-                       file_id: int) -> None:
+    def _avro_protocol(self, obj: Dict[str, Any], engine: str, file_id: int) -> None:
         ns = obj.get("namespace")
         for ty in obj.get("types", []) or []:
             self._avro_named(ty, engine, file_id, ns)
         msgs = obj.get("messages", {}) or {}
         if not msgs:
             return
-        trow = self._emit_table(obj.get("protocol", "protocol"), engine, ns,
-                                "protocol", file_id)
+        trow = self._emit_table(
+            obj.get("protocol", "protocol"), engine, ns, "protocol", file_id
+        )
         for mname, mdef in msgs.items():
             if not isinstance(mdef, dict):
                 continue
@@ -1564,9 +2030,12 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             ret = resp if isinstance(resp, str) else json.dumps(resp)
             args = ", ".join(
                 f"{r.get('name')}:{self._avro_type(r.get('type'), engine, file_id, ns)[0]}"
-                for r in (mdef.get("request", []) or []) if isinstance(r, dict))
-            self._emit_method(mname, "message", ret, "avro", args or None,
-                              trow["table_id"], file_id)
+                for r in (mdef.get("request", []) or [])
+                if isinstance(r, dict)
+            )
+            self._emit_method(
+                mname, "message", ret, "avro", args or None, trow["table_id"], file_id
+            )
 
     # ==================================================================
     # Avro IDL (.avdl) — brace grammar
@@ -1579,20 +2048,30 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             self._emit_type(em.group(1), "ENUM", None, vals, None, file_id)
         for rm in re.finditer(r"\b(record|error)\s+([A-Za-z_]\w*)\s*\{", src):
             inner, _ = self._extract_braced(src, rm.end() - 1)
-            trow = self._emit_table(rm.group(2), engine, None,
-                                    "error" if rm.group(1) == "error" else "record",
-                                    file_id)
+            trow = self._emit_table(
+                rm.group(2),
+                engine,
+                None,
+                "error" if rm.group(1) == "error" else "record",
+                file_id,
+            )
             for fld in (inner or "").split(";"):
                 fm = re.match(
                     r"\s*(?P<type>(?:array|map|union)\s*<[^>]+>|[\w\.]+(?:<[^>]+>)?"
                     r"(?:\?)?(?:\[\])?)\s+(?P<name>[A-Za-z_]\w*)"
-                    r"(?:\s*=\s*(?P<def>.+))?$", fld.strip(), re.S)
+                    r"(?:\s*=\s*(?P<def>.+))?$",
+                    fld.strip(),
+                    re.S,
+                )
                 if not fm:
                     continue
                 self._emit_column(
-                    trow, fm.group("name"), re.sub(r"\s+", "", fm.group("type")),
+                    trow,
+                    fm.group("name"),
+                    re.sub(r"\s+", "", fm.group("type")),
                     file_id,
-                    default=(fm.group("def").strip() if fm.group("def") else None))
+                    default=(fm.group("def").strip() if fm.group("def") else None),
+                )
         # protocol-level messages (RPC) -> methods
         stripped = self._strip_nested_blocks(src, ("record", "error", "enum"))
         pm = re.search(r"\bprotocol\s+([A-Za-z_]\w*)\s*\{", stripped)
@@ -1600,15 +2079,23 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             pbody, _ = self._extract_braced(stripped, pm.end() - 1)
             trow: Optional[Dict[str, Any]] = None
             for fn in re.finditer(
-                    r"(?P<ret>[\w\.]+(?:<[^>]+>)?)\s+(?P<name>[A-Za-z_]\w*)\s*"
-                    r"\((?P<args>[^)]*)\)\s*;", pbody or ""):
+                r"(?P<ret>[\w\.]+(?:<[^>]+>)?)\s+(?P<name>[A-Za-z_]\w*)\s*"
+                r"\((?P<args>[^)]*)\)\s*;",
+                pbody or "",
+            ):
                 if trow is None:
-                    trow = self._emit_table(pm.group(1), engine, None,
-                                            "protocol", file_id)
+                    trow = self._emit_table(
+                        pm.group(1), engine, None, "protocol", file_id
+                    )
                 self._emit_method(
-                    fn.group("name"), "message", fn.group("ret"), "avro",
+                    fn.group("name"),
+                    "message",
+                    fn.group("ret"),
+                    "avro",
                     re.sub(r"\s+", " ", fn.group("args").strip()) or None,
-                    trow["table_id"], file_id)
+                    trow["table_id"],
+                    file_id,
+                )
 
     # ==================================================================
     # FlatBuffers (.fbs)
@@ -1619,31 +2106,43 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
         ns = nm.group(1) if nm else None
 
         for em in re.finditer(
-                r"\b(enum|union)\s+([A-Za-z_]\w*)\s*(?::\s*\w+)?\s*\{", src):
+            r"\b(enum|union)\s+([A-Za-z_]\w*)\s*(?::\s*\w+)?\s*\{", src
+        ):
             inner, _ = self._extract_braced(src, em.end() - 1)
             if em.group(1) == "enum":
                 vals = re.findall(r"[A-Za-z_]\w*", inner or "")
                 self._emit_type(em.group(2), "ENUM", None, vals, None, file_id)
             else:
                 members = self._split_members(inner or "", seps=",")
-                self._emit_type(em.group(2), "UNION", None,
-                                [re.sub(r"\s+", "", m) for m in members],
-                                None, file_id)
+                self._emit_type(
+                    em.group(2),
+                    "UNION",
+                    None,
+                    [re.sub(r"\s+", "", m) for m in members],
+                    None,
+                    file_id,
+                )
 
         for tm in re.finditer(r"\b(table|struct)\s+([A-Za-z_]\w*)\s*\{", src):
             inner, _ = self._extract_braced(src, tm.end() - 1)
-            trow = self._emit_table(tm.group(2), engine, ns,
-                                    tm.group(1).lower(), file_id)
+            trow = self._emit_table(
+                tm.group(2), engine, ns, tm.group(1).lower(), file_id
+            )
             for fld in (inner or "").split(";"):
                 fm = re.match(
                     r"\s*(?P<name>[A-Za-z_]\w*)\s*:\s*(?P<type>\[?\s*[\w\.]+\s*\]?)"
-                    r"\s*(?:=\s*(?P<def>[^;(]+))?", fld.strip())
+                    r"\s*(?:=\s*(?P<def>[^;(]+))?",
+                    fld.strip(),
+                )
                 if not fm:
                     continue
                 self._emit_column(
-                    trow, fm.group("name"), re.sub(r"\s+", "", fm.group("type")),
+                    trow,
+                    fm.group("name"),
+                    re.sub(r"\s+", "", fm.group("type")),
                     file_id,
-                    default=(fm.group("def").strip() if fm.group("def") else None))
+                    default=(fm.group("def").strip() if fm.group("def") else None),
+                )
 
         for rm in re.finditer(r"\brpc_service\s+([A-Za-z_]\w*)\s*\{", src):
             inner, _ = self._extract_braced(src, rm.end() - 1)
@@ -1651,12 +2150,20 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             for fn in (inner or "").split(";"):
                 fnm = re.match(
                     r"\s*(?P<name>[A-Za-z_]\w*)\s*\(\s*(?P<arg>[\w\.]+)\s*\)\s*:\s*"
-                    r"(?P<ret>[\w\.]+)", fn.strip())
+                    r"(?P<ret>[\w\.]+)",
+                    fn.strip(),
+                )
                 if not fnm:
                     continue
-                self._emit_method(fnm.group("name"), "rpc", fnm.group("ret"),
-                                  "flatbuffers", fnm.group("arg"),
-                                  trow["table_id"], file_id)
+                self._emit_method(
+                    fnm.group("name"),
+                    "rpc",
+                    fnm.group("ret"),
+                    "flatbuffers",
+                    fnm.group("arg"),
+                    trow["table_id"],
+                    file_id,
+                )
 
     # ==================================================================
     # Cap'n Proto (.capnp)
@@ -1665,11 +2172,11 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
         src = self._strip_idl_comments(text, hash_comments=True)
         self._capnp_scope(src, engine, file_id, "")
 
-    def _capnp_scope(self, body: str, engine: str, file_id: int,
-                     prefix: str) -> None:
+    def _capnp_scope(self, body: str, engine: str, file_id: int, prefix: str) -> None:
         kw = re.compile(
             r"\b(struct|enum|interface)\s+([A-Za-z_]\w*)"
-            r"(?:\s*@0x[0-9a-fA-F]+)?\s*\{")
+            r"(?:\s*@0x[0-9a-fA-F]+)?\s*\{"
+        )
         i = 0
         while True:
             m = kw.search(body, i)
@@ -1684,29 +2191,42 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
                 vals = re.findall(r"([A-Za-z_]\w*)\s*@\d+", inner)
                 self._emit_type(qname, "ENUM", None, vals, None, file_id)
             elif kind == "interface":
-                trow = self._emit_table(m.group(2), engine, None, "interface",
-                                        file_id, qualified=qname)
+                trow = self._emit_table(
+                    m.group(2), engine, None, "interface", file_id, qualified=qname
+                )
                 for fn in re.finditer(
-                        r"([A-Za-z_]\w*)\s*@\d+\s*\((?P<args>[^)]*)\)\s*"
-                        r"(?:->\s*\((?P<ret>[^)]*)\))?", inner):
+                    r"([A-Za-z_]\w*)\s*@\d+\s*\((?P<args>[^)]*)\)\s*"
+                    r"(?:->\s*\((?P<ret>[^)]*)\))?",
+                    inner,
+                ):
                     self._emit_method(
-                        fn.group(1), "method",
+                        fn.group(1),
+                        "method",
                         re.sub(r"\s+", " ", (fn.group("ret") or "").strip()) or None,
                         "capnp",
                         re.sub(r"\s+", " ", fn.group("args").strip()) or None,
-                        trow["table_id"], file_id)
+                        trow["table_id"],
+                        file_id,
+                    )
                 self._capnp_scope(inner, engine, file_id, qname + ".")
             else:  # struct
-                trow = self._emit_table(m.group(2), engine, None, "struct",
-                                        file_id, qualified=qname)
+                trow = self._emit_table(
+                    m.group(2), engine, None, "struct", file_id, qualified=qname
+                )
                 cleaned = self._strip_nested_blocks(
-                    inner, ("struct", "enum", "interface"))
+                    inner, ("struct", "enum", "interface")
+                )
                 for fld in re.finditer(
-                        r"([A-Za-z_]\w*)\s*@\d+\s*:\s*"
-                        r"(?P<type>[A-Za-z_][\w\.]*(?:\([^)]*\))?)", cleaned):
-                    self._emit_column(trow, fld.group(1),
-                                      re.sub(r"\s+", "", fld.group("type")),
-                                      file_id)
+                    r"([A-Za-z_]\w*)\s*@\d+\s*:\s*"
+                    r"(?P<type>[A-Za-z_][\w\.]*(?:\([^)]*\))?)",
+                    cleaned,
+                ):
+                    self._emit_column(
+                        trow,
+                        fld.group(1),
+                        re.sub(r"\s+", "", fld.group("type")),
+                        file_id,
+                    )
                 self._capnp_scope(inner, engine, file_id, qname + ".")
 
     # ==================================================================
@@ -1714,6 +2234,7 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
     # ==================================================================
     def _parse_xsd(self, text: str, engine: str, file_id: int) -> None:
         import xml.etree.ElementTree as ET
+
         try:
             root = ET.fromstring(text)
         except ET.ParseError:
@@ -1751,8 +2272,13 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
                 en = el.get("name")
                 if not en:
                     continue
-                self._emit_column(trow, en, type_of(el), file_id,
-                                  nullable=(el.get("minOccurs") == "0"))
+                self._emit_column(
+                    trow,
+                    en,
+                    type_of(el),
+                    file_id,
+                    nullable=(el.get("minOccurs") == "0"),
+                )
 
         for st in root.iter():
             if local(st.tag) != "simpleType":
@@ -1760,15 +2286,19 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             name = st.get("name")
             if not name:
                 continue
-            syms = [e.get("value") for e in st.iter()
-                    if local(e.tag) == "enumeration" and e.get("value") is not None]
+            syms = [
+                e.get("value")
+                for e in st.iter()
+                if local(e.tag) == "enumeration" and e.get("value") is not None
+            ]
             base = None
             for r in st.iter():
                 if local(r.tag) == "restriction":
                     base = (r.get("base") or "").split(":")[-1] or None
                     break
-            self._emit_type(name, "ENUM" if syms else "SIMPLE", base, syms,
-                            None, file_id)
+            self._emit_type(
+                name, "ENUM" if syms else "SIMPLE", base, syms, None, file_id
+            )
 
     # ==================================================================
     # Post-processing: attach triggers/indexes to tables; build databases
@@ -1804,8 +2334,10 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
                 g = {
                     "db_id": self._next("database"),
                     "db_name": t["namespace"] or t["db_engine"],
-                    "db_engine": t["db_engine"], "namespace": t["namespace"],
-                    "file_ids": [], "table_ids": [],
+                    "db_engine": t["db_engine"],
+                    "namespace": t["namespace"],
+                    "file_ids": [],
+                    "table_ids": [],
                 }
                 groups[key] = g
             g["table_ids"].append(t["table_id"])
@@ -1818,7 +2350,9 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
     # ==================================================================
     def link_repository(
         self,
-        repository_tables: Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]],
+        repository_tables: Tuple[
+            List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]
+        ],
         analyzed_file_paths: Optional[List[Union[str, Path]]] = None,
     ) -> List[Dict[str, Any]]:
         """
@@ -1839,7 +2373,9 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             deepest = location[-1] if location else 1
             folder_path = folder_by_id.get(deepest, ".")
             fname = f["file_name"] + (f".{ext}" if ext else "")
-            relpath = fname if folder_path in (".", "", None) else f"{folder_path}/{fname}"
+            relpath = (
+                fname if folder_path in (".", "", None) else f"{folder_path}/{fname}"
+            )
             repo_by_relpath.setdefault(relpath, f["file_id"])
             repo_by_basename.setdefault(Path(relpath).name, []).append(f["file_id"])
 
@@ -1865,7 +2401,12 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             (self.KIND_TABLE, self.schema_tables_table, "table_id", "file_id"),
             (self.KIND_COLUMN, self.schema_columns_table, "column_id", "file_id"),
             (self.KIND_KEY, self.schema_keys_table, "key_id", "file_id"),
-            (self.KIND_CONSTRAINT, self.schema_constraints_table, "constraint_id", "file_id"),
+            (
+                self.KIND_CONSTRAINT,
+                self.schema_constraints_table,
+                "constraint_id",
+                "file_id",
+            ),
             (self.KIND_TRIGGER, self.schema_triggers_table, "trigger_id", "file_id"),
             (self.KIND_METHOD, self.schema_methods_table, "method_id", "file_id"),
             (self.KIND_TYPE, self.schema_types_table, "type_id", "file_id"),
@@ -1885,18 +2426,26 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
                             repo_ids.append(r)
                     row[file_key] = repo_ids
                     for r in repo_ids:
-                        self.schema_file_index.append({
-                            "sfi_id": self._next("sfi"), "file_id": r,
-                            "entity_kind": kind, "entity_id": row[id_key],
-                        })
+                        self.schema_file_index.append(
+                            {
+                                "sfi_id": self._next("sfi"),
+                                "file_id": r,
+                                "entity_kind": kind,
+                                "entity_id": row[id_key],
+                            }
+                        )
                 else:
                     repo_id = local_to_repo.get(row.get(file_key))
                     row[file_key] = repo_id
                     if repo_id is not None:
-                        self.schema_file_index.append({
-                            "sfi_id": self._next("sfi"), "file_id": repo_id,
-                            "entity_kind": kind, "entity_id": row[id_key],
-                        })
+                        self.schema_file_index.append(
+                            {
+                                "sfi_id": self._next("sfi"),
+                                "file_id": repo_id,
+                                "entity_kind": kind,
+                                "entity_id": row[id_key],
+                            }
+                        )
         return self.schema_file_index
 
     # ==================================================================
@@ -1926,9 +2475,11 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
         Returns (type_name, type_value, remainder)."""
         s = s.strip()
         multi = "|".join(self._MULTIWORD_TYPES)
-        pat = (r"^(?P<type>(?:" + multi + r")|" + self._NAME + r")"
-               r"(?P<params>\s*\([^)]*\))?"
-               r"(?P<arr>(?:\s*\[\s*\d*\s*\])+|\s+ARRAY\b)?")
+        pat = (
+            r"^(?P<type>(?:" + multi + r")|" + self._NAME + r")"
+            r"(?P<params>\s*\([^)]*\))?"
+            r"(?P<arr>(?:\s*\[\s*\d*\s*\])+|\s+ARRAY\b)?"
+        )
         m = re.match(pat, s, re.I)
         if not m:
             return None, None, s
@@ -1938,11 +2489,16 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             tval = m.group("params").strip()[1:-1].strip() or None
         if m.group("arr"):
             tname = tname + "[]"
-        return tname, tval, s[m.end():].strip()
+        return tname, tval, s[m.end() :].strip()
 
     def _find_referential_action(self, s: str, which: str) -> Optional[str]:
-        m = re.search(r"\bON\s+" + which + r"\s+(?P<a>CASCADE|SET\s+NULL|SET\s+DEFAULT|RESTRICT|NO\s+ACTION)",
-                      s, re.I)
+        m = re.search(
+            r"\bON\s+"
+            + which
+            + r"\s+(?P<a>CASCADE|SET\s+NULL|SET\s+DEFAULT|RESTRICT|NO\s+ACTION)",
+            s,
+            re.I,
+        )
         if m:
             return re.sub(r"\s+", " ", m.group("a").upper())
         return None
@@ -1953,7 +2509,9 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
         rest = s[start:]
         stops = re.compile(
             r"\b(NOT\s+NULL|NULL|REFERENCES|CHECK|UNIQUE|PRIMARY\s+KEY|"
-            r"GENERATED|COLLATE|CONSTRAINT)\b", re.I)
+            r"GENERATED|COLLATE|CONSTRAINT)\b",
+            re.I,
+        )
         depth = 0
         quote = None
         i = 0
@@ -1990,7 +2548,9 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
         val = rest[:i].strip().rstrip(",").strip()
         return val or None
 
-    def _extract_balanced(self, s: str, open_idx: int) -> Tuple[Optional[str], Optional[int]]:
+    def _extract_balanced(
+        self, s: str, open_idx: int
+    ) -> Tuple[Optional[str], Optional[int]]:
         """Given s[open_idx] == '(', return (inner_text, index_after_close)."""
         if open_idx >= len(s) or s[open_idx] != "(":
             op = s.find("(", open_idx)
@@ -2022,11 +2582,11 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             if c == ")":
                 depth -= 1
                 if depth == 0:
-                    return s[open_idx + 1:i], i + 1
+                    return s[open_idx + 1 : i], i + 1
                 i += 1
                 continue
             i += 1
-        return s[open_idx + 1:], n
+        return s[open_idx + 1 :], n
 
     def _split_top_level(self, s: str, sep: str = ",") -> List[str]:
         parts: List[str] = []
@@ -2079,7 +2639,7 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
         i = 0
         n = len(sql)
         while i < n:
-            two = sql[i:i + 2]
+            two = sql[i : i + 2]
             c = sql[i]
             if two == "--":
                 j = sql.find("\n", i)
@@ -2124,7 +2684,7 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
                         buf.append(sql[i:])
                         i = n
                     else:
-                        buf.append(sql[i:j + len(tag)])
+                        buf.append(sql[i : j + len(tag)])
                         i = j + len(tag)
                     continue
             if c == ";":
@@ -2155,6 +2715,7 @@ class SchemaAnalyzer(SchemaDefinitionEngines):
             print(f"Exported schema analysis to JSON: {out}")
         elif self.dump_file_type in ("yml", "yaml"):
             import yaml
+
             with open(out, "w", encoding="utf-8") as f:
                 yaml.dump(tables, f, sort_keys=False)
             print(f"Exported schema analysis to YAML: {out}")

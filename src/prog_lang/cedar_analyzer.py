@@ -12,7 +12,7 @@
 # and action paths referenced in the scope are surfaced as variables.  Comments
 # are '//'; strings use '"'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -37,11 +37,13 @@ class CedarAnalyzer(RegexCodeAnalyzer):
                 continue
             effect = eff.group(1)
             counters[effect] += 1
-            am = self._ANNOT.search(chunk[:eff.start()])
+            am = self._ANNOT.search(chunk[: eff.start()])
             # prefer an @id annotation; else the first annotation value; else ordinal
             name = None
-            ids = [(m.group(1), m.group(2))
-                   for m in self._ANNOT.finditer(chunk[:eff.start()])]
+            ids = [
+                (m.group(1), m.group(2))
+                for m in self._ANNOT.finditer(chunk[: eff.start()])
+            ]
             for key, val in ids:
                 if key == "id":
                     name = val
@@ -50,8 +52,9 @@ class CedarAnalyzer(RegexCodeAnalyzer):
                 name = ids[0][1]
             if name is None:
                 name = f"{effect}_{counters[effect]}"
-            self._add_function(file_id, name, [], [],
-                               description=f"cedar {effect} policy")
+            self._add_function(
+                file_id, name, [], [], description=f"cedar {effect} policy"
+            )
             # entity-type literals referenced in the policy scope
             seen = set()
             for em in self._ENTITY.finditer(chunk):

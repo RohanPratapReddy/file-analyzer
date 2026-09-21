@@ -12,7 +12,7 @@
 #
 # Comments are '//', '(* *)' and '/* */'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -23,8 +23,10 @@ class LigoAnalyzer(RegexCodeAnalyzer):
     BLOCK_COMMENTS = (("(*", "*)"), ("/*", "*/"))
     STRING_DELIMS = ('"',)
 
-    _FUNC = re.compile(r"^[ \t]*(?:recursive\s+)?function\s+([A-Za-z_]\w*)\s*"
-                       r"\(([^)]*)\)", re.MULTILINE)
+    _FUNC = re.compile(
+        r"^[ \t]*(?:recursive\s+)?function\s+([A-Za-z_]\w*)\s*" r"\(([^)]*)\)",
+        re.MULTILINE,
+    )
     _CONST = re.compile(r"^[ \t]*(const|var)\s+([A-Za-z_]\w*)\s*:", re.MULTILINE)
     _TYPE = re.compile(r"^[ \t]*type\s+([A-Za-z_]\w*)\s+is\b", re.MULTILINE)
     _MODULE = re.compile(r"^[ \t]*module\s+([A-Za-z_]\w*)\s+is\b", re.MULTILINE)
@@ -53,5 +55,6 @@ class LigoAnalyzer(RegexCodeAnalyzer):
                 pm = re.search(r"(?:const|var)?\s*([A-Za-z_]\w*)\s*:", part)
                 if pm:
                     arg_ids.append(self._add_arg(pm.group(1)))
-            self._add_function(file_id, m.group(1), arg_ids, [],
-                               description="ligo function")
+            self._add_function(
+                file_id, m.group(1), arg_ids, [], description="ligo function"
+            )

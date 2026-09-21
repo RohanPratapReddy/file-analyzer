@@ -9,8 +9,8 @@
 # extension -- no reimplementation, no placeholder.
 import re
 
-from ..prog_lang.regex_base import RegexCodeAnalyzer
 from ..prog_lang.groovy_analyzer import GroovyAnalyzer
+from ..prog_lang.regex_base import RegexCodeAnalyzer
 from ..shell.python_dsls import StarlarkAnalyzer
 
 
@@ -34,25 +34,26 @@ class BazelExtensionAnalyzer(StarlarkAnalyzer):
 class CMakeAnalyzer(RegexCodeAnalyzer):
     """CMake module / script (`.cmake`).
 
-        function(my_fn ARG1 ARG2)  ... endfunction()   -> function (+params)
-        macro(my_macro a b)        ... endmacro()       -> function (+params)
-        set(MY_VAR value CACHE ...)                     -> variable
-        option(BUILD_TESTS "desc" ON)                   -> variable
-        include(GNUInstallDirs)                          -> import
-        find_package(Threads REQUIRED)                   -> import
-        add_subdirectory(src)                            -> import (directory)
+    function(my_fn ARG1 ARG2)  ... endfunction()   -> function (+params)
+    macro(my_macro a b)        ... endmacro()       -> function (+params)
+    set(MY_VAR value CACHE ...)                     -> variable
+    option(BUILD_TESTS "desc" ON)                   -> variable
+    include(GNUInstallDirs)                          -> import
+    find_package(Threads REQUIRED)                   -> import
+    add_subdirectory(src)                            -> import (directory)
     """
 
     LANG_KEY = "cmake"
     EXTENSIONS = (".cmake",)
     LINE_COMMENTS = ("#",)
-    BLOCK_COMMENTS = ()          # `#[[ ... ]]` handled in _strip_bracket_comments
+    BLOCK_COMMENTS = ()  # `#[[ ... ]]` handled in _strip_bracket_comments
     STRING_DELIMS = ('"',)
 
     _FUNC = re.compile(r"(?im)^[ \t]*(function|macro)[ \t]*\(([^)]*)\)")
     _SET = re.compile(r"(?im)^[ \t]*set[ \t]*\([ \t]*([A-Za-z_]\w*)([^)]*)\)")
-    _OPTION = re.compile(r"(?im)^[ \t]*(?:option|cmake_dependent_option)[ \t]*\("
-                         r"[ \t]*([A-Za-z_]\w*)")
+    _OPTION = re.compile(
+        r"(?im)^[ \t]*(?:option|cmake_dependent_option)[ \t]*\(" r"[ \t]*([A-Za-z_]\w*)"
+    )
     _INCLUDE = re.compile(r"(?im)^[ \t]*include[ \t]*\([ \t]*([^\s)]+)")
     _FIND = re.compile(r"(?im)^[ \t]*find_package[ \t]*\([ \t]*([A-Za-z_][\w.\-]*)")
     _SUBDIR = re.compile(r"(?im)^[ \t]*add_subdirectory[ \t]*\([ \t]*([^\s)]+)")
@@ -73,8 +74,9 @@ class CMakeAnalyzer(RegexCodeAnalyzer):
             mod = m.group(1).strip('"')
             if mod and not mod.startswith("$") and mod not in seen_imp:
                 seen_imp.add(mod)
-                self._add_import(file_id, mod.replace("\\", "/").split("/")[-1],
-                                 mod, alias="include")
+                self._add_import(
+                    file_id, mod.replace("\\", "/").split("/")[-1], mod, alias="include"
+                )
         for m in self._FIND.finditer(clean):
             pkg = m.group(1)
             if pkg not in seen_imp:
@@ -84,8 +86,12 @@ class CMakeAnalyzer(RegexCodeAnalyzer):
             d = m.group(1).strip('"')
             if d and not d.startswith("$") and d not in seen_imp:
                 seen_imp.add(d)
-                self._add_import(file_id, d.replace("\\", "/").split("/")[-1],
-                                 d, alias="add_subdirectory")
+                self._add_import(
+                    file_id,
+                    d.replace("\\", "/").split("/")[-1],
+                    d,
+                    alias="add_subdirectory",
+                )
 
         # Functions / macros (+ declared parameters).
         seen_fn = set()
@@ -98,8 +104,9 @@ class CMakeAnalyzer(RegexCodeAnalyzer):
                 continue
             seen_fn.add(name)
             arg_ids = [self._add_arg(p) for p in params]
-            self._add_function(file_id, name, arg_ids=arg_ids,
-                               description=f"cmake {m.group(1)}")
+            self._add_function(
+                file_id, name, arg_ids=arg_ids, description=f"cmake {m.group(1)}"
+            )
 
         # Variables: set(VAR ...) and option(VAR ...).
         seen_var = set()
@@ -118,9 +125,14 @@ class CMakeAnalyzer(RegexCodeAnalyzer):
                 self._add_variable(file_id, name, scope="option")
 
         self.record_introspection_metadata(
-            file_id=file_id, entity_id=file_id, entity_type="module",
+            file_id=file_id,
+            entity_id=file_id,
+            entity_type="module",
             inspection_source=self.introspection_source,
-            structural_properties={"dialect": "cmake",
-                                   "functions": len(seen_fn),
-                                   "variables": len(seen_var),
-                                   "imports": len(seen_imp)})
+            structural_properties={
+                "dialect": "cmake",
+                "functions": len(seen_fn),
+                "variables": len(seen_var),
+                "imports": len(seen_imp),
+            },
+        )

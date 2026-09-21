@@ -17,16 +17,18 @@
 # a dedicated regex reader keyed to the Swift *declaration* grammar (which also
 # matches ordinary `.swift` source, since `func NAME(...)` appears there too).
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
 _QNAME = r"[A-Za-z_][A-Za-z0-9_.]*"
 # access / declaration modifiers that may precede a decl keyword
-_MODS = (r"(?:(?:public|private|internal|fileprivate|open|final|static|class|"
-         r"mutating|nonmutating|override|required|convenience|dynamic|lazy|weak|"
-         r"unowned|indirect|optional|prefix|postfix|infix|distributed|"
-         r"nonisolated|isolated|@\w+(?:\([^)]*\))?)\s+)*")
+_MODS = (
+    r"(?:(?:public|private|internal|fileprivate|open|final|static|class|"
+    r"mutating|nonmutating|override|required|convenience|dynamic|lazy|weak|"
+    r"unowned|indirect|optional|prefix|postfix|infix|distributed|"
+    r"nonisolated|isolated|@\w+(?:\([^)]*\))?)\s+)*"
+)
 # a parenthesised parameter list allowing one level of nested parens (closures)
 _PARENS = r"\(((?:[^()]|\([^()]*\))*)\)"
 
@@ -38,23 +40,33 @@ class SwiftInterfaceAnalyzer(RegexCodeAnalyzer):
     BLOCK_COMMENTS = (("/*", "*/"),)
     STRING_DELIMS = ('"',)
 
-    _IMPORT = re.compile(r"(?m)^\s*(?:@\w+\s+)?import\s+(?:typealias\s+|struct\s+|"
-                         r"class\s+|enum\s+|protocol\s+|func\s+|let\s+|var\s+)?"
-                         r"(" + _QNAME + r")")
-    _TYPE = re.compile(r"(?m)^\s*" + _MODS +
-                       r"(class|struct|enum|protocol|actor|extension)\s+"
-                       r"(" + _ID + r")(?:<[^>]*>)?"
-                       r"\s*(?::\s*([^{\n]+?))?\s*(?:where\b[^{\n]*)?(?:\{|$)")
-    _FUNC = re.compile(r"(?m)^\s*" + _MODS + r"func\s+"
-                       r"(" + _ID + r"|`[^`]+`|[-+*/%<>=!&|^~]+)"
-                       r"\s*(?:<[^>]*>)?\s*" + _PARENS +
-                       r"\s*(?:async\s+)?(?:(?:re)?throws\s+)?"
-                       r"(?:->\s*([^{\n]+?))?\s*(?:where\b[^{\n]*)?(?:\{|$)")
+    _IMPORT = re.compile(
+        r"(?m)^\s*(?:@\w+\s+)?import\s+(?:typealias\s+|struct\s+|"
+        r"class\s+|enum\s+|protocol\s+|func\s+|let\s+|var\s+)?"
+        r"(" + _QNAME + r")"
+    )
+    _TYPE = re.compile(
+        r"(?m)^\s*" + _MODS + r"(class|struct|enum|protocol|actor|extension)\s+"
+        r"(" + _ID + r")(?:<[^>]*>)?"
+        r"\s*(?::\s*([^{\n]+?))?\s*(?:where\b[^{\n]*)?(?:\{|$)"
+    )
+    _FUNC = re.compile(
+        r"(?m)^\s*" + _MODS + r"func\s+"
+        r"(" + _ID + r"|`[^`]+`|[-+*/%<>=!&|^~]+)"
+        r"\s*(?:<[^>]*>)?\s*" + _PARENS + r"\s*(?:async\s+)?(?:(?:re)?throws\s+)?"
+        r"(?:->\s*([^{\n]+?))?\s*(?:where\b[^{\n]*)?(?:\{|$)"
+    )
     _INIT = re.compile(r"(?m)^\s*" + _MODS + r"init[?!]?\s*(?:<[^>]*>)?\s*" + _PARENS)
-    _VAR = re.compile(r"(?m)^\s*" + _MODS + r"(var|let)\s+(" + _ID +
-                      r")\s*:\s*([^={\n]+)")
-    _SUBSCRIPT = re.compile(r"(?m)^\s*" + _MODS + r"subscript\s*(?:<[^>]*>)?\s*" +
-                            _PARENS + r"\s*->\s*([^{\n]+)")
+    _VAR = re.compile(
+        r"(?m)^\s*" + _MODS + r"(var|let)\s+(" + _ID + r")\s*:\s*([^={\n]+)"
+    )
+    _SUBSCRIPT = re.compile(
+        r"(?m)^\s*"
+        + _MODS
+        + r"subscript\s*(?:<[^>]*>)?\s*"
+        + _PARENS
+        + r"\s*->\s*([^{\n]+)"
+    )
     _CASE = re.compile(r"(?m)^\s*(?:indirect\s+)?case\s+(" + _ID + r")")
 
     def _register_types(self, file_id, text, path):
@@ -77,12 +89,17 @@ class SwiftInterfaceAnalyzer(RegexCodeAnalyzer):
                     h = h.strip().split("<")[0].strip()
                     # drop layout/availability constraints, keep type names
                     if re.fullmatch(_QNAME, h) and h not in (
-                            "class", "AnyObject", "Sendable", "where"):
+                        "class",
+                        "AnyObject",
+                        "Sendable",
+                        "where",
+                    ):
                         pid = self._register_class(h.split(".")[-1])
                         if pid is not None:
                             parents.append(pid)
-            self._add_class(file_id, name, description="swift " + kind,
-                            parent_ids=parents)
+            self._add_class(
+                file_id, name, description="swift " + kind, parent_ids=parents
+            )
 
         seen_fn = set()
         for m in self._FUNC.finditer(clean):
@@ -93,15 +110,30 @@ class SwiftInterfaceAnalyzer(RegexCodeAnalyzer):
             outs = []
             if m.group(3):
                 outs = [self._add_output(m.group(3).strip())]
-            self._add_function(file_id, raw, self._swift_args(m.group(2)), outs,
-                               description="swift func")
+            self._add_function(
+                file_id,
+                raw,
+                self._swift_args(m.group(2)),
+                outs,
+                description="swift func",
+            )
         for m in self._INIT.finditer(clean):
-            self._add_function(file_id, "init", self._swift_args(m.group(1)), [],
-                               description="swift initializer")
+            self._add_function(
+                file_id,
+                "init",
+                self._swift_args(m.group(1)),
+                [],
+                description="swift initializer",
+            )
         for m in self._SUBSCRIPT.finditer(clean):
             outs = [self._add_output(m.group(2).strip())] if m.group(2) else []
-            self._add_function(file_id, "subscript", self._swift_args(m.group(1)),
-                               outs, description="swift subscript")
+            self._add_function(
+                file_id,
+                "subscript",
+                self._swift_args(m.group(1)),
+                outs,
+                description="swift subscript",
+            )
 
         seen_var = set()
         for m in self._VAR.finditer(clean):
@@ -109,8 +141,9 @@ class SwiftInterfaceAnalyzer(RegexCodeAnalyzer):
             if name in seen_var:
                 continue
             seen_var.add(name)
-            self._add_variable(file_id, name, (m.group(3) or "").strip()[:80],
-                               scope="module")
+            self._add_variable(
+                file_id, name, (m.group(3) or "").strip()[:80], scope="module"
+            )
         for m in self._CASE.finditer(clean):
             name = m.group(1)
             if name not in seen_var:

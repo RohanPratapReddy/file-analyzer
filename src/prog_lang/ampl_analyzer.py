@@ -13,7 +13,7 @@
 #
 # Comments are '#' and '/* */'; strings use '"' and "'".
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -57,10 +57,12 @@ class AMPLAnalyzer(RegexCodeAnalyzer):
             self._add_variable(file_id, m.group(1), scope="var")
 
         for m in self._OBJ.finditer(clean):
-            self._add_function(file_id, m.group(1), [], [],
-                               description="ampl objective")
+            self._add_function(
+                file_id, m.group(1), [], [], description="ampl objective"
+            )
         for m in self._CON.finditer(clean):
-            self._add_function(file_id, m.group(1), [], [],
-                               description="ampl constraint")
+            self._add_function(
+                file_id, m.group(1), [], [], description="ampl constraint"
+            )
         for m in self._PROBLEM.finditer(clean):
             self._add_class(file_id, m.group(1), description="ampl problem")

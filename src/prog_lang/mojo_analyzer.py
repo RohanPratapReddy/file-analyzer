@@ -12,21 +12,25 @@
 #   var count: Int = 0                         -> field / variable
 #   alias NUM = 8                              -> compile-time alias (variable)
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
 class MojoAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "mojo"
-    EXTENSIONS = (".mojo", ".\U0001F525")
+    EXTENSIONS = (".mojo", ".\U0001f525")
     LINE_COMMENTS = ("#",)
     BLOCK_COMMENTS = ()
 
     _FROM = re.compile(r"^from\s+([\w.]+)\s+import\s+(.+)$")
     _IMPORT = re.compile(r"^import\s+([\w.]+)(?:\s+as\s+([A-Za-z_]\w*))?")
-    _TYPE = re.compile(r"^@?\w*\s*(struct|trait)\s+([A-Za-z_]\w*)\s*(?:\[[^\]]*\])?\s*(?:\(([^)]*)\))?\s*:")
+    _TYPE = re.compile(
+        r"^@?\w*\s*(struct|trait)\s+([A-Za-z_]\w*)\s*(?:\[[^\]]*\])?\s*(?:\(([^)]*)\))?\s*:"
+    )
     _DEF = re.compile(r"^(fn|def)\s+([A-Za-z_]\w*[!?]?)\s*(?:\[[^\]]*\])?\s*\(")
-    _FIELD = re.compile(r"^(var|let|alias)\s+([A-Za-z_]\w*)\s*(?::\s*([\w.\[\], ]+?))?\s*(?:=\s*(.+?))?\s*$")
+    _FIELD = re.compile(
+        r"^(var|let|alias)\s+([A-Za-z_]\w*)\s*(?::\s*([\w.\[\], ]+?))?\s*(?:=\s*(.+?))?\s*$"
+    )
 
     def _register_types(self, file_id, text, path):
         for raw in self._strip_comments(text).splitlines():
@@ -36,7 +40,7 @@ class MojoAnalyzer(RegexCodeAnalyzer):
 
     def _extract_entities(self, file_id, text, path):
         text = self._strip_comments(text)
-        scopes = []     # stack of {is_class, header_indent, ...}
+        scopes = []  # stack of {is_class, header_indent, ...}
         classes = []
 
         for raw in text.splitlines():
@@ -44,7 +48,7 @@ class MojoAnalyzer(RegexCodeAnalyzer):
                 continue
             ind = self._indent_of(raw)
             line = raw.strip()
-            if line.startswith("@"):          # decorator line
+            if line.startswith("@"):  # decorator line
                 continue
 
             while scopes and ind <= scopes[-1]["header_indent"]:
@@ -62,8 +66,12 @@ class MojoAnalyzer(RegexCodeAnalyzer):
                 continue
             im = self._IMPORT.match(line)
             if im:
-                self._add_import(file_id, im.group(2) or im.group(1).split(".")[-1],
-                                 im.group(1), im.group(2))
+                self._add_import(
+                    file_id,
+                    im.group(2) or im.group(1).split(".")[-1],
+                    im.group(1),
+                    im.group(2),
+                )
                 continue
 
             tm = self._TYPE.match(line)
@@ -74,8 +82,15 @@ class MojoAnalyzer(RegexCodeAnalyzer):
                         p = p.strip().split("[")[0]
                         if p in self._class_registry:
                             parents.append(self._class_registry[p])
-                entry = {"name": tm.group(2), "kind": tm.group(1), "parents": parents,
-                         "methods": [], "attrs": [], "header_indent": ind, "is_class": True}
+                entry = {
+                    "name": tm.group(2),
+                    "kind": tm.group(1),
+                    "parents": parents,
+                    "methods": [],
+                    "attrs": [],
+                    "header_indent": ind,
+                    "is_class": True,
+                }
                 classes.append(entry)
                 scopes.append(entry)
                 continue
@@ -85,16 +100,20 @@ class MojoAnalyzer(RegexCodeAnalyzer):
                 popen = line.index("(", dm.start())
                 # params may be balanced on this line; fall back gracefully.
                 pclose = self._find_matching(line, popen, "(", ")")
-                params = line[popen + 1:pclose - 1]
+                params = line[popen + 1 : pclose - 1]
                 rest = line[pclose:]
                 ret = None
                 rmatch = re.search(r"->\s*([\w.\[\], !]+?)\s*:", rest)
                 if rmatch:
                     ret = rmatch.group(1).strip()
                 arg_ids = self._params(params)
-                out_ids = [self._add_output(ret)] if ret and ret not in ("None",) else []
+                out_ids = (
+                    [self._add_output(ret)] if ret and ret not in ("None",) else []
+                )
                 cid = self._class_registry.get(cur_class["name"]) if cur_class else None
-                fid = self._add_function(file_id, dm.group(2), arg_ids, out_ids, class_id=cid)
+                fid = self._add_function(
+                    file_id, dm.group(2), arg_ids, out_ids, class_id=cid
+                )
                 if cur_class is not None:
                     cur_class["methods"].append(fid)
                 scopes.append({"is_class": False, "header_indent": ind})
@@ -104,23 +123,44 @@ class MojoAnalyzer(RegexCodeAnalyzer):
                 continue
             xm = self._FIELD.match(line)
             if xm:
-                kind, name, ftype, val = xm.group(1), xm.group(2), xm.group(3), xm.group(4)
+                kind, name, ftype, val = (
+                    xm.group(1),
+                    xm.group(2),
+                    xm.group(3),
+                    xm.group(4),
+                )
                 if cur_class is not None:
-                    cur_class["attrs"].append(self._add_arg(
-                        name, ftype.strip() if ftype else kind, val.strip() if val else None))
+                    cur_class["attrs"].append(
+                        self._add_arg(
+                            name,
+                            ftype.strip() if ftype else kind,
+                            val.strip() if val else None,
+                        )
+                    )
                 else:
-                    self._add_variable(file_id, name, val.strip() if val else None,
-                                       scope="const" if kind == "alias" else "module")
+                    self._add_variable(
+                        file_id,
+                        name,
+                        val.strip() if val else None,
+                        scope="const" if kind == "alias" else "module",
+                    )
 
         for c in classes:
-            self._add_class(file_id, c["name"], description=f"mojo {c['kind']}",
-                            parent_ids=c["parents"], method_ids=c["methods"],
-                            attr_ids=c["attrs"])
+            self._add_class(
+                file_id,
+                c["name"],
+                description=f"mojo {c['kind']}",
+                parent_ids=c["parents"],
+                method_ids=c["methods"],
+                attr_ids=c["attrs"],
+            )
 
     def _params(self, params):
         arg_ids = []
         for part in self._split_top_level(params):
-            part = re.sub(r"\b(?:inout|owned|borrowed|read|mut|ref)\b", "", part).strip()
+            part = re.sub(
+                r"\b(?:inout|owned|borrowed|read|mut|ref)\b", "", part
+            ).strip()
             if not part or part in ("self", "*", "/"):
                 continue
             default = None

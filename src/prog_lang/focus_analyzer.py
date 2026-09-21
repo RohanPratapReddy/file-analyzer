@@ -29,7 +29,7 @@
 # `-*` starts a Dialogue Manager comment line; FOCUS keywords are
 # case-insensitive.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_#@$][A-Za-z0-9_#@$]*"
@@ -44,26 +44,27 @@ class FocusAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ("'",)
 
     # DEFINE fieldname[/format] = ...   (but NOT `DEFINE FILE master`)
-    _DEFINE_FIELD = re.compile(r"(?mi)^[ \t]*DEFINE\s+(?!FILE\b)(" + _FLD +
-                               r")\s*(?:/[^=;\s]+)?\s*=")
+    _DEFINE_FIELD = re.compile(
+        r"(?mi)^[ \t]*DEFINE\s+(?!FILE\b)(" + _FLD + r")\s*(?:/[^=;\s]+)?\s*="
+    )
     # COMPUTE fieldname[/format] = ...  (may appear inline after PRINT/SUM/etc.)
-    _COMPUTE = re.compile(r"(?mi)\bCOMPUTE\s+(" + _FLD +
-                          r")\s*(?:/[^=;\s]+)?\s*=")
+    _COMPUTE = re.compile(r"(?mi)\bCOMPUTE\s+(" + _FLD + r")\s*(?:/[^=;\s]+)?\s*=")
     # inside a `DEFINE FILE ... END` block, a bare `field[/fmt] = expr` line
     _BLOCK_OPEN = re.compile(r"(?mi)^[ \t]*DEFINE\s+FILE\b")
     _BLOCK_END = re.compile(r"(?mi)^[ \t]*END[ \t]*$")
-    _BLOCK_FIELD = re.compile(r"(?i)^[ \t]*(" + _FLD +
-                              r")\s*(?:/[^=;\s]+)?\s*=")
+    _BLOCK_FIELD = re.compile(r"(?i)^[ \t]*(" + _FLD + r")\s*(?:/[^=;\s]+)?\s*=")
     # -SET &var = value ;
     _AMPER = re.compile(r"(?mi)^[ \t]*-SET\s+&+(" + _ID + r")\s*=")
     # CASE label
     _CASE = re.compile(r"(?mi)^[ \t]*CASE\s+(" + _ID + r")\b")
     # TABLE/MODIFY/DEFINE/GRAPH/MATCH FILE  <master>
-    _FILE = re.compile(r"(?mi)^[ \t]*(?:TABLE|MODIFY|GRAPH|MATCH|DEFINE)\s+"
-                       r"FILE\s+(" + _ID + r")")
+    _FILE = re.compile(
+        r"(?mi)^[ \t]*(?:TABLE|MODIFY|GRAPH|MATCH|DEFINE)\s+" r"FILE\s+(" + _ID + r")"
+    )
     # -INCLUDE member  /  -READ file
-    _INCLUDE = re.compile(r"(?mi)^[ \t]*-(?:INCLUDE|READ|MRNOEDIT\s+-INCLUDE)\s+"
-                          r"(" + _ID + r")")
+    _INCLUDE = re.compile(
+        r"(?mi)^[ \t]*-(?:INCLUDE|READ|MRNOEDIT\s+-INCLUDE)\s+" r"(" + _ID + r")"
+    )
 
     def _extract_entities(self, file_id, text, path):
         clean = self._strip_comments(text)

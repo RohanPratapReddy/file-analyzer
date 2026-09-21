@@ -24,5 +24,12 @@ from .python_embedded_base import PythonEmbeddedAnalyzer
 class TritonAnalyzer(PythonEmbeddedAnalyzer):
     LANG_KEY = "triton"
     EXTENSIONS = (".triton",)
-    DSL_DECORATORS = ("triton.jit", "jit", "triton.autotune", "autotune",
-                      "triton.heuristics", "heuristics", "triton.language.jit")
+    DSL_DECORATORS = (
+        "triton.jit",
+        "jit",
+        "triton.autotune",
+        "autotune",
+        "triton.heuristics",
+        "heuristics",
+        "triton.language.jit",
+    )

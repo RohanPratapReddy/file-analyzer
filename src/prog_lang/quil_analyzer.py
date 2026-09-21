@@ -18,7 +18,7 @@
 # The instruction body (`H 0`, `MEASURE 0 ro[0]`, ...) is not itself a named
 # entity, so only the DECLARE/DEF*/LABEL headers produce rows.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -36,7 +36,9 @@ class QuilAnalyzer(RegexCodeAnalyzer):
     # DEFGATE / DEFCIRCUIT / DEFWAVEFORM / DEFCAL headers (identifier-named)
     _DEF = re.compile(
         r"^[ \t]*(DEFGATE|DEFCIRCUIT|DEFWAVEFORM|DEFCAL)\s+"
-        r"([A-Za-z_][\w-]*)\s*(?:\(([^)]*)\))?([^:\n]*):", re.MULTILINE)
+        r"([A-Za-z_][\w-]*)\s*(?:\(([^)]*)\))?([^:\n]*):",
+        re.MULTILINE,
+    )
     # DEFFRAME is named by qubit operands + a quoted frame name, with optional ':'
     _DEFFRAME = re.compile(r'^[ \t]*DEFFRAME\s+([\d \t]*)"([^"]+)"', re.MULTILINE)
 
@@ -65,8 +67,7 @@ class QuilAnalyzer(RegexCodeAnalyzer):
             for q in re.split(r"[ \t]+", tail.strip()):
                 if re.match(r"^[A-Za-z_]\w*$", q):
                     arg_ids.append(self._add_arg(q, "qubit"))
-            self._add_function(file_id, name, arg_ids, [],
-                               description=kind.lower())
+            self._add_function(file_id, name, arg_ids, [], description=kind.lower())
 
         # DEFFRAME <qubits> "frame-name" [:]  -> function named by the frame
         for m in self._DEFFRAME.finditer(text):
@@ -74,5 +75,4 @@ class QuilAnalyzer(RegexCodeAnalyzer):
             for q in re.split(r"[ \t]+", m.group(1).strip()):
                 if q:
                     arg_ids.append(self._add_arg(q, "qubit"))
-            self._add_function(file_id, m.group(2), arg_ids, [],
-                               description="defframe")
+            self._add_function(file_id, m.group(2), arg_ids, [], description="defframe")

@@ -56,7 +56,9 @@ def _installed_views(db_path: str) -> List[str]:
         conn.close()
 
 
-def _read_python(db_path: str, views: List[str], limit: int) -> Dict[str, Dict[str, Any]]:
+def _read_python(
+    db_path: str, views: List[str], limit: int
+) -> Dict[str, Dict[str, Any]]:
     """Read the given views in-process, read-only. Errors are captured per view."""
     out: Dict[str, Dict[str, Any]] = {}
     conn = sqlite3.connect(f"file:{Path(db_path).as_posix()}?mode=ro", uri=True)
@@ -88,7 +90,9 @@ def _go_binary(log: List[str]) -> Optional[Path]:
     try:
         proc = subprocess.run(
             ["go", "build", "-o", exe.name, "."],
-            cwd=_GO_DIR, capture_output=True, text=True,
+            cwd=_GO_DIR,
+            capture_output=True,
+            text=True,
         )
         if proc.returncode != 0:
             log.append(f"[native-read] go build failed:\n{proc.stderr}")
@@ -113,7 +117,9 @@ def _java_classpath(log: List[str]) -> Optional[str]:
     try:
         proc = subprocess.run(
             ["javac", "-cp", compile_cp, "-d", "out", "RepositoryReader.java"],
-            cwd=_JAVA_DIR, capture_output=True, text=True,
+            cwd=_JAVA_DIR,
+            capture_output=True,
+            text=True,
         )
         if proc.returncode != 0:
             log.append(f"[native-read] javac failed:\n{proc.stderr}")
@@ -128,7 +134,9 @@ def _java_classpath(log: List[str]) -> Optional[str]:
 # ---------------------------------------------------------------------------
 # Reader runners (subprocess -> JSON)
 # ---------------------------------------------------------------------------
-def _run_reader(cmd: List[str], cwd: Path, log: List[str], timeout: int) -> Optional[Dict[str, Any]]:
+def _run_reader(
+    cmd: List[str], cwd: Path, log: List[str], timeout: int
+) -> Optional[Dict[str, Any]]:
     """Run one native reader in -json mode; return its parsed object or None."""
     try:
         proc = subprocess.run(
@@ -138,7 +146,9 @@ def _run_reader(cmd: List[str], cwd: Path, log: List[str], timeout: int) -> Opti
         log.append(f"[native-read] {cmd[0]} launch/timeout error: {err}")
         return None
     if proc.returncode != 0:
-        log.append(f"[native-read] {cmd[0]} exit {proc.returncode}: {proc.stderr.strip()[:500]}")
+        log.append(
+            f"[native-read] {cmd[0]} exit {proc.returncode}: {proc.stderr.strip()[:500]}"
+        )
         return None
     try:
         return json.loads(proc.stdout)
@@ -147,17 +157,40 @@ def _run_reader(cmd: List[str], cwd: Path, log: List[str], timeout: int) -> Opti
         return None
 
 
-def _go_cmd(exe: Path, db_path: str, views: List[str], limit: int, workers: int) -> List[str]:
+def _go_cmd(
+    exe: Path, db_path: str, views: List[str], limit: int, workers: int
+) -> List[str]:
     return [
-        str(exe), "-source", db_path, "-json",
-        "-views", ",".join(views), "-limit", str(limit), "-workers", str(workers),
+        str(exe),
+        "-source",
+        db_path,
+        "-json",
+        "-views",
+        ",".join(views),
+        "-limit",
+        str(limit),
+        "-workers",
+        str(workers),
     ]
 
 
-def _java_cmd(cp: str, db_path: str, views: List[str], limit: int, workers: int) -> List[str]:
+def _java_cmd(
+    cp: str, db_path: str, views: List[str], limit: int, workers: int
+) -> List[str]:
     return [
-        "java", "-cp", cp, "RepositoryReader", "-source", db_path, "-json",
-        "-views", ",".join(views), "-limit", str(limit), "-workers", str(workers),
+        "java",
+        "-cp",
+        cp,
+        "RepositoryReader",
+        "-source",
+        db_path,
+        "-json",
+        "-views",
+        ",".join(views),
+        "-limit",
+        str(limit),
+        "-workers",
+        str(workers),
     ]
 
 
@@ -206,11 +239,15 @@ def read_views_native(
     merged: Dict[str, Dict[str, Any]] = {}
     lock = threading.Lock()
 
-    def _collect(result: Optional[Dict[str, Any]], subset: List[str], cwd_note: str) -> None:
+    def _collect(
+        result: Optional[Dict[str, Any]], subset: List[str], cwd_note: str
+    ) -> None:
         if result is None:
             # Whole reader failed -> fill this subset from pure Python so the
             # response is still complete.
-            log.append(f"[native-read] {cwd_note} failed; python fallback for {len(subset)} views")
+            log.append(
+                f"[native-read] {cwd_note} failed; python fallback for {len(subset)} views"
+            )
             data = _read_python(db_path, subset, limit)
             with lock:
                 merged.update(data)
@@ -226,13 +263,20 @@ def read_views_native(
     def go_runner() -> None:
         if not go_views:
             return
-        res = _run_reader(_go_cmd(go_exe, db_path, go_views, limit, workers), _GO_DIR, log, timeout)
+        res = _run_reader(
+            _go_cmd(go_exe, db_path, go_views, limit, workers), _GO_DIR, log, timeout
+        )
         _collect(res, go_views, "go reader")
 
     def java_runner() -> None:
         if not java_views:
             return
-        res = _run_reader(_java_cmd(java_cp, db_path, java_views, limit, workers), _JAVA_DIR, log, timeout)
+        res = _run_reader(
+            _java_cmd(java_cp, db_path, java_views, limit, workers),
+            _JAVA_DIR,
+            log,
+            timeout,
+        )
         _collect(res, java_views, "java reader")
 
     threads = []

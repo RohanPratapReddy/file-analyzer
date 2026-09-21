@@ -14,7 +14,7 @@
 #
 # Comments are '//'; strings use '"'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -29,20 +29,31 @@ class CarbonAnalyzer(RegexCodeAnalyzer):
 
     _PACKAGE = re.compile(r"(?m)^\s*package\s+(" + _ID + r")")
     _IMPORT = re.compile(r"(?m)^\s*import\s+(" + _ID + r")")
-    _FN = re.compile(r"(?m)^\s*(?:private\s+|protected\s+|virtual\s+|abstract\s+|"
-                     r"final\s+|default\s+)*fn\s+(" + _ID + r")\s*(?:\[[^\]]*\])?\s*\(")
-    _CLASS = re.compile(r"(?m)^\s*(?:(?:private|protected|abstract|base|final|"
-                        r"extern|virtual)\s+)*class\s+(" + _ID + r")")
+    _FN = re.compile(
+        r"(?m)^\s*(?:private\s+|protected\s+|virtual\s+|abstract\s+|"
+        r"final\s+|default\s+)*fn\s+(" + _ID + r")\s*(?:\[[^\]]*\])?\s*\("
+    )
+    _CLASS = re.compile(
+        r"(?m)^\s*(?:(?:private|protected|abstract|base|final|"
+        r"extern|virtual)\s+)*class\s+(" + _ID + r")"
+    )
     _INTERFACE = re.compile(r"(?m)^\s*(?:private\s+)?interface\s+(" + _ID + r")")
     _CHOICE = re.compile(r"(?m)^\s*(?:private\s+)?choice\s+(" + _ID + r")")
     _CONSTRAINT = re.compile(r"(?m)^\s*(?:private\s+)?constraint\s+(" + _ID + r")")
-    _VAR = re.compile(r"(?m)^\s*(?:private\s+|protected\s+)?(?:var|let)\s+(" + _ID + r")\s*:")
+    _VAR = re.compile(
+        r"(?m)^\s*(?:private\s+|protected\s+)?(?:var|let)\s+(" + _ID + r")\s*:"
+    )
     _ALIAS = re.compile(r"(?m)^\s*(?:private\s+)?alias\s+(" + _ID + r")\s*=")
 
     def _register_types(self, file_id, text, path):
         clean = self._strip_comments(text)
-        for rx in (self._PACKAGE, self._CLASS, self._INTERFACE, self._CHOICE,
-                   self._CONSTRAINT):
+        for rx in (
+            self._PACKAGE,
+            self._CLASS,
+            self._INTERFACE,
+            self._CHOICE,
+            self._CONSTRAINT,
+        ):
             for m in rx.finditer(clean):
                 self._register_class(m.group(1))
 
@@ -70,13 +81,17 @@ class CarbonAnalyzer(RegexCodeAnalyzer):
         for m in self._FN.finditer(clean):
             args = self._fn_args(clean, m.end() - 1)
             out = self._fn_output(clean, m.end())
-            self._add_function(file_id, m.group(1), args,
-                               [out] if out is not None else [],
-                               description="carbon function")
+            self._add_function(
+                file_id,
+                m.group(1),
+                args,
+                [out] if out is not None else [],
+                description="carbon function",
+            )
 
     def _fn_args(self, clean, open_paren):
         end = self._find_matching(clean, open_paren, "(", ")")
-        body = clean[open_paren + 1:end - 1]
+        body = clean[open_paren + 1 : end - 1]
         arg_ids = []
         for part in self._split_top_level(body):
             name = part.split(":")[0].strip()

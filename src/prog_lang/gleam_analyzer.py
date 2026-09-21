@@ -10,27 +10,33 @@
 #   pub fn area(r: Float) -> Float { ... }                 -> function
 #   pub const pi: Float = 3.14159                           -> variable
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
 class GleamAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "gleam"
     EXTENSIONS = (".gleam",)
-    LINE_COMMENTS = ("//",)         # covers // /// ////
+    LINE_COMMENTS = ("//",)  # covers // /// ////
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ('"',)
 
     _IMPORT = re.compile(
-        r"^\s*import\s+([\w/]+)(?:\.\{([^}]*)\})?(?:\s+as\s+(\w+))?", re.MULTILINE)
+        r"^\s*import\s+([\w/]+)(?:\.\{([^}]*)\})?(?:\s+as\s+(\w+))?", re.MULTILINE
+    )
     _TYPE = re.compile(r"^\s*(?:pub\s+)?(?:opaque\s+)?type\s+([A-Z]\w*)", re.MULTILINE)
-    _ALIAS = re.compile(r"^\s*(?:pub\s+)?type\s+([A-Z]\w*)\s*(?:\([^)]*\))?\s*=",
-                        re.MULTILINE)
-    _FN = re.compile(r"^\s*(?:pub\s+)?fn\s+([a-z_]\w*)\s*\(([^)]*)\)"
-                     r"(?:\s*->\s*([\w()/., ]+?))?\s*\{", re.MULTILINE)
+    _ALIAS = re.compile(
+        r"^\s*(?:pub\s+)?type\s+([A-Z]\w*)\s*(?:\([^)]*\))?\s*=", re.MULTILINE
+    )
+    _FN = re.compile(
+        r"^\s*(?:pub\s+)?fn\s+([a-z_]\w*)\s*\(([^)]*)\)"
+        r"(?:\s*->\s*([\w()/., ]+?))?\s*\{",
+        re.MULTILINE,
+    )
     _CONST = re.compile(r"^\s*(?:pub\s+)?const\s+([a-z_]\w*)", re.MULTILINE)
-    _EXTFN = re.compile(r"^\s*@external\([^)]*\)\s*(?:pub\s+)?fn\s+([a-z_]\w*)",
-                        re.MULTILINE)
+    _EXTFN = re.compile(
+        r"^\s*@external\([^)]*\)\s*(?:pub\s+)?fn\s+([a-z_]\w*)", re.MULTILINE
+    )
 
     def _register_types(self, file_id, text, path):
         text = self._strip_comments(text)
@@ -64,7 +70,7 @@ class GleamAnalyzer(RegexCodeAnalyzer):
             attrs = []
             if lb != -1 and (text.find("=", m.end(), lb) == -1):
                 rb = self._find_matching(text, lb, "{", "}")
-                body = text[lb + 1:rb - 1]
+                body = text[lb + 1 : rb - 1]
                 # variant constructors:  Name(field: Type, ...)  or bare  Name
                 for vm in re.finditer(r"([A-Z]\w*)\s*(?:\(([^)]*)\))?", body):
                     attrs.append(self._add_arg(vm.group(1), "variant"))
@@ -72,8 +78,9 @@ class GleamAnalyzer(RegexCodeAnalyzer):
                         for fld in self._split_top_level(vm.group(2)):
                             fm = re.match(r"(\w+)\s*:\s*(.+)", fld.strip())
                             if fm:
-                                attrs.append(self._add_arg(fm.group(1),
-                                                           fm.group(2).strip()))
+                                attrs.append(
+                                    self._add_arg(fm.group(1), fm.group(2).strip())
+                                )
             self._add_class(file_id, name, description="gleam type", attr_ids=attrs)
 
         # functions
@@ -84,8 +91,11 @@ class GleamAnalyzer(RegexCodeAnalyzer):
             for part in self._split_top_level(m.group(2) or ""):
                 pm = re.match(r"(?:_\s+)?(\w+)\s*(?::\s*(.+))?", part.strip())
                 if pm:
-                    arg_ids.append(self._add_arg(pm.group(1),
-                                                 pm.group(2).strip() if pm.group(2) else None))
+                    arg_ids.append(
+                        self._add_arg(
+                            pm.group(1), pm.group(2).strip() if pm.group(2) else None
+                        )
+                    )
             out_ids = [self._add_output(m.group(3).strip())] if m.group(3) else []
             self._add_function(file_id, name, arg_ids, out_ids)
         for name in ext_names:

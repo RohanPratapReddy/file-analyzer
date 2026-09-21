@@ -9,10 +9,10 @@
 #
 # Comments are '%' (line) and '%{ %}' (block); strings use '"'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
-_ID = r"[A-Za-z][A-Za-z]*"          # LilyPond identifiers: letters only
+_ID = r"[A-Za-z][A-Za-z]*"  # LilyPond identifiers: letters only
 _SCHEME_ID = r"[A-Za-z_][A-Za-z0-9_!?%*/+.<>=-]*"
 
 
@@ -27,16 +27,20 @@ class LilyPondAnalyzer(RegexCodeAnalyzer):
     # top-level assignment:  name = <value>
     _ASSIGN = re.compile(r"(?m)^\s*(" + _ID + r")\s*=\s*(\S)")
     # embedded Scheme function:  #(define (fname args) ...)
-    _SCM_FUNC = re.compile(r"#\(\s*define(?:-public|-session-public|-session)?\s*"
-                           r"\(\s*(" + _SCHEME_ID + r")")
+    _SCM_FUNC = re.compile(
+        r"#\(\s*define(?:-public|-session-public|-session)?\s*"
+        r"\(\s*(" + _SCHEME_ID + r")"
+    )
     # LilyPond markup commands name the function as the first token:
     #   #(define-markup-command (name layout props ...) ...)
     #   #(define-markup-list-command (name ...) ...)
-    _SCM_MARKUP = re.compile(r"#\(\s*define-markup(?:-list)?-command\s*"
-                             r"\(\s*(" + _SCHEME_ID + r")")
+    _SCM_MARKUP = re.compile(
+        r"#\(\s*define-markup(?:-list)?-command\s*" r"\(\s*(" + _SCHEME_ID + r")"
+    )
     # embedded Scheme constant:  #(define name value)
-    _SCM_VAR = re.compile(r"#\(\s*define(?:-public|-session-public|-session)?\s+(" +
-                          _SCHEME_ID + r")\b")
+    _SCM_VAR = re.compile(
+        r"#\(\s*define(?:-public|-session-public|-session)?\s+(" + _SCHEME_ID + r")\b"
+    )
 
     def _register_types(self, file_id, text, path):
         # LilyPond has no class-like constructs.
@@ -61,18 +65,16 @@ class LilyPondAnalyzer(RegexCodeAnalyzer):
         for m in self._SCM_FUNC.finditer(clean):
             name = m.group(1)
             args = self._scm_args(clean, m.end())
-            self._add_function(file_id, name, args, [],
-                               description="scheme definition")
+            self._add_function(file_id, name, args, [], description="scheme definition")
 
         for m in self._SCM_MARKUP.finditer(clean):
             name = m.group(1)
             args = self._scm_args(clean, m.end())
-            self._add_function(file_id, name, args, [],
-                               description="markup command")
+            self._add_function(file_id, name, args, [], description="markup command")
 
         for m in self._SCM_VAR.finditer(clean):
             # skip if it was actually a function form `(define (name ...))`
-            after = clean[m.start():m.end() + 1]
+            after = clean[m.start() : m.end() + 1]
             self._add_variable(file_id, m.group(1), scope="scheme")
 
     def _scm_args(self, clean, after_name):

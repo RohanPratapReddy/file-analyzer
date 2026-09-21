@@ -21,7 +21,7 @@
 # OCaml comments are nestable `(* ... *)`; a dedicated nested stripper is used so
 # a comment containing `(*` does not terminate early.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _LID = r"[a-z_][A-Za-z0-9_']*"
@@ -32,21 +32,23 @@ class Ml4Analyzer(RegexCodeAnalyzer):
     LANG_KEY = "ocaml-camlp4"
     EXTENSIONS = (".ml4",)
     LINE_COMMENTS = ()
-    BLOCK_COMMENTS = ()         # nested (* *) handled by _strip_nested
+    BLOCK_COMMENTS = ()  # nested (* *) handled by _strip_nested
     STRING_DELIMS = ('"',)
 
     _OPEN = re.compile(r"(?m)^\s*open\s+(" + _UID + r"(?:\.[A-Za-z0-9_']+)*)")
     _LOAD = re.compile(r'(?m)^\s*#\s*(?:load|use)\s+"([^"]+)"')
     _LETFUN = re.compile(r"(?m)^\s*let\s+(?:rec\s+)?(" + _LID + r")\s+([^=]*?)=")
     _LETVAL = re.compile(r"(?m)^\s*let\s+(?:rec\s+)?(" + _LID + r")\s*(?::[^=]+)?=")
-    _TYPE = re.compile(r"(?m)^\s*(?:type|module|exception)\s+(?:type\s+|rec\s+)?"
-                       r"(?:'[a-z]+\s+|\([^)]*\)\s+)*(" + _UID + r")")
+    _TYPE = re.compile(
+        r"(?m)^\s*(?:type|module|exception)\s+(?:type\s+|rec\s+)?"
+        r"(?:'[a-z]+\s+|\([^)]*\)\s+)*(" + _UID + r")"
+    )
     _EXTEND = re.compile(r"(?m)\b(?:G?EXTEND)\s+(?:Gram\b|" + _UID + r")?")
 
     def _strip_nested(self, text: str) -> str:
         out, i, n, depth = [], 0, len(text), 0
         while i < n:
-            two = text[i:i + 2]
+            two = text[i : i + 2]
             if depth == 0 and text[i] == '"':
                 out.append('"')
                 i += 1
@@ -111,8 +113,9 @@ class Ml4Analyzer(RegexCodeAnalyzer):
             if nm in seen_fn or not args.strip():
                 continue
             seen_fn.add(nm)
-            self._add_function(file_id, nm, self._ocaml_args(args), [],
-                               description="ocaml function")
+            self._add_function(
+                file_id, nm, self._ocaml_args(args), [], description="ocaml function"
+            )
         seen_v = set()
         for m in self._LETVAL.finditer(clean):
             nm = m.group(1)
@@ -122,5 +125,6 @@ class Ml4Analyzer(RegexCodeAnalyzer):
             self._add_variable(file_id, nm, None, scope="module")
 
         for i, m in enumerate(self._EXTEND.finditer(clean)):
-            self._add_function(file_id, f"EXTEND_{i}", [], [],
-                               description="camlp4 grammar extension")
+            self._add_function(
+                file_id, f"EXTEND_{i}", [], [], description="camlp4 grammar extension"
+            )

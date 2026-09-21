@@ -14,7 +14,7 @@
 #
 # Bicep strings use single quotes.  Comments are '//' and '/* */'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -77,6 +77,10 @@ class BicepAnalyzer(RegexCodeAnalyzer):
         for m in self._FUNC.finditer(clean):
             lp = m.end() - 1
             rp = self._find_matching(clean, lp, "(", ")")
-            self._add_function(file_id, m.group(1),
-                               self._args(clean[lp + 1:rp - 1]), [],
-                               description="bicep func")
+            self._add_function(
+                file_id,
+                m.group(1),
+                self._args(clean[lp + 1 : rp - 1]),
+                [],
+                description="bicep func",
+            )

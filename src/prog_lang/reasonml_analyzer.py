@@ -10,7 +10,7 @@
 #   let name = (a, b) => ...;                              -> function
 #   let pi = 3.14;                                          -> variable
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -25,7 +25,8 @@ class ReasonMLAnalyzer(RegexCodeAnalyzer):
     _MODULE = re.compile(r"^\s*module\s+([A-Z]\w*)\s*=", re.MULTILINE)
     _TYPE = re.compile(r"^\s*type\s+([a-z_]\w*)\s*(?:\([^)]*\))?\s*=", re.MULTILINE)
     _LET = re.compile(
-        r"^\s*let\s+(?:rec\s+)?([a-z_]\w*)\s*(?::[^=]+?)?=\s*", re.MULTILINE)
+        r"^\s*let\s+(?:rec\s+)?([a-z_]\w*)\s*(?::[^=]+?)?=\s*", re.MULTILINE
+    )
 
     def _register_types(self, file_id, text, path):
         text = self._strip_comments(text)
@@ -42,10 +43,12 @@ class ReasonMLAnalyzer(RegexCodeAnalyzer):
             c = text[i]
             if instr:
                 if c == "\\":
-                    i += 2; continue
+                    i += 2
+                    continue
                 if c == instr:
                     instr = None
-                i += 1; continue
+                i += 1
+                continue
             if c == '"':
                 instr = c
             elif c in "([{":
@@ -76,8 +79,9 @@ class ReasonMLAnalyzer(RegexCodeAnalyzer):
             rec = re.search(r"\{(.*)\}", rhs, re.DOTALL)
             if rec:
                 for field in self._split_top_level(rec.group(1)):
-                    fm = re.match(r"(?:mutable\s+)?(\w+)\s*:\s*(.+)", field.strip(),
-                                  re.DOTALL)
+                    fm = re.match(
+                        r"(?:mutable\s+)?(\w+)\s*:\s*(.+)", field.strip(), re.DOTALL
+                    )
                     if fm:
                         attrs.append(self._add_arg(fm.group(1), fm.group(2).strip()))
             else:

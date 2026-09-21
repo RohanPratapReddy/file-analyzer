@@ -16,7 +16,7 @@
 # `let NAME = regex` become variables, `rule`/`and NAME [args] = parse|shortest`
 # become functions, and `open X` inside the OCaml `{ }` blocks become imports.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -28,8 +28,10 @@ class OCamllexAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"',)
 
     _LET = re.compile(r"^[ \t]*let\s+([A-Za-z_]\w*)\s*=", re.MULTILINE)
-    _RULE = re.compile(r"^[ \t]*(?:rule|and)\s+([A-Za-z_]\w*)([^=\n]*)=\s*"
-                       r"(?:parse|shortest)\b", re.MULTILINE)
+    _RULE = re.compile(
+        r"^[ \t]*(?:rule|and)\s+([A-Za-z_]\w*)([^=\n]*)=\s*" r"(?:parse|shortest)\b",
+        re.MULTILINE,
+    )
     _OPEN = re.compile(r"\bopen\s+([A-Z][\w.]*)")
 
     def _blank_braces(self, s):
@@ -72,8 +74,7 @@ class OCamllexAnalyzer(RegexCodeAnalyzer):
             for a in re.split(r"[ \t]+", m.group(2).strip()):
                 if re.match(r"^[A-Za-z_]\w*$", a):
                     arg_ids.append(self._add_arg(a))
-            self._add_function(file_id, name, arg_ids, [],
-                               description="ocamllex rule")
+            self._add_function(file_id, name, arg_ids, [], description="ocamllex rule")
 
         # named regex abbreviations `let name = ...` in the definition area
         # (before the first `rule`).  Anything after `rule` is OCaml action code.

@@ -1,17 +1,6 @@
 # Auto-extracted from code_analyzer.py (verbatim class body).
-import os
-import csv
-import json
-import re
-import ast
-import dis
-import inspect
-import traceback
-import subprocess
-import sqlite3
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
 from .tree_sitter_base import BaseTreeSitterAnalyzer
+
 
 class PhpAnalyzer(BaseTreeSitterAnalyzer):
     """
@@ -21,15 +10,19 @@ class PhpAnalyzer(BaseTreeSitterAnalyzer):
     methods and constants, plus standalone functions.
     """
 
-    _TYPE_DECLS = ("class_declaration", "interface_declaration",
-                   "trait_declaration", "enum_declaration")
+    _TYPE_DECLS = (
+        "class_declaration",
+        "interface_declaration",
+        "trait_declaration",
+        "enum_declaration",
+    )
 
     def __init__(self, **kwargs):
         super().__init__(
             lang_key="php",
             extensions=[".php"],
             introspection_source="ReflectionClass + ReflectionFunction + debug_backtrace()",
-            **kwargs
+            **kwargs,
         )
 
     def _register_types(self, root_node, source: bytes):
@@ -76,7 +69,8 @@ class PhpAnalyzer(BaseTreeSitterAnalyzer):
                         nm = self._node_text(cc, source)
                     elif cc.type == "namespace_aliasing_clause":
                         a = cc.child_by_field_name("name") or (
-                            cc.named_children[-1] if cc.named_children else None)
+                            cc.named_children[-1] if cc.named_children else None
+                        )
                         alias = self._node_text(a, source) if a else None
                 if nm:
                     self._ts_add_import(file_id, nm.split("\\")[-1], nm, alias)
@@ -97,8 +91,11 @@ class PhpAnalyzer(BaseTreeSitterAnalyzer):
                 right = c.child_by_field_name("right")
                 if left is not None and left.type == "variable_name":
                     self._ts_add_variable(
-                        file_id, self._node_text(left, source).lstrip("$"),
-                        self._node_text(right, source) if right else None, scope="module")
+                        file_id,
+                        self._node_text(left, source).lstrip("$"),
+                        self._node_text(right, source) if right else None,
+                        scope="module",
+                    )
 
     def _php_bases(self, node, source: bytes):
         parent_ids = []
@@ -116,15 +113,21 @@ class PhpAnalyzer(BaseTreeSitterAnalyzer):
         if params is None:
             return arg_ids
         for p in params.named_children:
-            if p.type in ("simple_parameter", "variadic_parameter",
-                          "property_promotion_parameter"):
+            if p.type in (
+                "simple_parameter",
+                "variadic_parameter",
+                "property_promotion_parameter",
+            ):
                 nn = p.child_by_field_name("name")
                 tt = p.child_by_field_name("type")
                 dv = p.child_by_field_name("default_value")
-                arg_ids.append(self._ts_add_arg(
-                    self._node_text(nn, source).lstrip("$") if nn else "arg",
-                    self._node_text(tt, source) if tt else None,
-                    self._node_text(dv, source) if dv else None))
+                arg_ids.append(
+                    self._ts_add_arg(
+                        self._node_text(nn, source).lstrip("$") if nn else "arg",
+                        self._node_text(tt, source) if tt else None,
+                        self._node_text(dv, source) if dv else None,
+                    )
+                )
         return arg_ids
 
     def _php_props(self, node, source: bytes):
@@ -134,10 +137,14 @@ class PhpAnalyzer(BaseTreeSitterAnalyzer):
         for c in node.named_children:
             if c.type == "property_element":
                 vn = c.child_by_field_name("name") or (
-                    c.named_children[0] if c.named_children else None)
+                    c.named_children[0] if c.named_children else None
+                )
                 if vn is not None:
-                    ids.append(self._ts_add_arg(
-                        self._node_text(vn, source).lstrip("$"), type_text))
+                    ids.append(
+                        self._ts_add_arg(
+                            self._node_text(vn, source).lstrip("$"), type_text
+                        )
+                    )
         return ids
 
     def _php_function(self, file_id, node, source: bytes, class_id):
@@ -158,13 +165,18 @@ class PhpAnalyzer(BaseTreeSitterAnalyzer):
         cls_id = self._class_registry.get(name, self._class_counter)
         parent_ids = self._php_bases(node, source)
         method_ids, attr_ids = [], []
-        body = node.child_by_field_name("body") or self._child_of(node, "declaration_list")
+        body = node.child_by_field_name("body") or self._child_of(
+            node, "declaration_list"
+        )
         if node.type == "enum_declaration" and body is not None:
             for m in body.named_children:
                 if m.type == "enum_case":
                     mn = m.child_by_field_name("name") or self._child_of(m, "name")
-                    attr_ids.append(self._ts_add_arg(
-                        self._node_text(mn, source) if mn else "case", "enum_case"))
+                    attr_ids.append(
+                        self._ts_add_arg(
+                            self._node_text(mn, source) if mn else "case", "enum_case"
+                        )
+                    )
         elif body is not None:
             for m in body.named_children:
                 mt = m.type
@@ -174,6 +186,11 @@ class PhpAnalyzer(BaseTreeSitterAnalyzer):
                     attr_ids.extend(self._php_props(m, source))
                 elif mt == "const_declaration":
                     self._php_const(file_id, m, source)
-        self._ts_add_class(file_id, name,
-                           description=f"php {node.type.replace('_declaration', '')}",
-                           parent_ids=parent_ids, method_ids=method_ids, attr_ids=attr_ids)
+        self._ts_add_class(
+            file_id,
+            name,
+            description=f"php {node.type.replace('_declaration', '')}",
+            parent_ids=parent_ids,
+            method_ids=method_ids,
+            attr_ids=attr_ids,
+        )

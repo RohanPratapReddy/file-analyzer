@@ -12,7 +12,7 @@
 #         internal operation Helper() : Unit { ... }
 #     }
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -23,14 +23,17 @@ class QSharpAnalyzer(RegexCodeAnalyzer):
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ('"',)
 
-    _OPEN = re.compile(r"^[ \t]*open\s+([\w.]+)(?:\s+as\s+([A-Za-z_]\w*))?",
-                       re.MULTILINE)
+    _OPEN = re.compile(
+        r"^[ \t]*open\s+([\w.]+)(?:\s+as\s+([A-Za-z_]\w*))?", re.MULTILINE
+    )
     _CALLABLE = re.compile(
         r"^[ \t]*(?:internal\s+|public\s+)?(operation|function)\s+"
-        r"([A-Za-z_]\w*)(?:<[^>]*>)?\s*\(", re.MULTILINE)
+        r"([A-Za-z_]\w*)(?:<[^>]*>)?\s*\(",
+        re.MULTILINE,
+    )
     _NEWTYPE = re.compile(
-        r"^[ \t]*(?:internal\s+|public\s+)?newtype\s+([A-Za-z_]\w*)\s*=",
-        re.MULTILINE)
+        r"^[ \t]*(?:internal\s+|public\s+)?newtype\s+([A-Za-z_]\w*)\s*=", re.MULTILINE
+    )
 
     def _register_types(self, file_id, text, path):
         text = self._strip_comments(text)
@@ -52,13 +55,11 @@ class QSharpAnalyzer(RegexCodeAnalyzer):
             attrs = []
             if lb != -1 and (text.find(";", eq) == -1 or lb < text.find(";", eq)):
                 rb = self._find_matching(text, lb, "(", ")")
-                for fld in self._split_top_level(text[lb + 1:rb - 1]):
+                for fld in self._split_top_level(text[lb + 1 : rb - 1]):
                     fm = re.match(r"([A-Za-z_]\w*)\s*:\s*(.+)", fld.strip())
                     if fm:
-                        attrs.append(self._add_arg(fm.group(1),
-                                                   fm.group(2).strip()))
-            self._add_class(file_id, name, description="qsharp newtype",
-                            attr_ids=attrs)
+                        attrs.append(self._add_arg(fm.group(1), fm.group(2).strip()))
+            self._add_class(file_id, name, description="qsharp newtype", attr_ids=attrs)
 
         # operations / functions
         for m in self._CALLABLE.finditer(text):
@@ -66,14 +67,14 @@ class QSharpAnalyzer(RegexCodeAnalyzer):
             lb = text.find("(", m.end() - 1)
             rb = self._find_matching(text, lb, "(", ")")
             arg_ids = []
-            for p in self._split_top_level(text[lb + 1:rb - 1]):
+            for p in self._split_top_level(text[lb + 1 : rb - 1]):
                 pm = re.match(r"([A-Za-z_]\w*)\s*:\s*(.+)", p.strip())
                 if pm:
-                    arg_ids.append(self._add_arg(pm.group(1),
-                                                 pm.group(2).strip()))
+                    arg_ids.append(self._add_arg(pm.group(1), pm.group(2).strip()))
             out_ids = []
             rm = re.match(r"\s*:\s*([^\{\n]+?)(?:\bis\b|\{|$)", text[rb:])
             if rm and rm.group(1).strip():
                 out_ids.append(self._add_output(rm.group(1).strip()))
-            self._add_function(file_id, name, arg_ids, out_ids,
-                               description=f"qsharp {kind}")
+            self._add_function(
+                file_id, name, arg_ids, out_ids, description=f"qsharp {kind}"
+            )

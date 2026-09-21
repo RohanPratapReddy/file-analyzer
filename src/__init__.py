@@ -10,29 +10,31 @@ the orchestration glue that ties them together:
     core/       RepositoryAnalyzer -> ImportLinkageAnalyzer -> RepositoryDatabaseGenerator
                 + AnalysisEngine (orchestration glue)
 """
-from .core.repository_analyzer import RepositoryAnalyzer
-from .core.import_linkage import ImportLinkageAnalyzer
-from .core.db_generator import RepositoryDatabaseGenerator
 
-from .prog_lang import *          # noqa: F401,F403  (all {Lang}Analyzers + bases + polyglot)
-from .prog_lang import __all__ as _prog_all
-from .prog_lang import PolyglotCodeAnalyzer  # noqa: F401
-from .data import DataAnalyzer
-from .schema import SchemaAnalyzer
-from .database import DatabaseAnalyzer
 from .archive import ArchiveAnalyzer
-from .binary import MachineCodeAnalyzer, BinaryForensicsAnalyzer, BinaryFormatParser
-from .shell import *              # noqa: F401,F403  (shell/command-language analyzers + ShellScriptAnalyzer)
-from .shell import __all__ as _shell_all
-from .shell import ShellScriptAnalyzer, SHELL_EXT_MAP  # noqa: F401
-from .convert import FormatConverter, TextAnalyzer  # noqa: F401  (opaque/legacy -> renderable transcoder + artifact analyzer)
+from .binary import BinaryForensicsAnalyzer, BinaryFormatParser, MachineCodeAnalyzer
 from .config import ConfigAnalyzer  # noqa: F401  (configuration-file analyzer plane)
-from .text import TextualAnalyzer  # noqa: F401  (text-record analyzer plane)
-from .markup import MarkupAnalyzer  # noqa: F401  (markup analyzer plane)
-from .document import DocumentAnalyzer  # noqa: F401  (document analyzer plane)
-from .misc import MiscAnalyzer  # noqa: F401  (terminal misc analyzer plane)
-
+from .convert import (  # noqa: F401  (opaque/legacy -> renderable transcoder + artifact analyzer)
+    FormatConverter,
+    TextAnalyzer,
+)
 from .core.analysis_engine import AnalysisEngine
+from .core.db_generator import RepositoryDatabaseGenerator
+from .core.import_linkage import ImportLinkageAnalyzer
+from .core.repository_analyzer import RepositoryAnalyzer
+from .data import DataAnalyzer
+from .database import DatabaseAnalyzer
+from .document import DocumentAnalyzer  # noqa: F401  (document analyzer plane)
+from .markup import MarkupAnalyzer  # noqa: F401  (markup analyzer plane)
+from .misc import MiscAnalyzer  # noqa: F401  (terminal misc analyzer plane)
+from .prog_lang import *  # noqa: F401,F403  (all {Lang}Analyzers + bases + polyglot)
+from .prog_lang import PolyglotCodeAnalyzer  # noqa: F401
+from .prog_lang import __all__ as _prog_all
+from .schema import SchemaAnalyzer
+from .shell import *  # noqa: F401,F403  (shell analyzers + ShellScriptAnalyzer)
+from .shell import SHELL_EXT_MAP, ShellScriptAnalyzer  # noqa: F401
+from .shell import __all__ as _shell_all
+from .text import TextualAnalyzer  # noqa: F401  (text-record analyzer plane)
 
 __all__ = [
     "RepositoryAnalyzer",

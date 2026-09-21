@@ -27,10 +27,19 @@ _NAME = r"[A-Za-z_][A-Za-z0-9_]*"
 class PosixShellAnalyzer(ShellScriptBase):
     LANG_KEY = "shell"
     EXTENSIONS = (
-        ".bashrc", ".zshrc", ".profile", ".tcsh",
-        ".xinitrc", ".xsession",
-        ".ebuild", ".pkgbuild", ".gradlew",
-        ".postinst", ".postrm", ".preinst", ".prerm",
+        ".bashrc",
+        ".zshrc",
+        ".profile",
+        ".tcsh",
+        ".xinitrc",
+        ".xsession",
+        ".ebuild",
+        ".pkgbuild",
+        ".gradlew",
+        ".postinst",
+        ".postrm",
+        ".preinst",
+        ".prerm",
         ".userdata",
     )
     LINE_COMMENTS = ("#",)
@@ -46,7 +55,8 @@ class PosixShellAnalyzer(ShellScriptBase):
     _EXPORT = re.compile(r"(?m)^[ \t]*export[ \t]+(" + _NAME + r")(?:=(.*))?")
     _DECL = re.compile(
         r"(?m)^[ \t]*(local|declare|readonly|typeset)[ \t]+(?:-\w+[ \t]+)*"
-        r"(" + _NAME + r")(?:=(.*))?")
+        r"(" + _NAME + r")(?:=(.*))?"
+    )
     # plain assignment FOO=bar at statement start (not == comparison)
     _ASSIGN = re.compile(r"(?m)^[ \t]*(" + _NAME + r")=(.*)")
     # csh:  set var = value | set var=value | setenv VAR value | @ var = expr
@@ -55,7 +65,9 @@ class PosixShellAnalyzer(ShellScriptBase):
     # source file  |  . file
     _SOURCE = re.compile(r"(?m)^[ \t]*(?:source|\.)[ \t]+(\S+)")
     # bash alias name='...'   |   csh alias name cmd
-    _ALIAS = re.compile(r"(?m)^[ \t]*alias[ \t]+(" + _NAME + r")(?:[ \t]*=[ \t]*(.+)|[ \t]+(.+))?$")
+    _ALIAS = re.compile(
+        r"(?m)^[ \t]*alias[ \t]+(" + _NAME + r")(?:[ \t]*=[ \t]*(.+)|[ \t]+(.+))?$"
+    )
     # package-recipe function conventions worth surfacing as structure.
     _CONTROL = re.compile(r"(?m)^[ \t]*(if|for|while|until|case|foreach|select)\b")
 
@@ -79,8 +91,12 @@ class PosixShellAnalyzer(ShellScriptBase):
                 return
             seen_var.add(name)
             val = (value or "").strip()
-            self._add_variable(file_id, name, (val[:120] or None),
-                               scope=("exported" if exported else scope))
+            self._add_variable(
+                file_id,
+                name,
+                (val[:120] or None),
+                scope=("exported" if exported else scope),
+            )
 
         for m in self._EXPORT.finditer(clean):
             _var(m.group(1), m.group(2), "exported", exported=True)
@@ -121,11 +137,18 @@ class PosixShellAnalyzer(ShellScriptBase):
 
         # Structural summary (control-flow density) as module metadata.
         controls = len(self._CONTROL.findall(clean))
-        dialect = "csh" if (self._CSH_SET.search(clean) or self._CSH_SETENV.search(clean)) \
-            and not self._FUNC.search(clean) else "posix"
+        dialect = (
+            "csh"
+            if (self._CSH_SET.search(clean) or self._CSH_SETENV.search(clean))
+            and not self._FUNC.search(clean)
+            else "posix"
+        )
         self._record_module_meta(
-            file_id, dialect=dialect, control_blocks=controls,
-            functions=len(seen_fn), variables=len(seen_var),
+            file_id,
+            dialect=dialect,
+            control_blocks=controls,
+            functions=len(seen_fn),
+            variables=len(seen_var),
             recipe_kind=self._recipe_kind(path),
         )
 
@@ -133,8 +156,12 @@ class PosixShellAnalyzer(ShellScriptBase):
     def _recipe_kind(path: Path):
         suf = path.suffix.lower()
         return {
-            ".ebuild": "gentoo-ebuild", ".pkgbuild": "arch-pkgbuild",
-            ".postinst": "debian-postinst", ".postrm": "debian-postrm",
-            ".preinst": "debian-preinst", ".prerm": "debian-prerm",
-            ".gradlew": "gradle-wrapper", ".userdata": "cloud-init-userdata",
+            ".ebuild": "gentoo-ebuild",
+            ".pkgbuild": "arch-pkgbuild",
+            ".postinst": "debian-postinst",
+            ".postrm": "debian-postrm",
+            ".preinst": "debian-preinst",
+            ".prerm": "debian-prerm",
+            ".gradlew": "gradle-wrapper",
+            ".userdata": "cloud-init-userdata",
         }.get(suf)

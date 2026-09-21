@@ -90,10 +90,18 @@ class DatabaseAnalyzer:
         self.database_properties_table: List[Dict[str, Any]] = []
         self.database_file_index: List[Dict[str, Any]] = []
 
-        self._ids = {k: 0 for k in (
-            "store", "table", "column", "index", "relation",
-            "property", "dbfi",
-        )}
+        self._ids = {
+            k: 0
+            for k in (
+                "store",
+                "table",
+                "column",
+                "index",
+                "relation",
+                "property",
+                "dbfi",
+            )
+        }
 
     # ------------------------------------------------------------------
     # id helpers
@@ -152,8 +160,9 @@ class DatabaseAnalyzer:
     # ==================================================================
     # Row builders (merge schema structure + data profile)
     # ==================================================================
-    def _emit_store(self, path: Path, ext: str, profile: Dict[str, Any],
-                    local_fid: int) -> None:
+    def _emit_store(
+        self, path: Path, ext: str, profile: Dict[str, Any], local_fid: int
+    ) -> None:
         store_meta = profile.get("store") or {}
         tables = profile.get("tables") or []
         store_id = self._next("store")
@@ -173,22 +182,32 @@ class DatabaseAnalyzer:
             "engine_family": profile.get("engine_family") or "unknown",
             "file_format": ext.lstrip("."),
             "format_class": "binary",
-            "size_bytes": self._as_int(store_meta.get("byte_size")
-                                       or (profile.get("properties") or {}).get("byte_size")
-                                       or self._file_size(path)),
-            "page_size": self._as_int(store_meta.get("page_size")
-                                      or store_meta.get("page_size_guess")),
+            "size_bytes": self._as_int(
+                store_meta.get("byte_size")
+                or (profile.get("properties") or {}).get("byte_size")
+                or self._file_size(path)
+            ),
+            "page_size": self._as_int(
+                store_meta.get("page_size") or store_meta.get("page_size_guess")
+            ),
             "page_count": self._as_int(store_meta.get("page_count")),
-            "encoding": self._as_text(store_meta.get("text_encoding")
-                                      or store_meta.get("encoding")),
+            "encoding": self._as_text(
+                store_meta.get("text_encoding") or store_meta.get("encoding")
+            ),
             "schema_version": self._as_text(
-                store_meta.get("ods_version") or store_meta.get("format_version")
+                store_meta.get("ods_version")
+                or store_meta.get("format_version")
                 or store_meta.get("ese_format_version")
-                or store_meta.get("jet_version") or store_meta.get("dbase_version")
-                or store_meta.get("user_version")),
+                or store_meta.get("jet_version")
+                or store_meta.get("dbase_version")
+                or store_meta.get("user_version")
+            ),
             "app_version": self._as_text(
-                store_meta.get("app_version") or store_meta.get("qv_build_no")
-                or store_meta.get("rdb_version") or store_meta.get("bdb_version")),
+                store_meta.get("app_version")
+                or store_meta.get("qv_build_no")
+                or store_meta.get("rdb_version")
+                or store_meta.get("bdb_version")
+            ),
             "table_count": len(tables),
             "record_count_total": total_records if have_count else None,
             "structural_parse": 1 if profile.get("structural_parse") else 0,
@@ -205,100 +224,127 @@ class DatabaseAnalyzer:
         for t in tables:
             self._emit_table(store_id, t, local_fid, name_to_tid)
 
-        for idx in (profile.get("indexes") or []):
+        for idx in profile.get("indexes") or []:
             self._emit_index(store_id, idx, local_fid, name_to_tid)
 
-        for rel in (profile.get("relations") or []):
+        for rel in profile.get("relations") or []:
             self._emit_relation(store_id, rel, local_fid)
 
         # store-level technical metadata -> properties (flattened, no payload)
         self._emit_properties(store_id, store_meta, "store", local_fid)
-        self._emit_properties(store_id, profile.get("properties") or {},
-                              "forensic", local_fid)
+        self._emit_properties(
+            store_id, profile.get("properties") or {}, "forensic", local_fid
+        )
 
-    def _emit_table(self, store_id: int, t: Dict[str, Any], local_fid: int,
-                    name_to_tid: Dict[str, int]) -> None:
+    def _emit_table(
+        self,
+        store_id: int,
+        t: Dict[str, Any],
+        local_fid: int,
+        name_to_tid: Dict[str, int],
+    ) -> None:
         table_id = self._next("table")
         tname = self._as_text(t.get("name")) or f"table_{table_id}"
         cols = t.get("columns") or []
-        self.database_tables_table.append({
-            "table_id": table_id,
-            "store_id": store_id,
-            "table_name": tname,
-            "table_kind": self._as_text(t.get("kind")) or "table",
-            "qualified_name": self._as_text(t.get("qualified_name")) or tname,
-            "column_count": len(cols),
-            "row_count": self._as_int(t.get("row_count")),
-            "estimated": 1 if t.get("estimated") else 0,
-            "notes": self._as_text(t.get("notes")),
-            "file_id": local_fid,
-        })
+        self.database_tables_table.append(
+            {
+                "table_id": table_id,
+                "store_id": store_id,
+                "table_name": tname,
+                "table_kind": self._as_text(t.get("kind")) or "table",
+                "qualified_name": self._as_text(t.get("qualified_name")) or tname,
+                "column_count": len(cols),
+                "row_count": self._as_int(t.get("row_count")),
+                "estimated": 1 if t.get("estimated") else 0,
+                "notes": self._as_text(t.get("notes")),
+                "file_id": local_fid,
+            }
+        )
         name_to_tid.setdefault(tname, table_id)
         for ordinal, c in enumerate(cols, start=1):
             self._emit_column(store_id, table_id, c, ordinal, local_fid)
 
-    def _emit_column(self, store_id: int, table_id: int, c: Dict[str, Any],
-                     ordinal: int, local_fid: int) -> None:
+    def _emit_column(
+        self,
+        store_id: int,
+        table_id: int,
+        c: Dict[str, Any],
+        ordinal: int,
+        local_fid: int,
+    ) -> None:
         column_id = self._next("column")
-        self.database_columns_table.append({
-            "column_id": column_id,
-            "table_id": table_id,
-            "store_id": store_id,
-            "column_name": self._as_text(c.get("name")) or f"col_{column_id}",
-            "ordinal": ordinal,
-            "declared_type": self._as_text(c.get("declared_type")),
-            "inferred_type": self._as_text(c.get("inferred_type")),
-            "is_nullable": self._as_bool_int(c.get("nullable")),
-            "is_primary_key": 1 if c.get("primary_key") else 0,
-            "is_unique": 1 if c.get("unique") else 0,
-            "default_value": self._as_text(c.get("default")),
-            "references_table": self._as_text(c.get("references_table")),
-            "references_column": self._as_text(c.get("references_column")),
-            "null_count": self._as_int(c.get("null_count")),
-            "non_null_count": self._as_int(c.get("non_null_count")),
-            "distinct_count": self._as_int(c.get("distinct_count")),
-            "min_value": self._as_text(c.get("minimum")),
-            "max_value": self._as_text(c.get("maximum")),
-            "sample_values": self._json(c.get("samples") or []),
-            "extra": self._json(c.get("extra") or {}),
-            "file_id": local_fid,
-        })
+        self.database_columns_table.append(
+            {
+                "column_id": column_id,
+                "table_id": table_id,
+                "store_id": store_id,
+                "column_name": self._as_text(c.get("name")) or f"col_{column_id}",
+                "ordinal": ordinal,
+                "declared_type": self._as_text(c.get("declared_type")),
+                "inferred_type": self._as_text(c.get("inferred_type")),
+                "is_nullable": self._as_bool_int(c.get("nullable")),
+                "is_primary_key": 1 if c.get("primary_key") else 0,
+                "is_unique": 1 if c.get("unique") else 0,
+                "default_value": self._as_text(c.get("default")),
+                "references_table": self._as_text(c.get("references_table")),
+                "references_column": self._as_text(c.get("references_column")),
+                "null_count": self._as_int(c.get("null_count")),
+                "non_null_count": self._as_int(c.get("non_null_count")),
+                "distinct_count": self._as_int(c.get("distinct_count")),
+                "min_value": self._as_text(c.get("minimum")),
+                "max_value": self._as_text(c.get("maximum")),
+                "sample_values": self._json(c.get("samples") or []),
+                "extra": self._json(c.get("extra") or {}),
+                "file_id": local_fid,
+            }
+        )
 
-    def _emit_index(self, store_id: int, idx: Dict[str, Any], local_fid: int,
-                    name_to_tid: Dict[str, int]) -> None:
+    def _emit_index(
+        self,
+        store_id: int,
+        idx: Dict[str, Any],
+        local_fid: int,
+        name_to_tid: Dict[str, int],
+    ) -> None:
         index_id = self._next("index")
         tname = self._as_text(idx.get("table"))
-        self.database_indexes_table.append({
-            "index_id": index_id,
-            "store_id": store_id,
-            "table_id": name_to_tid.get(tname) if tname else None,
-            "table_name": tname,
-            "index_name": self._as_text(idx.get("name")) or f"index_{index_id}",
-            "is_unique": self._as_bool_int(idx.get("unique")),
-            "method": self._as_text(idx.get("method")),
-            "column_names": self._json(idx.get("columns") or []),
-            "file_id": local_fid,
-        })
+        self.database_indexes_table.append(
+            {
+                "index_id": index_id,
+                "store_id": store_id,
+                "table_id": name_to_tid.get(tname) if tname else None,
+                "table_name": tname,
+                "index_name": self._as_text(idx.get("name")) or f"index_{index_id}",
+                "is_unique": self._as_bool_int(idx.get("unique")),
+                "method": self._as_text(idx.get("method")),
+                "column_names": self._json(idx.get("columns") or []),
+                "file_id": local_fid,
+            }
+        )
 
-    def _emit_relation(self, store_id: int, rel: Dict[str, Any],
-                       local_fid: int) -> None:
+    def _emit_relation(
+        self, store_id: int, rel: Dict[str, Any], local_fid: int
+    ) -> None:
         relation_id = self._next("relation")
-        self.database_relations_table.append({
-            "relation_id": relation_id,
-            "store_id": store_id,
-            "relation_type": self._as_text(rel.get("type")) or "relation",
-            "from_table": self._as_text(rel.get("from_table")),
-            "from_column": self._as_text(rel.get("from_column")),
-            "to_table": self._as_text(rel.get("to_table")),
-            "to_column": self._as_text(rel.get("to_column")),
-            "value": self._as_text(rel.get("value")),
-            "method": self._as_text(rel.get("method")),
-            "extra": self._json(rel.get("extra") or {}),
-            "file_id": local_fid,
-        })
+        self.database_relations_table.append(
+            {
+                "relation_id": relation_id,
+                "store_id": store_id,
+                "relation_type": self._as_text(rel.get("type")) or "relation",
+                "from_table": self._as_text(rel.get("from_table")),
+                "from_column": self._as_text(rel.get("from_column")),
+                "to_table": self._as_text(rel.get("to_table")),
+                "to_column": self._as_text(rel.get("to_column")),
+                "value": self._as_text(rel.get("value")),
+                "method": self._as_text(rel.get("method")),
+                "extra": self._json(rel.get("extra") or {}),
+                "file_id": local_fid,
+            }
+        )
 
-    def _emit_properties(self, store_id: int, props: Dict[str, Any],
-                         group_name: str, local_fid: int) -> None:
+    def _emit_properties(
+        self, store_id: int, props: Dict[str, Any], group_name: str, local_fid: int
+    ) -> None:
         if not isinstance(props, dict):
             return
         for name, value in props.items():
@@ -319,15 +365,17 @@ class DatabaseAnalyzer:
             else:
                 pv = str(value)
                 vtype = "str"
-            self.database_properties_table.append({
-                "property_id": self._next("property"),
-                "store_id": store_id,
-                "property_name": str(name)[:256],
-                "property_value": pv[:2048],
-                "value_type": vtype,
-                "group_name": group_name,
-                "file_id": local_fid,
-            })
+            self.database_properties_table.append(
+                {
+                    "property_id": self._next("property"),
+                    "store_id": store_id,
+                    "property_name": str(name)[:256],
+                    "property_value": pv[:2048],
+                    "value_type": vtype,
+                    "group_name": group_name,
+                    "file_id": local_fid,
+                }
+            )
 
     # ------------------------------------------------------------------
     # coercion helpers
@@ -382,7 +430,9 @@ class DatabaseAnalyzer:
     # ==================================================================
     def link_repository(
         self,
-        repository_tables: Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]],
+        repository_tables: Tuple[
+            List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]
+        ],
         analyzed_file_paths: Optional[List[Union[str, Path]]] = None,
     ) -> List[Dict[str, Any]]:
         folders, extensions, files = repository_tables
@@ -398,7 +448,9 @@ class DatabaseAnalyzer:
             deepest = location[-1] if location else 1
             folder_path = folder_by_id.get(deepest, ".")
             fname = f["file_name"] + (f".{ext}" if ext else "")
-            relpath = fname if folder_path in (".", "", None) else f"{folder_path}/{fname}"
+            relpath = (
+                fname if folder_path in (".", "", None) else f"{folder_path}/{fname}"
+            )
             repo_by_relpath.setdefault(relpath, f["file_id"])
             repo_by_basename.setdefault(Path(relpath).name, []).append(f["file_id"])
 
@@ -433,10 +485,14 @@ class DatabaseAnalyzer:
                 repo_id = local_to_repo.get(row.get("file_id"))
                 row["file_id"] = repo_id
                 if repo_id is not None:
-                    self.database_file_index.append({
-                        "dbfi_id": self._next("dbfi"), "file_id": repo_id,
-                        "entity_kind": kind, "entity_id": row[id_key],
-                    })
+                    self.database_file_index.append(
+                        {
+                            "dbfi_id": self._next("dbfi"),
+                            "file_id": repo_id,
+                            "entity_kind": kind,
+                            "entity_id": row[id_key],
+                        }
+                    )
         return self.database_file_index
 
     # ==================================================================

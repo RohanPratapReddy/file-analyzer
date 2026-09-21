@@ -23,7 +23,7 @@
 # Gate applications (`Sgate(...) | 0`) apply operations to a register wire and
 # introduce no name, so they are not recorded.  `#` starts a comment.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -38,15 +38,16 @@ class BlackbirdAnalyzer(RegexCodeAnalyzer):
 
     _NAME = re.compile(r"(?m)^[ \t]*name\s+(" + _ID + r")\s*$")
     _META = re.compile(r"(?m)^[ \t]*(version|target)\s+(\S+)")
-    _DECL = re.compile(r"(?m)^[ \t]*(?:float|int|complex|bool|str)\s+"
-                       r"(?:array\s+)?(" + _ID + r")\s*(?:\[[^\]]*\])?\s*=")
+    _DECL = re.compile(
+        r"(?m)^[ \t]*(?:float|int|complex|bool|str)\s+"
+        r"(?:array\s+)?(" + _ID + r")\s*(?:\[[^\]]*\])?\s*="
+    )
 
     def _extract_entities(self, file_id, text, path):
         clean = self._strip_comments(text)
 
         for m in self._NAME.finditer(clean):
-            self._add_class(file_id, m.group(1),
-                            description="Blackbird program")
+            self._add_class(file_id, m.group(1), description="Blackbird program")
         seen_v = set()
         for m in self._META.finditer(clean):
             key = m.group(1)

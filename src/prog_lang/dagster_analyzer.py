@@ -23,13 +23,38 @@ class DagsterAnalyzer(PythonEmbeddedAnalyzer):
     LANG_KEY = "dagster"
     EXTENSIONS = (".dagster",)
     DSL_DECORATORS = (
-        "asset", "op", "job", "graph", "graph_asset", "multi_asset",
-        "sensor", "schedule", "resource", "config_mapping", "hook",
-        "asset_check", "observable_source_asset", "static_partitioned_config",
+        "asset",
+        "op",
+        "job",
+        "graph",
+        "graph_asset",
+        "multi_asset",
+        "sensor",
+        "schedule",
+        "resource",
+        "config_mapping",
+        "hook",
+        "asset_check",
+        "observable_source_asset",
+        "static_partitioned_config",
         # dotted (aliased-module) forms
-        "dg.asset", "dg.op", "dg.job", "dg.graph", "dg.sensor", "dg.schedule",
-        "dagster.asset", "dagster.op", "dagster.job", "dagster.sensor",
+        "dg.asset",
+        "dg.op",
+        "dg.job",
+        "dg.graph",
+        "dg.sensor",
+        "dg.schedule",
+        "dagster.asset",
+        "dagster.op",
+        "dagster.job",
+        "dagster.sensor",
     )
-    DSL_BASECLASSES = ("Config", "dg.Config", "dagster.Config",
-                       "ConfigurableResource", "dg.ConfigurableResource",
-                       "IOManager", "dagster.ConfigurableResource")
+    DSL_BASECLASSES = (
+        "Config",
+        "dg.Config",
+        "dagster.Config",
+        "ConfigurableResource",
+        "dg.ConfigurableResource",
+        "IOManager",
+        "dagster.ConfigurableResource",
+    )

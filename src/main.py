@@ -57,6 +57,7 @@ Examples:
     python -m src.main --component dbgen --tables-json all_tables.json \\
         --build-db --db out.db --sql out.sql
 """
+
 from __future__ import annotations
 
 import argparse
@@ -81,7 +82,6 @@ def _bootstrap_package_root() -> None:
 _bootstrap_package_root()
 
 from src.core.analysis_engine import AnalysisEngine  # noqa: E402  (after bootstrap)
-
 
 # ----------------------------------------------------------------------------
 # Component registry (for --component / --list-components)
@@ -137,6 +137,7 @@ def _lang_analyzer_registry() -> dict:
     ``PythonCodeAnalyzer``.
     """
     from src.prog_lang.polyglot import PolyglotCodeAnalyzer
+
     reg: dict = {}
     for cls in set(PolyglotCodeAnalyzer.EXT_MAP.values()):
         if cls is not None:
@@ -150,6 +151,7 @@ def _lang_analyzer_registry() -> dict:
 def _exts_for_lang_analyzer(cls) -> frozenset:
     """The lower-cased extension set a single {Lang}Analyzer claims (EXT_MAP inverse)."""
     from src.prog_lang.polyglot import PolyglotCodeAnalyzer
+
     return frozenset(
         ext.lower() for ext, c in PolyglotCodeAnalyzer.EXT_MAP.items() if c is cls
     )
@@ -162,15 +164,24 @@ def list_components() -> dict:
     lang_names = sorted({cls.__name__ for cls in lang.values()})
     return {
         "special": ["census", "linkage", "dbgen"],
-        "planes": ["code", "schema", "database", "data", "config", "text",
-                   "markup", "document", "misc"],
+        "planes": [
+            "code",
+            "schema",
+            "database",
+            "data",
+            "config",
+            "text",
+            "markup",
+            "document",
+            "misc",
+        ],
         "language_analyzers": lang_names,
         "notes": {
             "census": "RepositoryAnalyzer file census only.",
             "linkage": "ImportLinkageAnalyzer; requires --tables-json.",
             "dbgen": "RepositoryDatabaseGenerator; requires --tables-json.",
             "aliases": "class names accepted case-insensitively; "
-                       "'PythonAnalyzer' -> PythonCodeAnalyzer.",
+            "'PythonAnalyzer' -> PythonCodeAnalyzer.",
         },
     }
 
@@ -179,137 +190,266 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="python -m src.main",
         description="Run the tabgen AnalysisEngine over a repository and emit "
-                    "the .db + .sql artifacts (with analysis views installed).",
+        "the .db + .sql artifacts (with analysis views installed).",
     )
-    p.add_argument("source", nargs="?", default=".",
-                   help="directory to analyze (default: current directory). "
-                        "Must be a git repository unless --no-git is given.")
-    p.add_argument("-o", "--out", default=".",
-                   help="output directory for the artifacts (default: current "
-                        "directory). Created if it does not exist.")
-    p.add_argument("--db", default="repository.db",
-                   help="SQLite database filename written under --out "
-                        "(default: repository.db).")
-    p.add_argument("--sql", default="repository_schema.sql",
-                   help="SQL dump filename written under --out "
-                        "(default: repository_schema.sql).")
-    p.add_argument("--dialect", default="sqlite",
-                   choices=["sqlite", "postgresql", "pgsql"],
-                   help="SQL dump dialect (default: sqlite). Use 'postgresql' "
-                        "for a psql-loadable dump for the docker loader.")
-    p.add_argument("--temp", default=None,
-                   help="staging directory for intermediate files (default: a "
-                        "'temp' dir under --out). Point this somewhere writable "
-                        "when the source tree is read-only (e.g. in a container).")
+    p.add_argument(
+        "source",
+        nargs="?",
+        default=".",
+        help="directory to analyze (default: current directory). "
+        "Must be a git repository unless --no-git is given.",
+    )
+    p.add_argument(
+        "-o",
+        "--out",
+        default=".",
+        help="output directory for the artifacts (default: current "
+        "directory). Created if it does not exist.",
+    )
+    p.add_argument(
+        "--db",
+        default="repository.db",
+        help="SQLite database filename written under --out "
+        "(default: repository.db).",
+    )
+    p.add_argument(
+        "--sql",
+        default="repository_schema.sql",
+        help="SQL dump filename written under --out "
+        "(default: repository_schema.sql).",
+    )
+    p.add_argument(
+        "--dialect",
+        default="sqlite",
+        choices=["sqlite", "postgresql", "pgsql"],
+        help="SQL dump dialect (default: sqlite). Use 'postgresql' "
+        "for a psql-loadable dump for the docker loader.",
+    )
+    p.add_argument(
+        "--temp",
+        default=None,
+        help="staging directory for intermediate files (default: a "
+        "'temp' dir under --out). Point this somewhere writable "
+        "when the source tree is read-only (e.g. in a container).",
+    )
 
     # -- concurrency -------------------------------------------------------
-    conc = p.add_argument_group("concurrency",
-                                "worker counts for the two concurrent stages "
-                                "(default each: --workers, else CPU count).")
-    conc.add_argument("--workers", type=int, default=None,
-                      help="default worker count for BOTH the routing planes and "
-                           "the table-injection db export (default: CPU count).")
-    conc.add_argument("--plane-workers", type=int, default=None,
-                      help="workers per analysis plane (Go/Java per-shard fan-out); "
-                           "overrides --workers for the routing stage only.")
-    conc.add_argument("--injection-workers", type=int, default=None,
-                      help="concurrent writer threads for the SQLite table-injection "
-                           "export; overrides --workers for the db-write stage only.")
-    conc.add_argument("--python-exe", default=None,
-                      help="python interpreter the plane workers invoke "
-                           "(default: the interpreter running this command).")
+    conc = p.add_argument_group(
+        "concurrency",
+        "worker counts for the two concurrent stages "
+        "(default each: --workers, else CPU count).",
+    )
+    conc.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="default worker count for BOTH the routing planes and "
+        "the table-injection db export (default: CPU count).",
+    )
+    conc.add_argument(
+        "--plane-workers",
+        type=int,
+        default=None,
+        help="workers per analysis plane (Go/Java per-shard fan-out); "
+        "overrides --workers for the routing stage only.",
+    )
+    conc.add_argument(
+        "--injection-workers",
+        type=int,
+        default=None,
+        help="concurrent writer threads for the SQLite table-injection "
+        "export; overrides --workers for the db-write stage only.",
+    )
+    conc.add_argument(
+        "--python-exe",
+        default=None,
+        help="python interpreter the plane workers invoke "
+        "(default: the interpreter running this command).",
+    )
 
     # -- repository census (RepositoryAnalyzer) ----------------------------
-    census = p.add_argument_group("census",
-                                  "controls for the RepositoryAnalyzer file census.")
-    census.add_argument("--order", dest="order", default="bfs",
-                        choices=["bfs", "dfs"],
-                        help="directory traversal order for the census (default: bfs).")
-    census.add_argument("--ignore-dir", dest="ignore_dirs", action="append",
-                        metavar="NAME",
-                        help="directory name to skip during the census (repeatable). "
-                             "Overrides the analyzer's default ignore set entirely, so "
-                             "re-list any of __pycache__/.git/.venv you still want skipped.")
-    census.add_argument("--ignore-file", dest="ignore_files", action="append",
-                        metavar="NAME",
-                        help="file name to skip during the census (repeatable).")
-    census.add_argument("--exclude-folder", dest="exclude_folder_signatures",
-                        action="append", metavar="REGEX",
-                        help="regex; folders whose path matches are excluded (repeatable).")
-    census.add_argument("--exclude-file", dest="exclude_file_signatures",
-                        action="append", metavar="REGEX",
-                        help="regex; files whose path matches are excluded (repeatable).")
-    census.add_argument("--ext-catalog", dest="ext_catalog", default=None,
-                        metavar="PATH",
-                        help="path to the authoritative file_extensions.json used for "
-                             "extension ids (default: the package's bundled catalog).")
-    census.add_argument("--no-git", action="store_true",
-                        help="census every file on disk instead of only git-tracked files.")
+    census = p.add_argument_group(
+        "census", "controls for the RepositoryAnalyzer file census."
+    )
+    census.add_argument(
+        "--order",
+        dest="order",
+        default="bfs",
+        choices=["bfs", "dfs"],
+        help="directory traversal order for the census (default: bfs).",
+    )
+    census.add_argument(
+        "--ignore-dir",
+        dest="ignore_dirs",
+        action="append",
+        metavar="NAME",
+        help="directory name to skip during the census (repeatable). "
+        "Overrides the analyzer's default ignore set entirely, so "
+        "re-list any of __pycache__/.git/.venv you still want skipped.",
+    )
+    census.add_argument(
+        "--ignore-file",
+        dest="ignore_files",
+        action="append",
+        metavar="NAME",
+        help="file name to skip during the census (repeatable).",
+    )
+    census.add_argument(
+        "--exclude-folder",
+        dest="exclude_folder_signatures",
+        action="append",
+        metavar="REGEX",
+        help="regex; folders whose path matches are excluded (repeatable).",
+    )
+    census.add_argument(
+        "--exclude-file",
+        dest="exclude_file_signatures",
+        action="append",
+        metavar="REGEX",
+        help="regex; files whose path matches are excluded (repeatable).",
+    )
+    census.add_argument(
+        "--ext-catalog",
+        dest="ext_catalog",
+        default=None,
+        metavar="PATH",
+        help="path to the authoritative file_extensions.json used for "
+        "extension ids (default: the package's bundled catalog).",
+    )
+    census.add_argument(
+        "--no-git",
+        action="store_true",
+        help="census every file on disk instead of only git-tracked files.",
+    )
 
     # -- pipeline stage gates ----------------------------------------------
-    stages = p.add_argument_group("stages", "enable/disable individual pipeline stages.")
-    stages.add_argument("--no-linkage", action="store_true",
-                        help="skip cross-file import linkage over the code tables.")
-    stages.add_argument("--no-archives", action="store_true",
-                        help="do not recurse into archive containers (zip/tar/...).")
-    stages.add_argument("--max-archive-depth", type=int, default=8,
-                        help="max nested-archive recursion depth (default: 8).")
-    stages.add_argument("--no-binary", action="store_true",
-                        help="skip the machine-code/object/bytecode deep-parse stage.")
-    stages.add_argument("--no-conversions", action="store_true",
-                        help="skip renderable transcoding of opaque/legacy files.")
-    stages.add_argument("--no-conversion-analysis", action="store_true",
-                        help="transcode but skip the structural deep-parse of the "
-                             "rendered artifacts.")
-    stages.add_argument("--conversions-dir", default=None, metavar="PATH",
-                        help="output directory for rendered artifacts "
-                             "(default: <db_stem>_renderable/ beside the db).")
-    stages.add_argument("--no-views", action="store_true",
-                        help="do not install the analysis v_* views into the db/dump.")
+    stages = p.add_argument_group(
+        "stages", "enable/disable individual pipeline stages."
+    )
+    stages.add_argument(
+        "--no-linkage",
+        action="store_true",
+        help="skip cross-file import linkage over the code tables.",
+    )
+    stages.add_argument(
+        "--no-archives",
+        action="store_true",
+        help="do not recurse into archive containers (zip/tar/...).",
+    )
+    stages.add_argument(
+        "--max-archive-depth",
+        type=int,
+        default=8,
+        help="max nested-archive recursion depth (default: 8).",
+    )
+    stages.add_argument(
+        "--no-binary",
+        action="store_true",
+        help="skip the machine-code/object/bytecode deep-parse stage.",
+    )
+    stages.add_argument(
+        "--no-conversions",
+        action="store_true",
+        help="skip renderable transcoding of opaque/legacy files.",
+    )
+    stages.add_argument(
+        "--no-conversion-analysis",
+        action="store_true",
+        help="transcode but skip the structural deep-parse of the "
+        "rendered artifacts.",
+    )
+    stages.add_argument(
+        "--conversions-dir",
+        default=None,
+        metavar="PATH",
+        help="output directory for rendered artifacts "
+        "(default: <db_stem>_renderable/ beside the db).",
+    )
+    stages.add_argument(
+        "--no-views",
+        action="store_true",
+        help="do not install the analysis v_* views into the db/dump.",
+    )
 
     # -- database generation (RepositoryDatabaseGenerator) -----------------
     dbgen = p.add_argument_group("database", "SQL dump / DDL generation controls.")
-    dbgen.add_argument("--schema-name", default="code_intelligence",
-                       help="namespace/schema name for the postgresql/mysql dump "
-                            "(default: code_intelligence).")
-    dbgen.add_argument("--no-drop", action="store_true",
-                       help="do not prepend DROP TABLE IF EXISTS statements to the dump.")
+    dbgen.add_argument(
+        "--schema-name",
+        default="code_intelligence",
+        help="namespace/schema name for the postgresql/mysql dump "
+        "(default: code_intelligence).",
+    )
+    dbgen.add_argument(
+        "--no-drop",
+        action="store_true",
+        help="do not prepend DROP TABLE IF EXISTS statements to the dump.",
+    )
 
-    p.add_argument("--keep-temp", action="store_true",
-                   help="keep the temp/ staging directory on success (for debugging).")
-    p.add_argument("-q", "--quiet", action="store_true",
-                   help="route the engine's incidental progress lines to stderr so "
-                        "stdout carries ONLY the final JSON result (for agents/pipes).")
+    p.add_argument(
+        "--keep-temp",
+        action="store_true",
+        help="keep the temp/ staging directory on success (for debugging).",
+    )
+    p.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="route the engine's incidental progress lines to stderr so "
+        "stdout carries ONLY the final JSON result (for agents/pipes).",
+    )
 
     # -- component mode (run ONE building block, bypass AnalysisEngine) -----
     comp = p.add_argument_group(
         "component mode",
         "run a single analyzer block instead of the full AnalysisEngine "
-        "pipeline (see --list-components).")
-    comp.add_argument("--list-components", action="store_true",
-                      help="print every valid --component value and exit.")
-    comp.add_argument("-C", "--component", default=None, metavar="NAME",
-                      help="run only this block over the source and dump its tables "
-                           "as JSON. NAME is 'census', a plane ('code'/'schema'/'data'/"
-                           "'config'/'text'/'markup'/'document'/'database'/'misc'), a "
-                           "language analyzer class ('RustAnalyzer', 'PythonAnalyzer', "
-                           "...), 'linkage', or 'dbgen'. Case-insensitive.")
-    comp.add_argument("--emit", default=None, metavar="PATH",
-                      help="output JSON path for the component's tables "
-                           "(default: <component>_analysis.json under --out). "
-                           "Ignored by 'dbgen', which writes --sql/--db instead.")
-    comp.add_argument("--tables-json", default=None, metavar="PATH",
-                      help="input tables JSON for 'linkage' and 'dbgen' components. "
-                           "A dict with keys folders/extensions/files, code_tables, "
-                           "import_linkage, and any {schema,database,data,config,text,"
-                           "markup,document,misc,archive,binary,conversion}_tables. "
-                           "'linkage' additionally reads analyzed_file_paths.")
-    comp.add_argument("--build-db", action="store_true",
-                      help="for --component dbgen: also materialize the SQLite .db "
-                           "(concurrently) after writing the .sql dump.")
-    comp.add_argument("--mapping", action="store_true",
-                      help="for --component census: also emit the file->analyzer "
-                           "mapping and per-class shards.")
+        "pipeline (see --list-components).",
+    )
+    comp.add_argument(
+        "--list-components",
+        action="store_true",
+        help="print every valid --component value and exit.",
+    )
+    comp.add_argument(
+        "-C",
+        "--component",
+        default=None,
+        metavar="NAME",
+        help="run only this block over the source and dump its tables "
+        "as JSON. NAME is 'census', a plane ('code'/'schema'/'data'/"
+        "'config'/'text'/'markup'/'document'/'database'/'misc'), a "
+        "language analyzer class ('RustAnalyzer', 'PythonAnalyzer', "
+        "...), 'linkage', or 'dbgen'. Case-insensitive.",
+    )
+    comp.add_argument(
+        "--emit",
+        default=None,
+        metavar="PATH",
+        help="output JSON path for the component's tables "
+        "(default: <component>_analysis.json under --out). "
+        "Ignored by 'dbgen', which writes --sql/--db instead.",
+    )
+    comp.add_argument(
+        "--tables-json",
+        default=None,
+        metavar="PATH",
+        help="input tables JSON for 'linkage' and 'dbgen' components. "
+        "A dict with keys folders/extensions/files, code_tables, "
+        "import_linkage, and any {schema,database,data,config,text,"
+        "markup,document,misc,archive,binary,conversion}_tables. "
+        "'linkage' additionally reads analyzed_file_paths.",
+    )
+    comp.add_argument(
+        "--build-db",
+        action="store_true",
+        help="for --component dbgen: also materialize the SQLite .db "
+        "(concurrently) after writing the .sql dump.",
+    )
+    comp.add_argument(
+        "--mapping",
+        action="store_true",
+        help="for --component census: also emit the file->analyzer "
+        "mapping and per-class shards.",
+    )
     return p
 
 
@@ -328,6 +468,7 @@ def _maybe_quiet(args):
 def _run_census(args, source: Path):
     """Instantiate RepositoryAnalyzer with the census CLI args and generate()."""
     from src import RepositoryAnalyzer
+
     repo = RepositoryAnalyzer(
         dir_path=str(source),
         dump_file_type="memory",
@@ -342,13 +483,17 @@ def _run_census(args, source: Path):
     generated = repo.generate()
     if generated is None:
         raise RuntimeError(
-            "census produced no files (not a git repository? try --no-git)")
+            "census produced no files (not a git repository? try --no-git)"
+        )
     return repo, generated
 
 
 def _emit_path(args, out_dir: Path, default_stem: str) -> Path:
-    return (Path(args.emit).resolve() if args.emit
-            else out_dir / f"{default_stem}_analysis.json")
+    return (
+        Path(args.emit).resolve()
+        if args.emit
+        else out_dir / f"{default_stem}_analysis.json"
+    )
 
 
 def run_component(args) -> int:
@@ -383,6 +528,7 @@ def run_component(args) -> int:
         payload = {"folders": folders, "extensions": extensions, "files": files}
         if args.mapping:
             from src.router.routing import build_mapping, group_into_shards
+
             mapping = build_mapping(source, folders, extensions, files)
             payload["mapping"] = mapping
             payload["shards"] = group_into_shards(mapping)
@@ -390,7 +536,8 @@ def run_component(args) -> int:
         emit.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
         summary = {
             "component": "RepositoryAnalyzer",
-            "folders": len(folders), "extensions": len(extensions),
+            "folders": len(folders),
+            "extensions": len(extensions),
             "files": len(files),
             "mapped": len(payload.get("mapping", [])) if args.mapping else None,
             "emit_path": str(emit),
@@ -400,9 +547,11 @@ def run_component(args) -> int:
 
     # ---- analyzer components: a plane engine or a single {Lang}Analyzer -----
     from src.router.routing import reconstruct_paths, resolve_analyzer
+
     paths_by_id = reconstruct_paths(source, folders, extensions, files)
-    all_paths = [paths_by_id[f["file_id"]] for f in files
-                 if f["file_id"] in paths_by_id]
+    all_paths = [
+        paths_by_id[f["file_id"]] for f in files if f["file_id"] in paths_by_id
+    ]
 
     plane = _PLANE_COMPONENTS.get(key)
     lang_reg = _lang_analyzer_registry()
@@ -410,6 +559,7 @@ def run_component(args) -> int:
     if plane is not None:
         facade_name, class_id = plane
         import src as _src
+
         engine_cls = getattr(_src, facade_name)
         selected = [p for p in all_paths if resolve_analyzer(p.name) == class_id]
         noncode = class_id in _NONCODE_PLANE_IDS
@@ -422,24 +572,28 @@ def run_component(args) -> int:
     else:
         sys.stderr.write(
             f"[main] unknown component: {name!r}. "
-            f"Run --list-components to see valid names.\n")
+            f"Run --list-components to see valid names.\n"
+        )
         return 2
 
     if not selected:
         sys.stderr.write(
             f"[main] warning: no source files matched component {facade_name}; "
-            f"emitting empty tables.\n")
+            f"emitting empty tables.\n"
+        )
 
     try:
         with _maybe_quiet(args):
-            engine = engine_cls(file_paths=[str(p) for p in selected],
-                                dump_file_type="memory")
+            engine = engine_cls(
+                file_paths=[str(p) for p in selected], dump_file_type="memory"
+            )
             tables = engine.analyze()
             file_index_rows = None
             if noncode:
                 # Mirror the per-shard worker: rewrite local ids -> repository ids.
                 file_index = engine.link_repository(
-                    (folders, extensions, files), [str(p) for p in selected])
+                    (folders, extensions, files), [str(p) for p in selected]
+                )
                 tables = engine.get_tables()
                 file_index_rows = len(file_index) if file_index is not None else None
     except Exception as exc:
@@ -451,8 +605,7 @@ def run_component(args) -> int:
     summary = {
         "component": facade_name,
         "files_selected": len(selected),
-        "tables": {k: len(v) for k, v in tables.items()
-                   if isinstance(v, list)},
+        "tables": {k: len(v) for k, v in tables.items() if isinstance(v, list)},
         "file_index_rows": file_index_rows,
         "emit_path": str(emit),
     }
@@ -472,6 +625,7 @@ def _load_tables_json(args):
 
 def _run_linkage_component(args, out_dir: Path) -> int:
     from src import ImportLinkageAnalyzer
+
     try:
         data, repo_tables = _load_tables_json(args)
     except Exception as exc:
@@ -490,16 +644,26 @@ def _run_linkage_component(args, out_dir: Path) -> int:
         sys.stderr.write(f"[main] linkage failed: {exc}\n")
         return 1
     emit = _emit_path(args, out_dir, "linkage")
-    emit.write_text(json.dumps({"import_linkage": linkage}, indent=2, default=str),
-                    encoding="utf-8")
-    print(json.dumps({"component": "ImportLinkageAnalyzer",
-                      "linkage_rows": len(linkage), "emit_path": str(emit)},
-                     indent=2, default=str))
+    emit.write_text(
+        json.dumps({"import_linkage": linkage}, indent=2, default=str), encoding="utf-8"
+    )
+    print(
+        json.dumps(
+            {
+                "component": "ImportLinkageAnalyzer",
+                "linkage_rows": len(linkage),
+                "emit_path": str(emit),
+            },
+            indent=2,
+            default=str,
+        )
+    )
     return 0
 
 
 def _run_dbgen_component(args, out_dir: Path) -> int:
     from src import RepositoryDatabaseGenerator
+
     try:
         data, repo_tables = _load_tables_json(args)
     except Exception as exc:
@@ -533,7 +697,8 @@ def _run_dbgen_component(args, out_dir: Path) -> int:
             generator.generate()
             if args.build_db:
                 generator.export_to_sqlite_db_concurrent(
-                    str(db_path), workers=args.injection_workers)
+                    str(db_path), workers=args.injection_workers
+                )
     except Exception as exc:
         sys.stderr.write(f"[main] dbgen failed: {exc}\n")
         return 1
@@ -575,7 +740,9 @@ def run(argv=None) -> int:
     # own default of <source>/temp, so a read-only source tree still analyzes.
     temp_dir = Path(args.temp).resolve() if args.temp else (out_dir / "temp")
 
-    conversions_dir = Path(args.conversions_dir).resolve() if args.conversions_dir else None
+    conversions_dir = (
+        Path(args.conversions_dir).resolve() if args.conversions_dir else None
+    )
 
     engine = AnalysisEngine(
         dir_path=source,

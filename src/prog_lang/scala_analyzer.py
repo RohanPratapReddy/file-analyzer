@@ -1,17 +1,6 @@
 # Auto-extracted from code_analyzer.py (verbatim class body).
-import os
-import csv
-import json
-import re
-import ast
-import dis
-import inspect
-import traceback
-import subprocess
-import sqlite3
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
 from .tree_sitter_base import BaseTreeSitterAnalyzer
+
 
 class ScalaAnalyzer(BaseTreeSitterAnalyzer):
     """
@@ -22,16 +11,25 @@ class ScalaAnalyzer(BaseTreeSitterAnalyzer):
     standalone defs (functions).
     """
 
-    _TYPE_DECLS = ("class_definition", "trait_definition", "object_definition",
-                   "enum_definition")
-    _VAL_DECLS = ("val_definition", "var_definition", "val_declaration", "var_declaration")
+    _TYPE_DECLS = (
+        "class_definition",
+        "trait_definition",
+        "object_definition",
+        "enum_definition",
+    )
+    _VAL_DECLS = (
+        "val_definition",
+        "var_definition",
+        "val_declaration",
+        "var_declaration",
+    )
 
     def __init__(self, **kwargs):
         super().__init__(
             lang_key="scala",
             extensions=[".scala", ".sc"],
             introspection_source="scala.reflect.runtime.universe + scala.quoted",
-            **kwargs
+            **kwargs,
         )
 
     def _register_types(self, root_node, source: bytes):
@@ -84,8 +82,9 @@ class ScalaAnalyzer(BaseTreeSitterAnalyzer):
             ident = self._child_of(node, "identifier")
             name = self._node_text(ident, source) if ident else "val"
         v = node.child_by_field_name("value")
-        self._ts_add_variable(file_id, name,
-                              self._node_text(v, source) if v else None, scope=scope)
+        self._ts_add_variable(
+            file_id, name, self._node_text(v, source) if v else None, scope=scope
+        )
 
     def _sc_function(self, file_id, node, source: bytes, class_id):
         name_node = node.child_by_field_name("name")
@@ -100,9 +99,12 @@ class ScalaAnalyzer(BaseTreeSitterAnalyzer):
                 if p.type in ("parameter", "class_parameter"):
                     pn = p.child_by_field_name("name")
                     pt = p.child_by_field_name("type")
-                    arg_ids.append(self._ts_add_arg(
-                        self._node_text(pn, source) if pn else "arg",
-                        self._node_text(pt, source) if pt else None))
+                    arg_ids.append(
+                        self._ts_add_arg(
+                            self._node_text(pn, source) if pn else "arg",
+                            self._node_text(pt, source) if pt else None,
+                        )
+                    )
         out = []
         rt = node.child_by_field_name("return_type")
         if rt is not None:
@@ -125,6 +127,7 @@ class ScalaAnalyzer(BaseTreeSitterAnalyzer):
                             parent_ids.append(pid)
                 else:
                     rec(c)
+
         rec(node)
         return parent_ids
 
@@ -137,7 +140,9 @@ class ScalaAnalyzer(BaseTreeSitterAnalyzer):
             ident = self._child_of(node, "identifier")
             name = self._node_text(ident, source) if ident else None
         t = node.child_by_field_name("type")
-        return [self._ts_add_arg(name or "attr", self._node_text(t, source) if t else None)]
+        return [
+            self._ts_add_arg(name or "attr", self._node_text(t, source) if t else None)
+        ]
 
     def _sc_type(self, file_id, node, source: bytes):
         name_node = node.child_by_field_name("name")
@@ -147,15 +152,20 @@ class ScalaAnalyzer(BaseTreeSitterAnalyzer):
         cls_id = self._class_registry.get(name, self._class_counter)
         parent_ids = self._sc_parents(node, name, source)
         method_ids, attr_ids = [], []
-        cps = node.child_by_field_name("class_parameters") or self._child_of(node, "class_parameters")
+        cps = node.child_by_field_name("class_parameters") or self._child_of(
+            node, "class_parameters"
+        )
         if cps is not None:
             for p in cps.named_children:
                 if p.type in ("class_parameter", "parameter"):
                     pn = p.child_by_field_name("name")
                     pt = p.child_by_field_name("type")
-                    attr_ids.append(self._ts_add_arg(
-                        self._node_text(pn, source) if pn else "param",
-                        self._node_text(pt, source) if pt else None))
+                    attr_ids.append(
+                        self._ts_add_arg(
+                            self._node_text(pn, source) if pn else "param",
+                            self._node_text(pt, source) if pt else None,
+                        )
+                    )
         body = node.child_by_field_name("body") or self._child_of(node, "template_body")
         if body is not None:
             for m in body.named_children:
@@ -163,6 +173,11 @@ class ScalaAnalyzer(BaseTreeSitterAnalyzer):
                     method_ids.append(self._sc_function(file_id, m, source, cls_id))
                 elif m.type in self._VAL_DECLS:
                     attr_ids.extend(self._sc_attr(m, source))
-        self._ts_add_class(file_id, name,
-                           description=f"scala {node.type.replace('_definition', '')}",
-                           parent_ids=parent_ids, method_ids=method_ids, attr_ids=attr_ids)
+        self._ts_add_class(
+            file_id,
+            name,
+            description=f"scala {node.type.replace('_definition', '')}",
+            parent_ids=parent_ids,
+            method_ids=method_ids,
+            attr_ids=attr_ids,
+        )

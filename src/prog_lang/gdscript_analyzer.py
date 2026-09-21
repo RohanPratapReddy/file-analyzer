@@ -12,7 +12,7 @@
 #   enum State { IDLE, RUN }               -> nested enum (class row)
 #   class Inner extends Ref: ...           -> inner class (indented body)
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 
@@ -22,8 +22,12 @@ class GDScriptAnalyzer(RegexCodeAnalyzer):
     LINE_COMMENTS = ("#",)
     BLOCK_COMMENTS = ()
 
-    _FUNC = re.compile(r"^func\s+([A-Za-z_]\w*)\s*\(([^)]*)\)\s*(?:->\s*([\w.\[\], ]+?))?\s*:")
-    _VAR = re.compile(r"^(?:@\w+(?:\([^)]*\))?\s*)*(?:static\s+)?var\s+([A-Za-z_]\w*)\s*(?::\s*([\w.\[\], ]+?))?\s*(?:=\s*(.+?))?\s*$")
+    _FUNC = re.compile(
+        r"^func\s+([A-Za-z_]\w*)\s*\(([^)]*)\)\s*(?:->\s*([\w.\[\], ]+?))?\s*:"
+    )
+    _VAR = re.compile(
+        r"^(?:@\w+(?:\([^)]*\))?\s*)*(?:static\s+)?var\s+([A-Za-z_]\w*)\s*(?::\s*([\w.\[\], ]+?))?\s*(?:=\s*(.+?))?\s*$"
+    )
     _CONST = re.compile(r"^const\s+([A-Za-z_]\w*)\s*(?::\s*[\w.]+)?\s*=\s*(.+?)\s*$")
     _SIGNAL = re.compile(r"^signal\s+([A-Za-z_]\w*)\s*(?:\(([^)]*)\))?")
     _CLASS = re.compile(r"^class\s+([A-Za-z_]\w*)\s*(?:extends\s+([\w.\"']+)\s*)?:")
@@ -52,8 +56,15 @@ class GDScriptAnalyzer(RegexCodeAnalyzer):
             base = em.group(1).strip("\"'").split(".")[-1].replace(".gd", "")
             if base in self._class_registry:
                 file_parents.append(self._class_registry[base])
-        file_cls = {"name": file_name, "kind": "gdscript", "parents": file_parents,
-                    "methods": [], "attrs": [], "header_indent": -1, "is_class": True}
+        file_cls = {
+            "name": file_name,
+            "kind": "gdscript",
+            "parents": file_parents,
+            "methods": [],
+            "attrs": [],
+            "header_indent": -1,
+            "is_class": True,
+        }
         emitted = [file_cls]
         scopes = [file_cls]
 
@@ -66,7 +77,9 @@ class GDScriptAnalyzer(RegexCodeAnalyzer):
             while len(scopes) > 1 and ind <= scopes[-1]["header_indent"]:
                 scopes.pop()
             cur = scopes[-1]
-            cur_class = next((s for s in reversed(scopes) if s.get("is_class")), file_cls)
+            cur_class = next(
+                (s for s in reversed(scopes) if s.get("is_class")), file_cls
+            )
 
             for pm in self._PRELOAD.finditer(line):
                 src = pm.group(1)
@@ -79,9 +92,15 @@ class GDScriptAnalyzer(RegexCodeAnalyzer):
                     b = cmatch.group(2).strip("\"'").split(".")[-1]
                     if b in self._class_registry:
                         parents.append(self._class_registry[b])
-                entry = {"name": cmatch.group(1), "kind": "inner class",
-                         "parents": parents, "methods": [], "attrs": [],
-                         "header_indent": ind, "is_class": True}
+                entry = {
+                    "name": cmatch.group(1),
+                    "kind": "inner class",
+                    "parents": parents,
+                    "methods": [],
+                    "attrs": [],
+                    "header_indent": ind,
+                    "is_class": True,
+                }
                 emitted.append(entry)
                 scopes.append(entry)
                 continue
@@ -90,9 +109,18 @@ class GDScriptAnalyzer(RegexCodeAnalyzer):
             if fmatch:
                 arg_ids = self._params(fmatch.group(2))
                 ret = fmatch.group(3)
-                out_ids = [self._add_output(ret.strip())] if ret and ret.strip() != "void" else []
-                fid = self._add_function(file_id, fmatch.group(1), arg_ids, out_ids,
-                                         class_id=self._class_registry.get(cur_class["name"]))
+                out_ids = (
+                    [self._add_output(ret.strip())]
+                    if ret and ret.strip() != "void"
+                    else []
+                )
+                fid = self._add_function(
+                    file_id,
+                    fmatch.group(1),
+                    arg_ids,
+                    out_ids,
+                    class_id=self._class_registry.get(cur_class["name"]),
+                )
                 cur_class["methods"].append(fid)
                 scopes.append({"is_class": False, "header_indent": ind})
                 continue
@@ -104,10 +132,18 @@ class GDScriptAnalyzer(RegexCodeAnalyzer):
             enm = self._ENUM.match(line)
             if enm:
                 if enm.group(1):
-                    members = [x.split("=")[0].strip() for x in enm.group(2).split(",") if x.strip()]
+                    members = [
+                        x.split("=")[0].strip()
+                        for x in enm.group(2).split(",")
+                        if x.strip()
+                    ]
                     aids = [self._add_arg(x, "enum") for x in members]
-                    self._add_class(file_id, enm.group(1), description="gdscript enum",
-                                    attr_ids=aids)
+                    self._add_class(
+                        file_id,
+                        enm.group(1),
+                        description="gdscript enum",
+                        attr_ids=aids,
+                    )
                 else:
                     for x in enm.group(2).split(","):
                         x = x.split("=")[0].strip()
@@ -122,21 +158,31 @@ class GDScriptAnalyzer(RegexCodeAnalyzer):
 
             komatch = self._CONST.match(line)
             if komatch:
-                cur_class["attrs"].append(self._add_arg(komatch.group(1), "const",
-                                                        komatch.group(2).strip()))
+                cur_class["attrs"].append(
+                    self._add_arg(komatch.group(1), "const", komatch.group(2).strip())
+                )
                 continue
 
             vmatch = self._VAR.match(line)
             if vmatch:
-                cur_class["attrs"].append(self._add_arg(
-                    vmatch.group(1), vmatch.group(2).strip() if vmatch.group(2) else None,
-                    vmatch.group(3).strip() if vmatch.group(3) else None))
+                cur_class["attrs"].append(
+                    self._add_arg(
+                        vmatch.group(1),
+                        vmatch.group(2).strip() if vmatch.group(2) else None,
+                        vmatch.group(3).strip() if vmatch.group(3) else None,
+                    )
+                )
                 continue
 
         for t in emitted:
-            self._add_class(file_id, t["name"], description=f"{t['kind']}",
-                            parent_ids=t["parents"], method_ids=t["methods"],
-                            attr_ids=t["attrs"])
+            self._add_class(
+                file_id,
+                t["name"],
+                description=f"{t['kind']}",
+                parent_ids=t["parents"],
+                method_ids=t["methods"],
+                attr_ids=t["attrs"],
+            )
 
     def _params(self, params):
         arg_ids = []

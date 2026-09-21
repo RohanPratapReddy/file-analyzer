@@ -12,7 +12,7 @@
 #
 # Comments are '#' to end of line; strings use '"'.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _TYPE = r"L[\w/$]+;"
@@ -43,9 +43,11 @@ class SmaliAnalyzer(RegexCodeAnalyzer):
     _SOURCE = re.compile(r'^[ \t]*\.source\s+"([^"]+)"', re.MULTILINE)
     _FIELD = re.compile(
         r"^[ \t]*\.field\b[^\n]*?\b([\w$]+):(\[*(?:[VZBSCIJFD]|L[\w/$]+;))",
-        re.MULTILINE)
+        re.MULTILINE,
+    )
     _METHOD = re.compile(
-        r"^[ \t]*\.method\b[^\n(]*?([\w$<>]+)\(([^)]*)\)", re.MULTILINE)
+        r"^[ \t]*\.method\b[^\n(]*?([\w$<>]+)\(([^)]*)\)", re.MULTILINE
+    )
 
     def _desc_args(self, params):
         ids = []
@@ -73,15 +75,23 @@ class SmaliAnalyzer(RegexCodeAnalyzer):
 
         cls_id = None
         for m in self._CLASS.finditer(clean):
-            cls_id = self._add_class(file_id, _simple_name(m.group(1)),
-                                     description="smali class",
-                                     parent_ids=parent_ids)
+            cls_id = self._add_class(
+                file_id,
+                _simple_name(m.group(1)),
+                description="smali class",
+                parent_ids=parent_ids,
+            )
 
         for m in self._FIELD.finditer(clean):
-            self._add_variable(file_id, m.group(1), value=m.group(2),
-                               scope="class")
+            self._add_variable(file_id, m.group(1), value=m.group(2), scope="class")
 
         for m in self._METHOD.finditer(clean):
             arg_ids = self._desc_args(m.group(2))
-            self._add_function(file_id, m.group(1), arg_ids, [],
-                               class_id=cls_id, description="smali method")
+            self._add_function(
+                file_id,
+                m.group(1),
+                arg_ids,
+                [],
+                class_id=cls_id,
+                description="smali method",
+            )

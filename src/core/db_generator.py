@@ -1,17 +1,11 @@
 # Auto-extracted from code_analyzer.py (verbatim class body).
-import os
-import csv
-import json
-import re
-import ast
-import dis
-import inspect
-import traceback
-import subprocess
-import sqlite3
 import concurrent.futures
+import json
+import os
+import sqlite3
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
+
 
 class RepositoryDatabaseGenerator:
     """
@@ -24,7 +18,9 @@ class RepositoryDatabaseGenerator:
 
     def __init__(
         self,
-        folder_tables: Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]],
+        folder_tables: Tuple[
+            List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]
+        ],
         code_analyzer_tables: Dict[str, List[Dict[str, Any]]],
         import_linkage_table: Optional[List[Dict[str, Any]]] = None,
         schema_tables: Optional[Dict[str, List[Dict[str, Any]]]] = None,
@@ -41,7 +37,7 @@ class RepositoryDatabaseGenerator:
         sql_dialect: str = "sqlite",
         dump_sql_path: str = "repository_schema.sql",
         schema_name: str = "code_intelligence",
-        drop_existing: bool = True
+        drop_existing: bool = True,
     ):
         """
         Args:
@@ -150,7 +146,9 @@ class RepositoryDatabaseGenerator:
             self.dialect = "pgsql"
 
         if self.dialect not in self.SUPPORTED_DIALECTS:
-            raise ValueError(f"Unsupported dialect '{sql_dialect}'. Must be one of: {self.SUPPORTED_DIALECTS}")
+            raise ValueError(
+                f"Unsupported dialect '{sql_dialect}'. Must be one of: {self.SUPPORTED_DIALECTS}"
+            )
 
         self.dump_sql_path = Path(dump_sql_path)
         self.schema_name = schema_name
@@ -182,7 +180,9 @@ class RepositoryDatabaseGenerator:
         output_content = "\n\n".join(stmt for stmt in sql_statements if stmt.strip())
         self.dump_sql_path.parent.mkdir(parents=True, exist_ok=True)
         self.dump_sql_path.write_text(output_content, encoding="utf-8")
-        print(f"Successfully generated full {self.dialect.upper()} relational schema: {self.dump_sql_path}")
+        print(
+            f"Successfully generated full {self.dialect.upper()} relational schema: {self.dump_sql_path}"
+        )
         return self.dump_sql_path
 
     # ================= Dialect Primitives =================
@@ -244,171 +244,229 @@ class RepositoryDatabaseGenerator:
             f"-- Relational Database Schema Dump ({self.dialect.upper()})",
             f"-- Generated Target: {self.dump_sql_path.name}",
             comment_bar,
-            ""
+            "",
         ]
         if self.dialect == "sqlite":
             lines.append("PRAGMA foreign_keys = OFF;")
         elif self.dialect == "mysql":
-            lines.extend([
-                "SET FOREIGN_KEY_CHECKS = 0;",
-                "SET NAMES utf8mb4;",
-                f"CREATE DATABASE IF NOT EXISTS {self._quote(self.schema_name)};",
-                f"USE {self._quote(self.schema_name)};"
-            ])
+            lines.extend(
+                [
+                    "SET FOREIGN_KEY_CHECKS = 0;",
+                    "SET NAMES utf8mb4;",
+                    f"CREATE DATABASE IF NOT EXISTS {self._quote(self.schema_name)};",
+                    f"USE {self._quote(self.schema_name)};",
+                ]
+            )
         elif self.dialect == "pgsql":
-            lines.extend([
-                "SET client_encoding = 'UTF8';",
-                f"CREATE SCHEMA IF NOT EXISTS {self._quote(self.schema_name)};",
-                f"SET search_path TO {self._quote(self.schema_name)}, public;"
-            ])
+            lines.extend(
+                [
+                    "SET client_encoding = 'UTF8';",
+                    f"CREATE SCHEMA IF NOT EXISTS {self._quote(self.schema_name)};",
+                    f"SET search_path TO {self._quote(self.schema_name)}, public;",
+                ]
+            )
         return "\n".join(lines)
 
     def _generate_drop_tables(self) -> str:
         # Tables ordered respecting reverse dependency hierarchy.
         # Schema-definition tables reference file_details, so they must be
         # dropped before it -> they lead the reverse-order list.
-        schema_reverse_order = [
-            "schema_file_index",
-            "schema_indexes_table",
-            "schema_types_table",
-            "schema_methods_table",
-            "schema_triggers_table",
-            "schema_constraints_table",
-            "schema_keys_table",
-            "schema_columns_table",
-            "schema_tables_table",
-            "schema_databases_table",
-        ] if self.schema else []
+        schema_reverse_order = (
+            [
+                "schema_file_index",
+                "schema_indexes_table",
+                "schema_types_table",
+                "schema_methods_table",
+                "schema_triggers_table",
+                "schema_constraints_table",
+                "schema_keys_table",
+                "schema_columns_table",
+                "schema_tables_table",
+                "schema_databases_table",
+            ]
+            if self.schema
+            else []
+        )
         # Data-profile tables also reference file_details (and their own parent
         # data_datasets_table), so children/index lead, datasets trail, and the
         # whole block precedes file_details.
-        data_reverse_order = [
-            "data_file_index",
-            "data_model_layers_table",
-            "data_relations_table",
-            "data_tensors_table",
-            "data_properties_table",
-            "data_columns_table",
-            "data_datasets_table",
-        ] if self.data else []
+        data_reverse_order = (
+            [
+                "data_file_index",
+                "data_model_layers_table",
+                "data_relations_table",
+                "data_tensors_table",
+                "data_properties_table",
+                "data_columns_table",
+                "data_datasets_table",
+            ]
+            if self.data
+            else []
+        )
         # Database-store tables: tables/columns/indexes/relations/properties and the
         # file index reference their database_stores_table parent (and file_details),
         # so children/index lead, stores trail, block precedes file_details.
-        database_reverse_order = [
-            "database_file_index",
-            "database_properties_table",
-            "database_relations_table",
-            "database_indexes_table",
-            "database_columns_table",
-            "database_tables_table",
-            "database_stores_table",
-        ] if self.database else []
+        database_reverse_order = (
+            [
+                "database_file_index",
+                "database_properties_table",
+                "database_relations_table",
+                "database_indexes_table",
+                "database_columns_table",
+                "database_tables_table",
+                "database_stores_table",
+            ]
+            if self.database
+            else []
+        )
         # Config key/value tables: sections/keys/values/properties and the file
         # index reference their config_files_table parent (and file_details), so
         # children/index lead, files trail, block precedes file_details.
-        config_reverse_order = [
-            "config_file_index",
-            "config_values_table",
-            "config_value_keys_table",
-            "config_properties_table",
-            "config_sections_table",
-            "config_files_table",
-        ] if self.config else []
+        config_reverse_order = (
+            [
+                "config_file_index",
+                "config_values_table",
+                "config_value_keys_table",
+                "config_properties_table",
+                "config_sections_table",
+                "config_files_table",
+            ]
+            if self.config
+            else []
+        )
         # Text-record tables: sections/records/fields/properties and the file index
         # reference their text_files_table parent (and file_details), so children/
         # index lead, files trail, block precedes file_details.
-        text_reverse_order = [
-            "text_file_index",
-            "text_fields_table",
-            "text_records_table",
-            "text_sections_table",
-            "text_properties_table",
-            "text_files_table",
-        ] if self.text else []
+        text_reverse_order = (
+            [
+                "text_file_index",
+                "text_fields_table",
+                "text_records_table",
+                "text_sections_table",
+                "text_properties_table",
+                "text_files_table",
+            ]
+            if self.text
+            else []
+        )
         # Markup tables: elements/attributes/namespaces/sections/properties and
         # the file index reference their markup_files_table parent (and
         # file_details); attributes also reference their markup_elements_table
         # parent. Children/index lead, files trail, block precedes file_details.
-        markup_reverse_order = [
-            "markup_file_index",
-            "markup_attributes_table",
-            "markup_namespaces_table",
-            "markup_sections_table",
-            "markup_properties_table",
-            "markup_elements_table",
-            "markup_files_table",
-        ] if self.markup else []
+        markup_reverse_order = (
+            [
+                "markup_file_index",
+                "markup_attributes_table",
+                "markup_namespaces_table",
+                "markup_sections_table",
+                "markup_properties_table",
+                "markup_elements_table",
+                "markup_files_table",
+            ]
+            if self.markup
+            else []
+        )
         # Document tables: sections/records/fields/properties and the file index
         # reference their document_files_table parent (and file_details); fields
         # also reference their record/section parents. Children/index lead, files
         # trail, block precedes file_details.
-        document_reverse_order = [
-            "document_file_index",
-            "document_fields_table",
-            "document_records_table",
-            "document_sections_table",
-            "document_properties_table",
-            "document_files_table",
-        ] if self.document else []
+        document_reverse_order = (
+            [
+                "document_file_index",
+                "document_fields_table",
+                "document_records_table",
+                "document_sections_table",
+                "document_properties_table",
+                "document_files_table",
+            ]
+            if self.document
+            else []
+        )
         # Misc census tables (terminal plane): mirror the document layer -- fields
         # lead, then records, sections, properties, index trails, files precede
         # file_details.
-        misc_reverse_order = [
-            "misc_file_index",
-            "misc_fields_table",
-            "misc_records_table",
-            "misc_sections_table",
-            "misc_properties_table",
-            "misc_files_table",
-        ] if self.misc else []
+        misc_reverse_order = (
+            [
+                "misc_file_index",
+                "misc_fields_table",
+                "misc_records_table",
+                "misc_sections_table",
+                "misc_properties_table",
+                "misc_files_table",
+            ]
+            if self.misc
+            else []
+        )
         # Archive census tables: members reference their archive_index parent (and
         # file_details), so members lead, index trails, block precedes file_details.
-        archive_reverse_order = [
-            "archive_members",
-            "archive_index",
-        ] if self.archive else []
+        archive_reverse_order = (
+            [
+                "archive_members",
+                "archive_index",
+            ]
+            if self.archive
+            else []
+        )
         # Binary tables: sections/symbols/imports/properties reference their
         # binary_index parent (and file_details), so children lead, index trails,
         # block precedes file_details.
-        binary_reverse_order = [
-            "binary_properties",
-            "binary_imports",
-            "binary_symbols",
-            "binary_sections",
-            "binary_index",
-        ] if self.binary else []
+        binary_reverse_order = (
+            [
+                "binary_properties",
+                "binary_imports",
+                "binary_symbols",
+                "binary_sections",
+                "binary_index",
+            ]
+            if self.binary
+            else []
+        )
         # Format-conversion outcomes + per-artifact deep analysis: flat tables
         # referencing file_details (analysis also references format_conversions, so
         # it must be dropped before it in reverse order).
         conversion_reverse_order = (
-            (["conversion_analysis"] if self.conversions.get("conversion_analysis") else [])
-            + (["format_conversions"] if self.conversions else [])
+            ["conversion_analysis"]
+            if self.conversions.get("conversion_analysis")
+            else []
+        ) + (["format_conversions"] if self.conversions else [])
+        tables_in_reverse_order = (
+            schema_reverse_order
+            + database_reverse_order
+            + data_reverse_order
+            + config_reverse_order
+            + text_reverse_order
+            + markup_reverse_order
+            + document_reverse_order
+            + misc_reverse_order
+            + archive_reverse_order
+            + binary_reverse_order
+            + conversion_reverse_order
+            + [
+                "junction_class_methods",
+                "junction_class_inheritance",
+                "junction_class_args",
+                "junction_class_attrs",
+                "junction_class_tensor_members",
+                "junction_function_args",
+                "junction_function_outputs",
+                "file_folder_lineage",
+                "import_linkage_table",
+                "temp_kind_details",
+                "introspection_metadata_table",
+                "symbol_index",
+                "outputs_table",
+                "tensor_members_table",
+                "args_table",
+                "functions_table",
+                "classes_table",
+                "variables_table",
+                "imports_table",
+                "kind_reference",
+                "file_details",
+                "tables",
+                "folder_details",
+            ]
         )
-        tables_in_reverse_order = schema_reverse_order + database_reverse_order + data_reverse_order + config_reverse_order + text_reverse_order + markup_reverse_order + document_reverse_order + misc_reverse_order + archive_reverse_order + binary_reverse_order + conversion_reverse_order + [
-            "junction_class_methods",
-            "junction_class_inheritance",
-            "junction_class_args",
-            "junction_class_attrs",
-            "junction_class_tensor_members",
-            "junction_function_args",
-            "junction_function_outputs",
-            "file_folder_lineage",
-            "import_linkage_table",
-            "temp_kind_details",
-            "introspection_metadata_table",
-            "symbol_index",
-            "outputs_table",
-            "tensor_members_table",
-            "args_table",
-            "functions_table",
-            "classes_table",
-            "variables_table",
-            "imports_table",
-            "kind_reference",
-            "file_details",
-            "tables",
-            "folder_details"
-        ]
         drops = ["-- Drop Tables"]
         for tbl in tables_in_reverse_order:
             q_tbl = self._quote(tbl)
@@ -468,7 +526,6 @@ class RepositoryDatabaseGenerator:
         REFERENCES {q('folder_details')} ({q('folder_id')}) ON DELETE CASCADE,
     CONSTRAINT {q('uq_file_folder_depth')} UNIQUE ({q('file_id')}, {q('depth_index')})
 );""",
-
             "-- ========================================================",
             "-- 2. Relational Entity Stores",
             "-- ========================================================",
@@ -571,7 +628,6 @@ class RepositoryDatabaseGenerator:
     CONSTRAINT {q('fk_linkage_to_file')} FOREIGN KEY ({q('imported_to_file_id')})
         REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL
 );""",
-
             "-- ========================================================",
             "-- 3. Normalized Relational Junction Tables (3NF)",
             "-- ========================================================",
@@ -710,7 +766,7 @@ class RepositoryDatabaseGenerator:
             f"CREATE INDEX {q('idx_meta_entity')} ON {q('introspection_metadata_table')} ({q('entity_id')}, {q('entity_type')});",
             f"CREATE INDEX {q('idx_linkage_import')} ON {q('import_linkage_table')} ({q('import_id')});",
             f"CREATE INDEX {q('idx_linkage_by_file')} ON {q('import_linkage_table')} ({q('imported_by_file_id')});",
-            f"CREATE INDEX {q('idx_linkage_to_file')} ON {q('import_linkage_table')} ({q('imported_to_file_id')});"
+            f"CREATE INDEX {q('idx_linkage_to_file')} ON {q('import_linkage_table')} ({q('imported_to_file_id')});",
         ]
 
         if self.schema:
@@ -874,8 +930,10 @@ class RepositoryDatabaseGenerator:
         bl = self._type_bool()
         js = self._type_json()
         # nullable FK back to the repository file inventory
-        fk_file = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('file_id')})\n"
-                   f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL")
+        fk_file = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('file_id')})\n"
+            f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL"
+        )
 
         return [
             "-- ========================================================",
@@ -1012,12 +1070,18 @@ class RepositoryDatabaseGenerator:
         txt = self._type_text()
         bl = self._type_bool()
         js = self._type_json()
-        fk_file = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('file_id')})\n"
-                   f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL")
-        fk_store = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('store_id')})\n"
-                    f"        REFERENCES {q('database_stores_table')} ({q('store_id')}) ON DELETE CASCADE")
-        fk_tbl = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('table_id')})\n"
-                  f"        REFERENCES {q('database_tables_table')} ({q('table_id')}) ON DELETE CASCADE")
+        fk_file = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('file_id')})\n"
+            f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL"
+        )
+        fk_store = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('store_id')})\n"
+            f"        REFERENCES {q('database_stores_table')} ({q('store_id')}) ON DELETE CASCADE"
+        )
+        fk_tbl = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('table_id')})\n"
+            f"        REFERENCES {q('database_tables_table')} ({q('table_id')}) ON DELETE CASCADE"
+        )
 
         return [
             "-- ========================================================",
@@ -1157,10 +1221,14 @@ class RepositoryDatabaseGenerator:
             rl = "DOUBLE"
         else:
             rl = "REAL"
-        fk_file = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('file_id')})\n"
-                   f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL")
-        fk_ds = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('dataset_id')})\n"
-                 f"        REFERENCES {q('data_datasets_table')} ({q('dataset_id')}) ON DELETE CASCADE")
+        fk_file = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('file_id')})\n"
+            f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL"
+        )
+        fk_ds = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('dataset_id')})\n"
+            f"        REFERENCES {q('data_datasets_table')} ({q('dataset_id')}) ON DELETE CASCADE"
+        )
 
         return [
             "-- ========================================================",
@@ -1296,16 +1364,26 @@ class RepositoryDatabaseGenerator:
         txt = self._type_text()
         bl = self._type_bool()
         js = self._type_json()
-        fk_file = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('file_id')})\n"
-                   f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL")
-        fk_cfg = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('config_file_id')})\n"
-                  f"        REFERENCES {q('config_files_table')} ({q('config_file_id')}) ON DELETE CASCADE")
-        fk_sec = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('section_id')})\n"
-                  f"        REFERENCES {q('config_sections_table')} ({q('section_id')}) ON DELETE SET NULL")
-        fk_key = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('config_value_key_id')})\n"
-                  f"        REFERENCES {q('config_value_keys_table')} ({q('config_value_key_id')}) ON DELETE CASCADE")
-        fk_parent_key = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('config_value_parent_key_id')})\n"
-                         f"        REFERENCES {q('config_value_keys_table')} ({q('config_value_key_id')}) ON DELETE SET NULL")
+        fk_file = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('file_id')})\n"
+            f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL"
+        )
+        fk_cfg = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('config_file_id')})\n"
+            f"        REFERENCES {q('config_files_table')} ({q('config_file_id')}) ON DELETE CASCADE"
+        )
+        fk_sec = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('section_id')})\n"
+            f"        REFERENCES {q('config_sections_table')} ({q('section_id')}) ON DELETE SET NULL"
+        )
+        fk_key = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('config_value_key_id')})\n"
+            f"        REFERENCES {q('config_value_keys_table')} ({q('config_value_key_id')}) ON DELETE CASCADE"
+        )
+        fk_parent_key = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('config_value_parent_key_id')})\n"
+            f"        REFERENCES {q('config_value_keys_table')} ({q('config_value_key_id')}) ON DELETE SET NULL"
+        )
 
         return [
             "-- ========================================================",
@@ -1421,14 +1499,22 @@ class RepositoryDatabaseGenerator:
         pk = self._type_pk()
         bi = self._type_int()
         txt = self._type_text()
-        fk_file = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('file_id')})\n"
-                   f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL")
-        fk_txt = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('text_file_id')})\n"
-                  f"        REFERENCES {q('text_files_table')} ({q('text_file_id')}) ON DELETE CASCADE")
-        fk_sec = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('text_section_id')})\n"
-                  f"        REFERENCES {q('text_sections_table')} ({q('text_section_id')}) ON DELETE SET NULL")
-        fk_rec = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('text_record_id')})\n"
-                  f"        REFERENCES {q('text_records_table')} ({q('text_record_id')}) ON DELETE CASCADE")
+        fk_file = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('file_id')})\n"
+            f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL"
+        )
+        fk_txt = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('text_file_id')})\n"
+            f"        REFERENCES {q('text_files_table')} ({q('text_file_id')}) ON DELETE CASCADE"
+        )
+        fk_sec = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('text_section_id')})\n"
+            f"        REFERENCES {q('text_sections_table')} ({q('text_section_id')}) ON DELETE SET NULL"
+        )
+        fk_rec = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('text_record_id')})\n"
+            f"        REFERENCES {q('text_records_table')} ({q('text_record_id')}) ON DELETE CASCADE"
+        )
 
         return [
             "-- ========================================================",
@@ -1548,14 +1634,22 @@ class RepositoryDatabaseGenerator:
         pk = self._type_pk()
         bi = self._type_int()
         txt = self._type_text()
-        fk_file = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('file_id')})\n"
-                   f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL")
-        fk_doc = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('document_file_id')})\n"
-                  f"        REFERENCES {q('document_files_table')} ({q('document_file_id')}) ON DELETE CASCADE")
-        fk_sec = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('document_section_id')})\n"
-                  f"        REFERENCES {q('document_sections_table')} ({q('document_section_id')}) ON DELETE SET NULL")
-        fk_rec = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('document_record_id')})\n"
-                  f"        REFERENCES {q('document_records_table')} ({q('document_record_id')}) ON DELETE CASCADE")
+        fk_file = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('file_id')})\n"
+            f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL"
+        )
+        fk_doc = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('document_file_id')})\n"
+            f"        REFERENCES {q('document_files_table')} ({q('document_file_id')}) ON DELETE CASCADE"
+        )
+        fk_sec = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('document_section_id')})\n"
+            f"        REFERENCES {q('document_sections_table')} ({q('document_section_id')}) ON DELETE SET NULL"
+        )
+        fk_rec = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('document_record_id')})\n"
+            f"        REFERENCES {q('document_records_table')} ({q('document_record_id')}) ON DELETE CASCADE"
+        )
 
         return [
             "-- ========================================================",
@@ -1671,14 +1765,22 @@ class RepositoryDatabaseGenerator:
         pk = self._type_pk()
         bi = self._type_int()
         txt = self._type_text()
-        fk_file = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('file_id')})\n"
-                   f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL")
-        fk_misc = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('misc_file_id')})\n"
-                   f"        REFERENCES {q('misc_files_table')} ({q('misc_file_id')}) ON DELETE CASCADE")
-        fk_sec = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('misc_section_id')})\n"
-                  f"        REFERENCES {q('misc_sections_table')} ({q('misc_section_id')}) ON DELETE SET NULL")
-        fk_rec = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('misc_record_id')})\n"
-                  f"        REFERENCES {q('misc_records_table')} ({q('misc_record_id')}) ON DELETE CASCADE")
+        fk_file = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('file_id')})\n"
+            f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL"
+        )
+        fk_misc = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('misc_file_id')})\n"
+            f"        REFERENCES {q('misc_files_table')} ({q('misc_file_id')}) ON DELETE CASCADE"
+        )
+        fk_sec = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('misc_section_id')})\n"
+            f"        REFERENCES {q('misc_sections_table')} ({q('misc_section_id')}) ON DELETE SET NULL"
+        )
+        fk_rec = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('misc_record_id')})\n"
+            f"        REFERENCES {q('misc_records_table')} ({q('misc_record_id')}) ON DELETE CASCADE"
+        )
 
         return [
             "-- ========================================================",
@@ -1795,12 +1897,18 @@ class RepositoryDatabaseGenerator:
         pk = self._type_pk()
         bi = self._type_int()
         txt = self._type_text()
-        fk_file = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('file_id')})\n"
-                   f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL")
-        fk_mk = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('markup_file_id')})\n"
-                 f"        REFERENCES {q('markup_files_table')} ({q('markup_file_id')}) ON DELETE CASCADE")
-        fk_el = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('markup_element_id')})\n"
-                 f"        REFERENCES {q('markup_elements_table')} ({q('markup_element_id')}) ON DELETE SET NULL")
+        fk_file = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('file_id')})\n"
+            f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL"
+        )
+        fk_mk = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('markup_file_id')})\n"
+            f"        REFERENCES {q('markup_files_table')} ({q('markup_file_id')}) ON DELETE CASCADE"
+        )
+        fk_el = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('markup_element_id')})\n"
+            f"        REFERENCES {q('markup_elements_table')} ({q('markup_element_id')}) ON DELETE SET NULL"
+        )
 
         return [
             "-- ========================================================",
@@ -1948,8 +2056,10 @@ class RepositoryDatabaseGenerator:
         txt = self._type_text()
         bl = self._type_bool()
         js = self._type_json()
-        fk_file = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('file_id')})\n"
-                   f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL")
+        fk_file = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('file_id')})\n"
+            f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL"
+        )
 
         return [
             "-- ========================================================",
@@ -2009,10 +2119,14 @@ class RepositoryDatabaseGenerator:
             rl = "DOUBLE"
         else:
             rl = "REAL"
-        fk_file = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('file_id')})\n"
-                   f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL")
-        fk_bin = (f"    CONSTRAINT {{name}} FOREIGN KEY ({q('binary_id')})\n"
-                  f"        REFERENCES {q('binary_index')} ({q('binary_id')}) ON DELETE CASCADE")
+        fk_file = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('file_id')})\n"
+            f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL"
+        )
+        fk_bin = (
+            f"    CONSTRAINT {{name}} FOREIGN KEY ({q('binary_id')})\n"
+            f"        REFERENCES {q('binary_index')} ({q('binary_id')}) ON DELETE CASCADE"
+        )
 
         return [
             "-- ========================================================",
@@ -2105,8 +2219,10 @@ class RepositoryDatabaseGenerator:
         pk = self._type_pk()
         bi = self._type_int()
         txt = self._type_text()
-        fk_file = (f"    CONSTRAINT {q('fk_conv_file')} FOREIGN KEY ({q('file_id')})\n"
-                   f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL")
+        fk_file = (
+            f"    CONSTRAINT {q('fk_conv_file')} FOREIGN KEY ({q('file_id')})\n"
+            f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL"
+        )
         return [
             "-- ========================================================",
             "-- 3f. Format Conversions (opaque/legacy -> renderable)",
@@ -2145,10 +2261,14 @@ class RepositoryDatabaseGenerator:
         pk = self._type_pk()
         bi = self._type_int()
         txt = self._type_text()
-        fk_file = (f"    CONSTRAINT {q('fk_canalysis_file')} FOREIGN KEY ({q('file_id')})\n"
-                   f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL")
-        fk_conv = (f"    CONSTRAINT {q('fk_canalysis_conv')} FOREIGN KEY ({q('conversion_id')})\n"
-                   f"        REFERENCES {q('format_conversions')} ({q('conversion_id')}) ON DELETE SET NULL")
+        fk_file = (
+            f"    CONSTRAINT {q('fk_canalysis_file')} FOREIGN KEY ({q('file_id')})\n"
+            f"        REFERENCES {q('file_details')} ({q('file_id')}) ON DELETE SET NULL"
+        )
+        fk_conv = (
+            f"    CONSTRAINT {q('fk_canalysis_conv')} FOREIGN KEY ({q('conversion_id')})\n"
+            f"        REFERENCES {q('format_conversions')} ({q('conversion_id')}) ON DELETE SET NULL"
+        )
         return [
             "-- ========================================================",
             "-- 3g. Conversion Analysis (deep parse of rendered artifacts)",
@@ -2173,7 +2293,11 @@ class RepositoryDatabaseGenerator:
 
     def _generate_triggers(self) -> str:
         q = self._quote
-        lines = ["-- ========================================================", "-- 5. Database Actions & Audit Triggers", "-- ========================================================"]
+        lines = [
+            "-- ========================================================",
+            "-- 5. Database Actions & Audit Triggers",
+            "-- ========================================================",
+        ]
 
         if self.dialect == "sqlite":
             lines.append(f"""CREATE TRIGGER {q('trg_update_folder_timestamp')}
@@ -2206,13 +2330,15 @@ END$$""")
             lines.append("DELIMITER ;")
 
         elif self.dialect == "pgsql":
-            lines.append(f"""CREATE OR REPLACE FUNCTION {self.schema_name}.update_timestamp_column()
+            lines.append(
+                f"""CREATE OR REPLACE FUNCTION {self.schema_name}.update_timestamp_column()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.{q('updated_at')} = CURRENT_TIMESTAMP;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;""")
+$$ LANGUAGE plpgsql;"""
+            )
             lines.append(f"""CREATE TRIGGER {q('trg_folder_updated_at')}
 BEFORE UPDATE ON {q('folder_details')}
 FOR EACH ROW
@@ -2227,254 +2353,412 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
     # ================= Insert Synthesis =================
 
     def _generate_inserts(self) -> str:
-        lines = ["-- ========================================================", "-- 6. Data Ingestion & Populating Normalized Tables", "-- ========================================================"]
+        lines = [
+            "-- ========================================================",
+            "-- 6. Data Ingestion & Populating Normalized Tables",
+            "-- ========================================================",
+        ]
         q = self._quote
 
         # 1. Folders
         if self.folders:
-            folder_cols = [q('folder_id'), q('folder_name'), q('parent_folder_id')]
+            folder_cols = [q("folder_id"), q("folder_name"), q("parent_folder_id")]
             lines.append(f"-- Ingesting {q('folder_details')}")
             for row in self.folders:
                 vals = [
-                    self._escape_sql_val(row.get('folder_id')),
-                    self._escape_sql_val(row.get('folder_name')),
-                    self._escape_sql_val(row.get('parent_folder_id'))
+                    self._escape_sql_val(row.get("folder_id")),
+                    self._escape_sql_val(row.get("folder_name")),
+                    self._escape_sql_val(row.get("parent_folder_id")),
                 ]
-                lines.append(f"INSERT INTO {q('folder_details')} ({', '.join(folder_cols)}) VALUES ({', '.join(vals)});")
+                lines.append(
+                    f"INSERT INTO {q('folder_details')} ({', '.join(folder_cols)}) VALUES ({', '.join(vals)});"
+                )
 
         # 2. Extensions
         if self.extensions:
-            ext_cols = [q('extension_id'), q('extension_name')]
+            ext_cols = [q("extension_id"), q("extension_name")]
             lines.append(f"\n-- Ingesting {q('tables')}")
             for row in self.extensions:
-                vals = [self._escape_sql_val(row.get('extension_id')), self._escape_sql_val(row.get('extension_name'))]
-                lines.append(f"INSERT INTO {q('tables')} ({', '.join(ext_cols)}) VALUES ({', '.join(vals)});")
+                vals = [
+                    self._escape_sql_val(row.get("extension_id")),
+                    self._escape_sql_val(row.get("extension_name")),
+                ]
+                lines.append(
+                    f"INSERT INTO {q('tables')} ({', '.join(ext_cols)}) VALUES ({', '.join(vals)});"
+                )
 
         # 3. Files & Lineage
         if self.files:
-            file_cols = [q('file_id'), q('file_name'), q('file_extension_id'), q('size'), q('units'), q('raw_location_json'), q('created_at_ts64'), q('modified_at_ts64')]
-            lineage_cols = [q('file_id'), q('folder_id'), q('depth_index')]
+            file_cols = [
+                q("file_id"),
+                q("file_name"),
+                q("file_extension_id"),
+                q("size"),
+                q("units"),
+                q("raw_location_json"),
+                q("created_at_ts64"),
+                q("modified_at_ts64"),
+            ]
+            lineage_cols = [q("file_id"), q("folder_id"), q("depth_index")]
             lines.append(f"\n-- Ingesting {q('file_details')} and Normalized Lineage")
 
             for row in self.files:
-                fid = row.get('file_id')
-                loc_list = row.get('location', [])
+                fid = row.get("file_id")
+                loc_list = row.get("location", [])
                 vals = [
                     self._escape_sql_val(fid),
-                    self._escape_sql_val(row.get('file_name')),
-                    self._escape_sql_val(row.get('file_extension_id')),
-                    self._escape_sql_val(row.get('size', 0.0)),
-                    self._escape_sql_val(row.get('units', 'Bytes')),
+                    self._escape_sql_val(row.get("file_name")),
+                    self._escape_sql_val(row.get("file_extension_id")),
+                    self._escape_sql_val(row.get("size", 0.0)),
+                    self._escape_sql_val(row.get("units", "Bytes")),
                     self._escape_sql_val(loc_list),
-                    self._escape_sql_val(row.get('created_at_ts64')),
-                    self._escape_sql_val(row.get('modified_at_ts64'))
+                    self._escape_sql_val(row.get("created_at_ts64")),
+                    self._escape_sql_val(row.get("modified_at_ts64")),
                 ]
-                lines.append(f"INSERT INTO {q('file_details')} ({', '.join(file_cols)}) VALUES ({', '.join(vals)});")
+                lines.append(
+                    f"INSERT INTO {q('file_details')} ({', '.join(file_cols)}) VALUES ({', '.join(vals)});"
+                )
 
                 # Deconstruct array into 3NF Lineage Table
                 for idx, folder_id in enumerate(loc_list):
-                    l_vals = [self._escape_sql_val(fid), self._escape_sql_val(folder_id), self._escape_sql_val(idx)]
-                    lines.append(f"INSERT INTO {q('file_folder_lineage')} ({', '.join(lineage_cols)}) VALUES ({', '.join(l_vals)});")
+                    l_vals = [
+                        self._escape_sql_val(fid),
+                        self._escape_sql_val(folder_id),
+                        self._escape_sql_val(idx),
+                    ]
+                    lines.append(
+                        f"INSERT INTO {q('file_folder_lineage')} ({', '.join(lineage_cols)}) VALUES ({', '.join(l_vals)});"
+                    )
 
         # 4. Reference Kinds
         kinds = self.code_tables.get("kind_reference", [])
         if kinds:
             lines.append(f"\n-- Ingesting {q('kind_reference')}")
             for row in kinds:
-                vals = [self._escape_sql_val(row.get('kind_id')), self._escape_sql_val(row.get('kind_name'))]
-                lines.append(f"INSERT INTO {q('kind_reference')} ({q('kind_id')}, {q('kind_name')}) VALUES ({', '.join(vals)});")
+                vals = [
+                    self._escape_sql_val(row.get("kind_id")),
+                    self._escape_sql_val(row.get("kind_name")),
+                ]
+                lines.append(
+                    f"INSERT INTO {q('kind_reference')} ({q('kind_id')}, {q('kind_name')}) VALUES ({', '.join(vals)});"
+                )
 
         # 5. Imports
         imports = self.code_tables.get("imports_table", [])
         if imports:
             lines.append(f"\n-- Ingesting {q('imports_table')}")
-            imp_cols = [q('import_id'), q('import_name'), q('import_source'), q('alias')]
+            imp_cols = [
+                q("import_id"),
+                q("import_name"),
+                q("import_source"),
+                q("alias"),
+            ]
             for row in imports:
-                vals = [self._escape_sql_val(row.get('import_id')), self._escape_sql_val(row.get('import_name')), self._escape_sql_val(row.get('import_source')), self._escape_sql_val(row.get('alias'))]
-                lines.append(f"INSERT INTO {q('imports_table')} ({', '.join(imp_cols)}) VALUES ({', '.join(vals)});")
+                vals = [
+                    self._escape_sql_val(row.get("import_id")),
+                    self._escape_sql_val(row.get("import_name")),
+                    self._escape_sql_val(row.get("import_source")),
+                    self._escape_sql_val(row.get("alias")),
+                ]
+                lines.append(
+                    f"INSERT INTO {q('imports_table')} ({', '.join(imp_cols)}) VALUES ({', '.join(vals)});"
+                )
 
         # 6. Variables
         variables = self.code_tables.get("variables_table", [])
         if variables:
             lines.append(f"\n-- Ingesting {q('variables_table')}")
-            var_cols = [q('variable_id'), q('variable_name'), q('variable_value'), q('scope'), q('is_imported'), q('source_import_id')]
+            var_cols = [
+                q("variable_id"),
+                q("variable_name"),
+                q("variable_value"),
+                q("scope"),
+                q("is_imported"),
+                q("source_import_id"),
+            ]
             for row in variables:
                 vals = [
-                    self._escape_sql_val(row.get('variable_id')),
-                    self._escape_sql_val(row.get('variable_name')),
-                    self._escape_sql_val(row.get('variable_value')),
-                    self._escape_sql_val(row.get('scope')),
-                    self._escape_sql_val(row.get('is_imported', False)),
-                    self._escape_sql_val(row.get('source_import_id'))
+                    self._escape_sql_val(row.get("variable_id")),
+                    self._escape_sql_val(row.get("variable_name")),
+                    self._escape_sql_val(row.get("variable_value")),
+                    self._escape_sql_val(row.get("scope")),
+                    self._escape_sql_val(row.get("is_imported", False)),
+                    self._escape_sql_val(row.get("source_import_id")),
                 ]
-                lines.append(f"INSERT INTO {q('variables_table')} ({', '.join(var_cols)}) VALUES ({', '.join(vals)});")
+                lines.append(
+                    f"INSERT INTO {q('variables_table')} ({', '.join(var_cols)}) VALUES ({', '.join(vals)});"
+                )
 
         # 7. Classes & Junctions
         classes = self.code_tables.get("classes_table", [])
         if classes:
             lines.append(f"\n-- Ingesting {q('classes_table')} and Member Junctions")
-            cls_cols = [q('class_id'), q('class_name'), q('class_description'), q('is_imported'), q('source_import_id')]
+            cls_cols = [
+                q("class_id"),
+                q("class_name"),
+                q("class_description"),
+                q("is_imported"),
+                q("source_import_id"),
+            ]
 
             for row in classes:
-                cid = row.get('class_id')
+                cid = row.get("class_id")
                 vals = [
                     self._escape_sql_val(cid),
-                    self._escape_sql_val(row.get('class_name')),
-                    self._escape_sql_val(row.get('class_description')),
-                    self._escape_sql_val(row.get('is_imported', False)),
-                    self._escape_sql_val(row.get('source_import_id'))
+                    self._escape_sql_val(row.get("class_name")),
+                    self._escape_sql_val(row.get("class_description")),
+                    self._escape_sql_val(row.get("is_imported", False)),
+                    self._escape_sql_val(row.get("source_import_id")),
                 ]
-                lines.append(f"INSERT INTO {q('classes_table')} ({', '.join(cls_cols)}) VALUES ({', '.join(vals)});")
+                lines.append(
+                    f"INSERT INTO {q('classes_table')} ({', '.join(cls_cols)}) VALUES ({', '.join(vals)});"
+                )
 
                 # Junctions for Class
-                for pid in row.get('parent_class_ids', []):
-                    lines.append(f"INSERT INTO {q('junction_class_inheritance')} ({q('class_id')}, {q('parent_class_id')}) VALUES ({cid}, {pid});")
-                for mid in row.get('method_ids', []):
-                    lines.append(f"INSERT INTO {q('junction_class_methods')} ({q('class_id')}, {q('function_id')}) VALUES ({cid}, {mid});")
-                for aid in row.get('args_ids', []):
-                    lines.append(f"INSERT INTO {q('junction_class_args')} ({q('class_id')}, {q('args_id')}) VALUES ({cid}, {aid});")
-                for attr_id in row.get('attr_ids', []):
-                    lines.append(f"INSERT INTO {q('junction_class_attrs')} ({q('class_id')}, {q('args_id')}) VALUES ({cid}, {attr_id});")
-                for tid in row.get('tensor_member_ids', []):
-                    lines.append(f"INSERT INTO {q('junction_class_tensor_members')} ({q('class_id')}, {q('member_id')}) VALUES ({cid}, {tid});")
+                for pid in row.get("parent_class_ids", []):
+                    lines.append(
+                        f"INSERT INTO {q('junction_class_inheritance')} ({q('class_id')}, {q('parent_class_id')}) VALUES ({cid}, {pid});"
+                    )
+                for mid in row.get("method_ids", []):
+                    lines.append(
+                        f"INSERT INTO {q('junction_class_methods')} ({q('class_id')}, {q('function_id')}) VALUES ({cid}, {mid});"
+                    )
+                for aid in row.get("args_ids", []):
+                    lines.append(
+                        f"INSERT INTO {q('junction_class_args')} ({q('class_id')}, {q('args_id')}) VALUES ({cid}, {aid});"
+                    )
+                for attr_id in row.get("attr_ids", []):
+                    lines.append(
+                        f"INSERT INTO {q('junction_class_attrs')} ({q('class_id')}, {q('args_id')}) VALUES ({cid}, {attr_id});"
+                    )
+                for tid in row.get("tensor_member_ids", []):
+                    lines.append(
+                        f"INSERT INTO {q('junction_class_tensor_members')} ({q('class_id')}, {q('member_id')}) VALUES ({cid}, {tid});"
+                    )
 
         # 8. Args & Outputs
         args = self.code_tables.get("args_table", [])
         if args:
             lines.append(f"\n-- Ingesting {q('args_table')}")
-            arg_cols = [q('args_id'), q('args_name'), q('args_type'), q('default_value'), q('permitted_values')]
+            arg_cols = [
+                q("args_id"),
+                q("args_name"),
+                q("args_type"),
+                q("default_value"),
+                q("permitted_values"),
+            ]
             for row in args:
-                vals = [self._escape_sql_val(row.get('args_id')), self._escape_sql_val(row.get('args_name')), self._escape_sql_val(row.get('args_type')), self._escape_sql_val(row.get('default_value')), self._escape_sql_val(row.get('permitted_values'))]
-                lines.append(f"INSERT INTO {q('args_table')} ({', '.join(arg_cols)}) VALUES ({', '.join(vals)});")
+                vals = [
+                    self._escape_sql_val(row.get("args_id")),
+                    self._escape_sql_val(row.get("args_name")),
+                    self._escape_sql_val(row.get("args_type")),
+                    self._escape_sql_val(row.get("default_value")),
+                    self._escape_sql_val(row.get("permitted_values")),
+                ]
+                lines.append(
+                    f"INSERT INTO {q('args_table')} ({', '.join(arg_cols)}) VALUES ({', '.join(vals)});"
+                )
 
         outputs = self.code_tables.get("outputs_table", [])
         if outputs:
             lines.append(f"\n-- Ingesting {q('outputs_table')}")
             for row in outputs:
-                vals = [self._escape_sql_val(row.get('output_id')), self._escape_sql_val(row.get('output_type')), self._escape_sql_val(row.get('description'))]
-                lines.append(f"INSERT INTO {q('outputs_table')} ({q('output_id')}, {q('output_type')}, {q('description')}) VALUES ({', '.join(vals)});")
+                vals = [
+                    self._escape_sql_val(row.get("output_id")),
+                    self._escape_sql_val(row.get("output_type")),
+                    self._escape_sql_val(row.get("description")),
+                ]
+                lines.append(
+                    f"INSERT INTO {q('outputs_table')} ({q('output_id')}, {q('output_type')}, {q('description')}) VALUES ({', '.join(vals)});"
+                )
 
         # 9. Tensor Members
         tensors = self.code_tables.get("tensor_members_table", [])
         if tensors:
             lines.append(f"\n-- Ingesting {q('tensor_members_table')}")
-            t_cols = [q('member_id'), q('kind'), q('name'), q('count'), q('shape')]
+            t_cols = [q("member_id"), q("kind"), q("name"), q("count"), q("shape")]
             for row in tensors:
-                vals = [self._escape_sql_val(row.get('member_id')), self._escape_sql_val(row.get('kind')), self._escape_sql_val(row.get('name')), self._escape_sql_val(row.get('count')), self._escape_sql_val(row.get('shape'))]
-                lines.append(f"INSERT INTO {q('tensor_members_table')} ({', '.join(t_cols)}) VALUES ({', '.join(vals)});")
+                vals = [
+                    self._escape_sql_val(row.get("member_id")),
+                    self._escape_sql_val(row.get("kind")),
+                    self._escape_sql_val(row.get("name")),
+                    self._escape_sql_val(row.get("count")),
+                    self._escape_sql_val(row.get("shape")),
+                ]
+                lines.append(
+                    f"INSERT INTO {q('tensor_members_table')} ({', '.join(t_cols)}) VALUES ({', '.join(vals)});"
+                )
 
         # 10. Functions & Junctions
         functions = self.code_tables.get("functions_table", [])
         if functions:
             lines.append(f"\n-- Ingesting {q('functions_table')}")
-            f_cols = [q('function_id'), q('function_name'), q('class_id'), q('function_description'), q('function_forward_pass'), q('function_backward_pass'), q('is_imported'), q('source_import_id')]
+            f_cols = [
+                q("function_id"),
+                q("function_name"),
+                q("class_id"),
+                q("function_description"),
+                q("function_forward_pass"),
+                q("function_backward_pass"),
+                q("is_imported"),
+                q("source_import_id"),
+            ]
             for row in functions:
-                fn_id = row.get('function_id')
+                fn_id = row.get("function_id")
                 vals = [
                     self._escape_sql_val(fn_id),
-                    self._escape_sql_val(row.get('function_name')),
-                    self._escape_sql_val(row.get('class_id')),
-                    self._escape_sql_val(row.get('function_description')),
-                    self._escape_sql_val(row.get('function_forward_pass')),
-                    self._escape_sql_val(row.get('function_backward_pass')),
-                    self._escape_sql_val(row.get('is_imported', False)),
-                    self._escape_sql_val(row.get('source_import_id'))
+                    self._escape_sql_val(row.get("function_name")),
+                    self._escape_sql_val(row.get("class_id")),
+                    self._escape_sql_val(row.get("function_description")),
+                    self._escape_sql_val(row.get("function_forward_pass")),
+                    self._escape_sql_val(row.get("function_backward_pass")),
+                    self._escape_sql_val(row.get("is_imported", False)),
+                    self._escape_sql_val(row.get("source_import_id")),
                 ]
-                lines.append(f"INSERT INTO {q('functions_table')} ({', '.join(f_cols)}) VALUES ({', '.join(vals)});")
+                lines.append(
+                    f"INSERT INTO {q('functions_table')} ({', '.join(f_cols)}) VALUES ({', '.join(vals)});"
+                )
 
-                for idx, aid in enumerate(row.get('args_ids', [])):
-                    lines.append(f"INSERT INTO {q('junction_function_args')} ({q('function_id')}, {q('args_id')}, {q('order_index')}) VALUES ({fn_id}, {aid}, {idx});")
-                for oid in row.get('function_outputs_ids', []):
-                    lines.append(f"INSERT INTO {q('junction_function_outputs')} ({q('function_id')}, {q('output_id')}) VALUES ({fn_id}, {oid});")
+                for idx, aid in enumerate(row.get("args_ids", [])):
+                    lines.append(
+                        f"INSERT INTO {q('junction_function_args')} ({q('function_id')}, {q('args_id')}, {q('order_index')}) VALUES ({fn_id}, {aid}, {idx});"
+                    )
+                for oid in row.get("function_outputs_ids", []):
+                    lines.append(
+                        f"INSERT INTO {q('junction_function_outputs')} ({q('function_id')}, {q('output_id')}) VALUES ({fn_id}, {oid});"
+                    )
 
         # 11. Symbol Index
         symbols = self.code_tables.get("symbol_index", [])
         if symbols:
             lines.append(f"\n-- Ingesting {q('symbol_index')}")
-            sym_cols = [q('symbol_id'), q('file_id'), q('kind_id'), q('target_entity_id')]
+            sym_cols = [
+                q("symbol_id"),
+                q("file_id"),
+                q("kind_id"),
+                q("target_entity_id"),
+            ]
             for row in symbols:
-                vals = [self._escape_sql_val(row.get('symbol_id')), self._escape_sql_val(row.get('file_id')), self._escape_sql_val(row.get('kind_id')), self._escape_sql_val(row.get('target_entity_id'))]
-                lines.append(f"INSERT INTO {q('symbol_index')} ({', '.join(sym_cols)}) VALUES ({', '.join(vals)});")
+                vals = [
+                    self._escape_sql_val(row.get("symbol_id")),
+                    self._escape_sql_val(row.get("file_id")),
+                    self._escape_sql_val(row.get("kind_id")),
+                    self._escape_sql_val(row.get("target_entity_id")),
+                ]
+                lines.append(
+                    f"INSERT INTO {q('symbol_index')} ({', '.join(sym_cols)}) VALUES ({', '.join(vals)});"
+                )
 
         # 12. Introspection Metadata
         meta_rows = self.code_tables.get("introspection_metadata_table", [])
         if meta_rows:
             lines.append(f"\n-- Ingesting {q('introspection_metadata_table')}")
             meta_cols = [
-                q('metadata_id'), q('entity_id'), q('entity_type'), q('language'),
-                q('inspection_source'), q('bytecode_or_ast_dump'),
-                q('runtime_decorators_or_attributes'), q('callstack_or_frame_trace'),
-                q('structural_properties')
+                q("metadata_id"),
+                q("entity_id"),
+                q("entity_type"),
+                q("language"),
+                q("inspection_source"),
+                q("bytecode_or_ast_dump"),
+                q("runtime_decorators_or_attributes"),
+                q("callstack_or_frame_trace"),
+                q("structural_properties"),
             ]
             for row in meta_rows:
                 vals = [
-                    self._escape_sql_val(row.get('metadata_id')),
-                    self._escape_sql_val(row.get('entity_id')),
-                    self._escape_sql_val(row.get('entity_type')),
-                    self._escape_sql_val(row.get('language')),
-                    self._escape_sql_val(row.get('inspection_source')),
-                    self._escape_sql_val(row.get('bytecode_or_ast_dump')),
-                    self._escape_sql_val(row.get('runtime_decorators_or_attributes')),
-                    self._escape_sql_val(row.get('callstack_or_frame_trace')),
-                    self._escape_sql_val(row.get('structural_properties'))
+                    self._escape_sql_val(row.get("metadata_id")),
+                    self._escape_sql_val(row.get("entity_id")),
+                    self._escape_sql_val(row.get("entity_type")),
+                    self._escape_sql_val(row.get("language")),
+                    self._escape_sql_val(row.get("inspection_source")),
+                    self._escape_sql_val(row.get("bytecode_or_ast_dump")),
+                    self._escape_sql_val(row.get("runtime_decorators_or_attributes")),
+                    self._escape_sql_val(row.get("callstack_or_frame_trace")),
+                    self._escape_sql_val(row.get("structural_properties")),
                 ]
-                lines.append(f"INSERT INTO {q('introspection_metadata_table')} ({', '.join(meta_cols)}) VALUES ({', '.join(vals)});")
+                lines.append(
+                    f"INSERT INTO {q('introspection_metadata_table')} ({', '.join(meta_cols)}) VALUES ({', '.join(vals)});"
+                )
 
         # 13. Import Linkage (Cross-File Import Resolution)
         linkage_rows = self.import_linkage
         if linkage_rows:
             lines.append(f"\n-- Ingesting {q('import_linkage_table')}")
             link_cols = [
-                q('linkage_id'), q('import_id'), q('import_name'), q('import_source'), q('alias'),
-                q('imported_by_file_id'), q('imported_by_file_name'), q('imported_by_file_type'),
-                q('imported_by_file_location'),
-                q('imported_to_file_id'), q('imported_to_file_name'), q('imported_to_file_type'),
-                q('imported_to_file_location'),
-                q('is_external'),
-                q('import_value_ids'), q('import_value_variable_ids'),
-                q('import_value_function_ids'), q('import_value_class_ids')
+                q("linkage_id"),
+                q("import_id"),
+                q("import_name"),
+                q("import_source"),
+                q("alias"),
+                q("imported_by_file_id"),
+                q("imported_by_file_name"),
+                q("imported_by_file_type"),
+                q("imported_by_file_location"),
+                q("imported_to_file_id"),
+                q("imported_to_file_name"),
+                q("imported_to_file_type"),
+                q("imported_to_file_location"),
+                q("is_external"),
+                q("import_value_ids"),
+                q("import_value_variable_ids"),
+                q("import_value_function_ids"),
+                q("import_value_class_ids"),
             ]
             for row in linkage_rows:
                 vals = [
-                    self._escape_sql_val(row.get('linkage_id')),
-                    self._escape_sql_val(row.get('import_id')),
-                    self._escape_sql_val(row.get('import_name')),
-                    self._escape_sql_val(row.get('import_source')),
-                    self._escape_sql_val(row.get('alias')),
-                    self._escape_sql_val(row.get('imported_by_file_id')),
-                    self._escape_sql_val(row.get('imported_by_file_name')),
-                    self._escape_sql_val(row.get('imported_by_file_type')),
-                    self._escape_sql_val(row.get('imported_by_file_location', [])),
-                    self._escape_sql_val(row.get('imported_to_file_id')),
-                    self._escape_sql_val(row.get('imported_to_file_name')),
-                    self._escape_sql_val(row.get('imported_to_file_type')),
-                    self._escape_sql_val(row.get('imported_to_file_location', [])),
-                    self._escape_sql_val(row.get('is_external', False)),
-                    self._escape_sql_val(row.get('import_value_ids', [])),
-                    self._escape_sql_val(row.get('import_value_variable_ids', [])),
-                    self._escape_sql_val(row.get('import_value_function_ids', [])),
-                    self._escape_sql_val(row.get('import_value_class_ids', []))
+                    self._escape_sql_val(row.get("linkage_id")),
+                    self._escape_sql_val(row.get("import_id")),
+                    self._escape_sql_val(row.get("import_name")),
+                    self._escape_sql_val(row.get("import_source")),
+                    self._escape_sql_val(row.get("alias")),
+                    self._escape_sql_val(row.get("imported_by_file_id")),
+                    self._escape_sql_val(row.get("imported_by_file_name")),
+                    self._escape_sql_val(row.get("imported_by_file_type")),
+                    self._escape_sql_val(row.get("imported_by_file_location", [])),
+                    self._escape_sql_val(row.get("imported_to_file_id")),
+                    self._escape_sql_val(row.get("imported_to_file_name")),
+                    self._escape_sql_val(row.get("imported_to_file_type")),
+                    self._escape_sql_val(row.get("imported_to_file_location", [])),
+                    self._escape_sql_val(row.get("is_external", False)),
+                    self._escape_sql_val(row.get("import_value_ids", [])),
+                    self._escape_sql_val(row.get("import_value_variable_ids", [])),
+                    self._escape_sql_val(row.get("import_value_function_ids", [])),
+                    self._escape_sql_val(row.get("import_value_class_ids", [])),
                 ]
-                lines.append(f"INSERT INTO {q('import_linkage_table')} ({', '.join(link_cols)}) VALUES ({', '.join(vals)});")
+                lines.append(
+                    f"INSERT INTO {q('import_linkage_table')} ({', '.join(link_cols)}) VALUES ({', '.join(vals)});"
+                )
 
         # 14. Temp Kind Details (Mermaid Graphs)
         temp_kinds = self.code_tables.get("temp_kind_details", [])
         if temp_kinds:
             lines.append(f"\n-- Ingesting {q('temp_kind_details')}")
-            tk_cols = [q('temp_kind_id'), q('kind_type'), q('kind_name'), q('kind_function_ids'), q('kind_args_ids'), q('kind_class_ids'), q('kind_variables_ids'), q('kind_tensor_member_ids'), q('pipeline_flowchart')]
+            tk_cols = [
+                q("temp_kind_id"),
+                q("kind_type"),
+                q("kind_name"),
+                q("kind_function_ids"),
+                q("kind_args_ids"),
+                q("kind_class_ids"),
+                q("kind_variables_ids"),
+                q("kind_tensor_member_ids"),
+                q("pipeline_flowchart"),
+            ]
             for row in temp_kinds:
                 vals = [
-                    self._escape_sql_val(row.get('temp_kind_id')),
-                    self._escape_sql_val(row.get('kind_type')),
-                    self._escape_sql_val(row.get('kind_name')),
-                    self._escape_sql_val(row.get('kind_function_ids', [])),
-                    self._escape_sql_val(row.get('kind_args_ids', [])),
-                    self._escape_sql_val(row.get('kind_class_ids', [])),
-                    self._escape_sql_val(row.get('kind_variables_ids', [])),
-                    self._escape_sql_val(row.get('kind_tensor_member_ids', [])),
-                    self._escape_sql_val(row.get('pipeline_flowchart'))
+                    self._escape_sql_val(row.get("temp_kind_id")),
+                    self._escape_sql_val(row.get("kind_type")),
+                    self._escape_sql_val(row.get("kind_name")),
+                    self._escape_sql_val(row.get("kind_function_ids", [])),
+                    self._escape_sql_val(row.get("kind_args_ids", [])),
+                    self._escape_sql_val(row.get("kind_class_ids", [])),
+                    self._escape_sql_val(row.get("kind_variables_ids", [])),
+                    self._escape_sql_val(row.get("kind_tensor_member_ids", [])),
+                    self._escape_sql_val(row.get("pipeline_flowchart")),
                 ]
-                lines.append(f"INSERT INTO {q('temp_kind_details')} ({', '.join(tk_cols)}) VALUES ({', '.join(vals)});")
+                lines.append(
+                    f"INSERT INTO {q('temp_kind_details')} ({', '.join(tk_cols)}) VALUES ({', '.join(vals)});"
+                )
 
         # 15. Schema definitions (SchemaAnalyzer output)
         if self.schema:
@@ -2538,37 +2822,124 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
 
         # (table_name, [column keys in order]) for each schema table.
         specs = [
-            ("schema_databases_table",
-             ["db_id", "db_name", "db_engine", "namespace", "file_ids", "table_ids"]),
-            ("schema_tables_table",
-             ["table_id", "table_name", "qualified_name", "db_engine", "namespace",
-              "table_kind", "columns_ids", "key_ids", "constraint_ids",
-              "trigger_ids", "index_ids", "file_id"]),
-            ("schema_columns_table",
-             ["column_id", "column_name", "column_type", "column_value", "keys",
-              "is_nullable", "default_value", "references_table",
-              "references_column", "ordinal", "table_ids", "file_id"]),
-            ("schema_keys_table",
-             ["key_id", "key_name", "key_type", "table_id", "column_ids",
-              "referenced_table", "referenced_columns", "on_delete",
-              "on_update", "file_id"]),
-            ("schema_constraints_table",
-             ["constraint_id", "constraint_name", "constraint_type", "table_id",
-              "column_ids", "expression", "file_id"]),
-            ("schema_triggers_table",
-             ["trigger_id", "trigger_name", "table_id", "timing", "events",
-              "level", "action", "method_id", "file_id"]),
-            ("schema_methods_table",
-             ["method_id", "method_name", "method_kind", "return_type",
-              "language", "arg_signature", "table_id", "file_id"]),
-            ("schema_types_table",
-             ["type_id", "type_name", "type_category", "base_type",
-              "allowed_values", "table_id", "file_id"]),
-            ("schema_indexes_table",
-             ["index_id", "index_name", "table_id", "is_unique", "method",
-              "column_ids", "column_expr", "file_id"]),
-            ("schema_file_index",
-             ["sfi_id", "file_id", "entity_kind", "entity_id"]),
+            (
+                "schema_databases_table",
+                ["db_id", "db_name", "db_engine", "namespace", "file_ids", "table_ids"],
+            ),
+            (
+                "schema_tables_table",
+                [
+                    "table_id",
+                    "table_name",
+                    "qualified_name",
+                    "db_engine",
+                    "namespace",
+                    "table_kind",
+                    "columns_ids",
+                    "key_ids",
+                    "constraint_ids",
+                    "trigger_ids",
+                    "index_ids",
+                    "file_id",
+                ],
+            ),
+            (
+                "schema_columns_table",
+                [
+                    "column_id",
+                    "column_name",
+                    "column_type",
+                    "column_value",
+                    "keys",
+                    "is_nullable",
+                    "default_value",
+                    "references_table",
+                    "references_column",
+                    "ordinal",
+                    "table_ids",
+                    "file_id",
+                ],
+            ),
+            (
+                "schema_keys_table",
+                [
+                    "key_id",
+                    "key_name",
+                    "key_type",
+                    "table_id",
+                    "column_ids",
+                    "referenced_table",
+                    "referenced_columns",
+                    "on_delete",
+                    "on_update",
+                    "file_id",
+                ],
+            ),
+            (
+                "schema_constraints_table",
+                [
+                    "constraint_id",
+                    "constraint_name",
+                    "constraint_type",
+                    "table_id",
+                    "column_ids",
+                    "expression",
+                    "file_id",
+                ],
+            ),
+            (
+                "schema_triggers_table",
+                [
+                    "trigger_id",
+                    "trigger_name",
+                    "table_id",
+                    "timing",
+                    "events",
+                    "level",
+                    "action",
+                    "method_id",
+                    "file_id",
+                ],
+            ),
+            (
+                "schema_methods_table",
+                [
+                    "method_id",
+                    "method_name",
+                    "method_kind",
+                    "return_type",
+                    "language",
+                    "arg_signature",
+                    "table_id",
+                    "file_id",
+                ],
+            ),
+            (
+                "schema_types_table",
+                [
+                    "type_id",
+                    "type_name",
+                    "type_category",
+                    "base_type",
+                    "allowed_values",
+                    "table_id",
+                    "file_id",
+                ],
+            ),
+            (
+                "schema_indexes_table",
+                [
+                    "index_id",
+                    "index_name",
+                    "table_id",
+                    "is_unique",
+                    "method",
+                    "column_ids",
+                    "column_expr",
+                    "file_id",
+                ],
+            ),
+            ("schema_file_index", ["sfi_id", "file_id", "entity_kind", "entity_id"]),
         ]
 
         for table_name, cols in specs:
@@ -2579,7 +2950,9 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
             lines.append(f"\n-- Ingesting {q(table_name)}")
             for row in rows:
                 vals = ", ".join(esc(row.get(c)) for c in cols)
-                lines.append(f"INSERT INTO {q(table_name)} ({col_sql}) VALUES ({vals});")
+                lines.append(
+                    f"INSERT INTO {q(table_name)} ({col_sql}) VALUES ({vals});"
+                )
 
         return lines
 
@@ -2595,33 +2968,115 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
 
         # (table_name, [column keys in order]) for each database table.
         specs = [
-            ("database_stores_table",
-             ["store_id", "store_name", "engine", "engine_family", "file_format",
-              "format_class", "size_bytes", "page_size", "page_count", "encoding",
-              "schema_version", "app_version", "table_count", "record_count_total",
-              "structural_parse", "likely_encrypted", "analysis_status", "notes",
-              "properties", "file_id"]),
-            ("database_tables_table",
-             ["table_id", "store_id", "table_name", "table_kind", "qualified_name",
-              "column_count", "row_count", "estimated", "notes", "file_id"]),
-            ("database_columns_table",
-             ["column_id", "table_id", "store_id", "column_name", "ordinal",
-              "declared_type", "inferred_type", "is_nullable", "is_primary_key",
-              "is_unique", "default_value", "references_table", "references_column",
-              "null_count", "non_null_count", "distinct_count", "min_value",
-              "max_value", "sample_values", "extra", "file_id"]),
-            ("database_indexes_table",
-             ["index_id", "store_id", "table_id", "table_name", "index_name",
-              "is_unique", "method", "column_names", "file_id"]),
-            ("database_relations_table",
-             ["relation_id", "store_id", "relation_type", "from_table",
-              "from_column", "to_table", "to_column", "value", "method", "extra",
-              "file_id"]),
-            ("database_properties_table",
-             ["property_id", "store_id", "property_name", "property_value",
-              "value_type", "group_name", "file_id"]),
-            ("database_file_index",
-             ["dbfi_id", "file_id", "entity_kind", "entity_id"]),
+            (
+                "database_stores_table",
+                [
+                    "store_id",
+                    "store_name",
+                    "engine",
+                    "engine_family",
+                    "file_format",
+                    "format_class",
+                    "size_bytes",
+                    "page_size",
+                    "page_count",
+                    "encoding",
+                    "schema_version",
+                    "app_version",
+                    "table_count",
+                    "record_count_total",
+                    "structural_parse",
+                    "likely_encrypted",
+                    "analysis_status",
+                    "notes",
+                    "properties",
+                    "file_id",
+                ],
+            ),
+            (
+                "database_tables_table",
+                [
+                    "table_id",
+                    "store_id",
+                    "table_name",
+                    "table_kind",
+                    "qualified_name",
+                    "column_count",
+                    "row_count",
+                    "estimated",
+                    "notes",
+                    "file_id",
+                ],
+            ),
+            (
+                "database_columns_table",
+                [
+                    "column_id",
+                    "table_id",
+                    "store_id",
+                    "column_name",
+                    "ordinal",
+                    "declared_type",
+                    "inferred_type",
+                    "is_nullable",
+                    "is_primary_key",
+                    "is_unique",
+                    "default_value",
+                    "references_table",
+                    "references_column",
+                    "null_count",
+                    "non_null_count",
+                    "distinct_count",
+                    "min_value",
+                    "max_value",
+                    "sample_values",
+                    "extra",
+                    "file_id",
+                ],
+            ),
+            (
+                "database_indexes_table",
+                [
+                    "index_id",
+                    "store_id",
+                    "table_id",
+                    "table_name",
+                    "index_name",
+                    "is_unique",
+                    "method",
+                    "column_names",
+                    "file_id",
+                ],
+            ),
+            (
+                "database_relations_table",
+                [
+                    "relation_id",
+                    "store_id",
+                    "relation_type",
+                    "from_table",
+                    "from_column",
+                    "to_table",
+                    "to_column",
+                    "value",
+                    "method",
+                    "extra",
+                    "file_id",
+                ],
+            ),
+            (
+                "database_properties_table",
+                [
+                    "property_id",
+                    "store_id",
+                    "property_name",
+                    "property_value",
+                    "value_type",
+                    "group_name",
+                    "file_id",
+                ],
+            ),
+            ("database_file_index", ["dbfi_id", "file_id", "entity_kind", "entity_id"]),
         ]
 
         for table_name, cols in specs:
@@ -2632,7 +3087,9 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
             lines.append(f"\n-- Ingesting {q(table_name)}")
             for row in rows:
                 vals = ", ".join(esc(row.get(c)) for c in cols)
-                lines.append(f"INSERT INTO {q(table_name)} ({col_sql}) VALUES ({vals});")
+                lines.append(
+                    f"INSERT INTO {q(table_name)} ({col_sql}) VALUES ({vals});"
+                )
 
         return lines
 
@@ -2648,32 +3105,113 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
 
         # (table_name, [column keys in order]) for each data table.
         specs = [
-            ("data_datasets_table",
-             ["dataset_id", "dataset_name", "category", "subcategory", "modality",
-              "file_format", "format_family", "size_bytes", "row_count",
-              "column_count", "record_count", "tensor_count", "analysis_status",
-              "notes", "properties", "file_id"]),
-            ("data_columns_table",
-             ["column_id", "dataset_id", "column_name", "ordinal", "data_type",
-              "inferred_type", "null_count", "non_null_count", "unique_count",
-              "min_value", "max_value", "mean_value", "std_value",
-              "sample_values", "extra", "file_id"]),
-            ("data_tensors_table",
-             ["tensor_id", "dataset_id", "tensor_name", "dtype", "shape", "rank",
-              "num_elements", "num_bytes", "role", "layer_name", "extra", "file_id"]),
-            ("data_relations_table",
-             ["relation_id", "dataset_id", "relation_type", "left_column",
-              "right_column", "value", "method", "extra", "file_id"]),
-            ("data_properties_table",
-             ["property_id", "dataset_id", "property_name", "property_value",
-              "value_type", "group_name", "file_id"]),
-            ("data_model_layers_table",
-             ["model_layer_id", "dataset_id", "layer_name", "layer_type",
-              "ordinal", "depth", "tensor_count", "param_tensor_count",
-              "buffer_tensor_count", "total_parameters", "total_buffer_elements",
-              "total_bytes", "dtypes", "param_shapes", "roles", "file_id"]),
-            ("data_file_index",
-             ["dfi_id", "file_id", "entity_kind", "entity_id"]),
+            (
+                "data_datasets_table",
+                [
+                    "dataset_id",
+                    "dataset_name",
+                    "category",
+                    "subcategory",
+                    "modality",
+                    "file_format",
+                    "format_family",
+                    "size_bytes",
+                    "row_count",
+                    "column_count",
+                    "record_count",
+                    "tensor_count",
+                    "analysis_status",
+                    "notes",
+                    "properties",
+                    "file_id",
+                ],
+            ),
+            (
+                "data_columns_table",
+                [
+                    "column_id",
+                    "dataset_id",
+                    "column_name",
+                    "ordinal",
+                    "data_type",
+                    "inferred_type",
+                    "null_count",
+                    "non_null_count",
+                    "unique_count",
+                    "min_value",
+                    "max_value",
+                    "mean_value",
+                    "std_value",
+                    "sample_values",
+                    "extra",
+                    "file_id",
+                ],
+            ),
+            (
+                "data_tensors_table",
+                [
+                    "tensor_id",
+                    "dataset_id",
+                    "tensor_name",
+                    "dtype",
+                    "shape",
+                    "rank",
+                    "num_elements",
+                    "num_bytes",
+                    "role",
+                    "layer_name",
+                    "extra",
+                    "file_id",
+                ],
+            ),
+            (
+                "data_relations_table",
+                [
+                    "relation_id",
+                    "dataset_id",
+                    "relation_type",
+                    "left_column",
+                    "right_column",
+                    "value",
+                    "method",
+                    "extra",
+                    "file_id",
+                ],
+            ),
+            (
+                "data_properties_table",
+                [
+                    "property_id",
+                    "dataset_id",
+                    "property_name",
+                    "property_value",
+                    "value_type",
+                    "group_name",
+                    "file_id",
+                ],
+            ),
+            (
+                "data_model_layers_table",
+                [
+                    "model_layer_id",
+                    "dataset_id",
+                    "layer_name",
+                    "layer_type",
+                    "ordinal",
+                    "depth",
+                    "tensor_count",
+                    "param_tensor_count",
+                    "buffer_tensor_count",
+                    "total_parameters",
+                    "total_buffer_elements",
+                    "total_bytes",
+                    "dtypes",
+                    "param_shapes",
+                    "roles",
+                    "file_id",
+                ],
+            ),
+            ("data_file_index", ["dfi_id", "file_id", "entity_kind", "entity_id"]),
         ]
 
         for table_name, cols in specs:
@@ -2684,7 +3222,9 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
             lines.append(f"\n-- Ingesting {q(table_name)}")
             for row in rows:
                 vals = ", ".join(esc(row.get(c)) for c in cols)
-                lines.append(f"INSERT INTO {q(table_name)} ({col_sql}) VALUES ({vals});")
+                lines.append(
+                    f"INSERT INTO {q(table_name)} ({col_sql}) VALUES ({vals});"
+                )
 
         return lines
 
@@ -2700,28 +3240,87 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
 
         # (table_name, [column keys in order]) for each config table.
         specs = [
-            ("config_files_table",
-             ["config_file_id", "file_name", "extension", "syntax_family",
-              "parse_engine", "format_label", "detected_via", "format_class",
-              "size_bytes", "encoding", "root_type", "section_count", "key_count",
-              "value_count", "property_count", "max_depth", "analysis_status",
-              "notes", "file_id"]),
-            ("config_sections_table",
-             ["section_id", "config_file_id", "section_name", "section_path",
-              "section_type", "parent_section_id", "key_count", "notes", "file_id"]),
-            ("config_value_keys_table",
-             ["config_value_key_id", "config_file_id", "section_id",
-              "config_value_key_name", "key_path", "config_value_parent_key_id",
-              "depth", "node_type", "child_count", "file_id"]),
-            ("config_values_table",
-             ["config_value_id", "config_value_key_id", "config_file_id",
-              "section_id", "config_value_parent_key_id", "config_value_type",
-              "scalar_value", "list_index", "is_leaf", "file_id"]),
-            ("config_properties_table",
-             ["property_id", "config_file_id", "property_name", "property_value",
-              "value_type", "group_name", "file_id"]),
-            ("config_file_index",
-             ["cfi_id", "file_id", "entity_kind", "entity_id"]),
+            (
+                "config_files_table",
+                [
+                    "config_file_id",
+                    "file_name",
+                    "extension",
+                    "syntax_family",
+                    "parse_engine",
+                    "format_label",
+                    "detected_via",
+                    "format_class",
+                    "size_bytes",
+                    "encoding",
+                    "root_type",
+                    "section_count",
+                    "key_count",
+                    "value_count",
+                    "property_count",
+                    "max_depth",
+                    "analysis_status",
+                    "notes",
+                    "file_id",
+                ],
+            ),
+            (
+                "config_sections_table",
+                [
+                    "section_id",
+                    "config_file_id",
+                    "section_name",
+                    "section_path",
+                    "section_type",
+                    "parent_section_id",
+                    "key_count",
+                    "notes",
+                    "file_id",
+                ],
+            ),
+            (
+                "config_value_keys_table",
+                [
+                    "config_value_key_id",
+                    "config_file_id",
+                    "section_id",
+                    "config_value_key_name",
+                    "key_path",
+                    "config_value_parent_key_id",
+                    "depth",
+                    "node_type",
+                    "child_count",
+                    "file_id",
+                ],
+            ),
+            (
+                "config_values_table",
+                [
+                    "config_value_id",
+                    "config_value_key_id",
+                    "config_file_id",
+                    "section_id",
+                    "config_value_parent_key_id",
+                    "config_value_type",
+                    "scalar_value",
+                    "list_index",
+                    "is_leaf",
+                    "file_id",
+                ],
+            ),
+            (
+                "config_properties_table",
+                [
+                    "property_id",
+                    "config_file_id",
+                    "property_name",
+                    "property_value",
+                    "value_type",
+                    "group_name",
+                    "file_id",
+                ],
+            ),
+            ("config_file_index", ["cfi_id", "file_id", "entity_kind", "entity_id"]),
         ]
 
         for table_name, cols in specs:
@@ -2732,7 +3331,9 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
             lines.append(f"\n-- Ingesting {q(table_name)}")
             for row in rows:
                 vals = ", ".join(esc(row.get(c)) for c in cols)
-                lines.append(f"INSERT INTO {q(table_name)} ({col_sql}) VALUES ({vals});")
+                lines.append(
+                    f"INSERT INTO {q(table_name)} ({col_sql}) VALUES ({vals});"
+                )
 
         return lines
 
@@ -2748,28 +3349,89 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
 
         # (table_name, [column keys in order]) for each text table.
         specs = [
-            ("text_files_table",
-             ["text_file_id", "file_name", "extension", "content_kind",
-              "syntax_family", "parse_engine", "format_label", "detected_via",
-              "format_class", "size_bytes", "encoding", "line_count",
-              "section_count", "record_count", "field_count", "property_count",
-              "analysis_status", "notes", "file_id"]),
-            ("text_sections_table",
-             ["text_section_id", "text_file_id", "section_name", "section_path",
-              "section_type", "ordinal", "record_count", "notes", "file_id"]),
-            ("text_records_table",
-             ["text_record_id", "text_file_id", "text_section_id", "record_index",
-              "record_type", "record_label", "start_line", "end_line",
-              "field_count", "text_preview", "notes", "file_id"]),
-            ("text_fields_table",
-             ["text_field_id", "text_record_id", "text_file_id", "text_section_id",
-              "field_name", "field_key", "field_type", "field_value", "ordinal",
-              "file_id"]),
-            ("text_properties_table",
-             ["property_id", "text_file_id", "property_name", "property_value",
-              "value_type", "group_name", "file_id"]),
-            ("text_file_index",
-             ["tfi_id", "file_id", "entity_kind", "entity_id"]),
+            (
+                "text_files_table",
+                [
+                    "text_file_id",
+                    "file_name",
+                    "extension",
+                    "content_kind",
+                    "syntax_family",
+                    "parse_engine",
+                    "format_label",
+                    "detected_via",
+                    "format_class",
+                    "size_bytes",
+                    "encoding",
+                    "line_count",
+                    "section_count",
+                    "record_count",
+                    "field_count",
+                    "property_count",
+                    "analysis_status",
+                    "notes",
+                    "file_id",
+                ],
+            ),
+            (
+                "text_sections_table",
+                [
+                    "text_section_id",
+                    "text_file_id",
+                    "section_name",
+                    "section_path",
+                    "section_type",
+                    "ordinal",
+                    "record_count",
+                    "notes",
+                    "file_id",
+                ],
+            ),
+            (
+                "text_records_table",
+                [
+                    "text_record_id",
+                    "text_file_id",
+                    "text_section_id",
+                    "record_index",
+                    "record_type",
+                    "record_label",
+                    "start_line",
+                    "end_line",
+                    "field_count",
+                    "text_preview",
+                    "notes",
+                    "file_id",
+                ],
+            ),
+            (
+                "text_fields_table",
+                [
+                    "text_field_id",
+                    "text_record_id",
+                    "text_file_id",
+                    "text_section_id",
+                    "field_name",
+                    "field_key",
+                    "field_type",
+                    "field_value",
+                    "ordinal",
+                    "file_id",
+                ],
+            ),
+            (
+                "text_properties_table",
+                [
+                    "property_id",
+                    "text_file_id",
+                    "property_name",
+                    "property_value",
+                    "value_type",
+                    "group_name",
+                    "file_id",
+                ],
+            ),
+            ("text_file_index", ["tfi_id", "file_id", "entity_kind", "entity_id"]),
         ]
 
         for table_name, cols in specs:
@@ -2780,7 +3442,9 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
             lines.append(f"\n-- Ingesting {q(table_name)}")
             for row in rows:
                 vals = ", ".join(esc(row.get(c)) for c in cols)
-                lines.append(f"INSERT INTO {q(table_name)} ({col_sql}) VALUES ({vals});")
+                lines.append(
+                    f"INSERT INTO {q(table_name)} ({col_sql}) VALUES ({vals});"
+                )
 
         return lines
 
@@ -2798,29 +3462,89 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
 
         # (table_name, [column keys in order]) for each document table.
         specs = [
-            ("document_files_table",
-             ["document_file_id", "file_name", "extension", "content_kind",
-              "syntax_family", "parse_engine", "format_label", "detected_via",
-              "format_class", "size_bytes", "encoding", "line_count",
-              "section_count", "record_count", "field_count", "property_count",
-              "analysis_status", "notes", "file_id"]),
-            ("document_sections_table",
-             ["document_section_id", "document_file_id", "section_name",
-              "section_path", "section_type", "ordinal", "record_count",
-              "notes", "file_id"]),
-            ("document_records_table",
-             ["document_record_id", "document_file_id", "document_section_id",
-              "record_index", "record_type", "record_label", "start_line",
-              "end_line", "field_count", "text_preview", "notes", "file_id"]),
-            ("document_fields_table",
-             ["document_field_id", "document_record_id", "document_file_id",
-              "document_section_id", "field_name", "field_key", "field_type",
-              "field_value", "ordinal", "file_id"]),
-            ("document_properties_table",
-             ["property_id", "document_file_id", "property_name", "property_value",
-              "value_type", "group_name", "file_id"]),
-            ("document_file_index",
-             ["dfi_id", "file_id", "entity_kind", "entity_id"]),
+            (
+                "document_files_table",
+                [
+                    "document_file_id",
+                    "file_name",
+                    "extension",
+                    "content_kind",
+                    "syntax_family",
+                    "parse_engine",
+                    "format_label",
+                    "detected_via",
+                    "format_class",
+                    "size_bytes",
+                    "encoding",
+                    "line_count",
+                    "section_count",
+                    "record_count",
+                    "field_count",
+                    "property_count",
+                    "analysis_status",
+                    "notes",
+                    "file_id",
+                ],
+            ),
+            (
+                "document_sections_table",
+                [
+                    "document_section_id",
+                    "document_file_id",
+                    "section_name",
+                    "section_path",
+                    "section_type",
+                    "ordinal",
+                    "record_count",
+                    "notes",
+                    "file_id",
+                ],
+            ),
+            (
+                "document_records_table",
+                [
+                    "document_record_id",
+                    "document_file_id",
+                    "document_section_id",
+                    "record_index",
+                    "record_type",
+                    "record_label",
+                    "start_line",
+                    "end_line",
+                    "field_count",
+                    "text_preview",
+                    "notes",
+                    "file_id",
+                ],
+            ),
+            (
+                "document_fields_table",
+                [
+                    "document_field_id",
+                    "document_record_id",
+                    "document_file_id",
+                    "document_section_id",
+                    "field_name",
+                    "field_key",
+                    "field_type",
+                    "field_value",
+                    "ordinal",
+                    "file_id",
+                ],
+            ),
+            (
+                "document_properties_table",
+                [
+                    "property_id",
+                    "document_file_id",
+                    "property_name",
+                    "property_value",
+                    "value_type",
+                    "group_name",
+                    "file_id",
+                ],
+            ),
+            ("document_file_index", ["dfi_id", "file_id", "entity_kind", "entity_id"]),
         ]
 
         for table_name, cols in specs:
@@ -2831,7 +3555,9 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
             lines.append(f"\n-- Ingesting {q(table_name)}")
             for row in rows:
                 vals = ", ".join(esc(row.get(c)) for c in cols)
-                lines.append(f"INSERT INTO {q(table_name)} ({col_sql}) VALUES ({vals});")
+                lines.append(
+                    f"INSERT INTO {q(table_name)} ({col_sql}) VALUES ({vals});"
+                )
 
         return lines
 
@@ -2848,29 +3574,89 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
 
         # (table_name, [column keys in order]) for each misc table.
         specs = [
-            ("misc_files_table",
-             ["misc_file_id", "file_name", "extension", "content_kind",
-              "syntax_family", "parse_engine", "format_label", "detected_via",
-              "format_class", "size_bytes", "encoding", "line_count",
-              "section_count", "record_count", "field_count", "property_count",
-              "analysis_status", "notes", "file_id"]),
-            ("misc_sections_table",
-             ["misc_section_id", "misc_file_id", "section_name",
-              "section_path", "section_type", "ordinal", "record_count",
-              "notes", "file_id"]),
-            ("misc_records_table",
-             ["misc_record_id", "misc_file_id", "misc_section_id",
-              "record_index", "record_type", "record_label", "start_line",
-              "end_line", "field_count", "text_preview", "notes", "file_id"]),
-            ("misc_fields_table",
-             ["misc_field_id", "misc_record_id", "misc_file_id",
-              "misc_section_id", "field_name", "field_key", "field_type",
-              "field_value", "ordinal", "file_id"]),
-            ("misc_properties_table",
-             ["property_id", "misc_file_id", "property_name", "property_value",
-              "value_type", "group_name", "file_id"]),
-            ("misc_file_index",
-             ["mfi_id", "file_id", "entity_kind", "entity_id"]),
+            (
+                "misc_files_table",
+                [
+                    "misc_file_id",
+                    "file_name",
+                    "extension",
+                    "content_kind",
+                    "syntax_family",
+                    "parse_engine",
+                    "format_label",
+                    "detected_via",
+                    "format_class",
+                    "size_bytes",
+                    "encoding",
+                    "line_count",
+                    "section_count",
+                    "record_count",
+                    "field_count",
+                    "property_count",
+                    "analysis_status",
+                    "notes",
+                    "file_id",
+                ],
+            ),
+            (
+                "misc_sections_table",
+                [
+                    "misc_section_id",
+                    "misc_file_id",
+                    "section_name",
+                    "section_path",
+                    "section_type",
+                    "ordinal",
+                    "record_count",
+                    "notes",
+                    "file_id",
+                ],
+            ),
+            (
+                "misc_records_table",
+                [
+                    "misc_record_id",
+                    "misc_file_id",
+                    "misc_section_id",
+                    "record_index",
+                    "record_type",
+                    "record_label",
+                    "start_line",
+                    "end_line",
+                    "field_count",
+                    "text_preview",
+                    "notes",
+                    "file_id",
+                ],
+            ),
+            (
+                "misc_fields_table",
+                [
+                    "misc_field_id",
+                    "misc_record_id",
+                    "misc_file_id",
+                    "misc_section_id",
+                    "field_name",
+                    "field_key",
+                    "field_type",
+                    "field_value",
+                    "ordinal",
+                    "file_id",
+                ],
+            ),
+            (
+                "misc_properties_table",
+                [
+                    "property_id",
+                    "misc_file_id",
+                    "property_name",
+                    "property_value",
+                    "value_type",
+                    "group_name",
+                    "file_id",
+                ],
+            ),
+            ("misc_file_index", ["mfi_id", "file_id", "entity_kind", "entity_id"]),
         ]
 
         for table_name, cols in specs:
@@ -2881,7 +3667,9 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
             lines.append(f"\n-- Ingesting {q(table_name)}")
             for row in rows:
                 vals = ", ".join(esc(row.get(c)) for c in cols)
-                lines.append(f"INSERT INTO {q(table_name)} ({col_sql}) VALUES ({vals});")
+                lines.append(
+                    f"INSERT INTO {q(table_name)} ({col_sql}) VALUES ({vals});"
+                )
 
         return lines
 
@@ -2898,39 +3686,127 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
 
         # (table_name, [column keys in order]) for each markup table.
         specs = [
-            ("markup_files_table",
-             ["markup_file_id", "file_name", "extension", "content_kind",
-              "syntax_family", "markup_language", "dialect_profile", "parse_engine",
-              "format_label", "detected_via", "format_class", "size_bytes",
-              "encoding", "line_count", "well_formed", "root_element",
-              "namespace_count", "element_count", "distinct_element_count",
-              "attribute_count", "distinct_attribute_count", "max_depth",
-              "comment_count", "pi_count", "cdata_count", "text_length",
-              "section_count", "property_count", "analysis_status", "notes",
-              "file_id"]),
-            ("markup_elements_table",
-             ["markup_element_id", "markup_file_id", "tag_name", "qualified_name",
-              "namespace_prefix", "namespace_uri", "occurrence_count", "min_depth",
-              "max_depth", "total_child_count", "max_children", "leaf_count",
-              "text_bearing_count", "total_text_length", "distinct_attribute_count",
-              "attribute_names", "sample_text", "is_root", "ordinal", "file_id"]),
-            ("markup_attributes_table",
-             ["markup_attribute_id", "markup_file_id", "markup_element_id",
-              "element_tag", "attribute_name", "namespace_prefix",
-              "occurrence_count", "distinct_value_count", "value_type",
-              "sample_value", "min_length", "max_length", "file_id"]),
-            ("markup_namespaces_table",
-             ["markup_namespace_id", "markup_file_id", "prefix", "uri",
-              "is_default", "element_usage_count", "file_id"]),
-            ("markup_sections_table",
-             ["markup_section_id", "markup_file_id", "section_name", "section_type",
-              "section_path", "depth", "ordinal", "element_tag", "child_count",
-              "text_length", "title", "file_id"]),
-            ("markup_properties_table",
-             ["property_id", "markup_file_id", "property_name", "property_value",
-              "value_type", "group_name", "file_id"]),
-            ("markup_file_index",
-             ["mfi_id", "file_id", "entity_kind", "entity_id"]),
+            (
+                "markup_files_table",
+                [
+                    "markup_file_id",
+                    "file_name",
+                    "extension",
+                    "content_kind",
+                    "syntax_family",
+                    "markup_language",
+                    "dialect_profile",
+                    "parse_engine",
+                    "format_label",
+                    "detected_via",
+                    "format_class",
+                    "size_bytes",
+                    "encoding",
+                    "line_count",
+                    "well_formed",
+                    "root_element",
+                    "namespace_count",
+                    "element_count",
+                    "distinct_element_count",
+                    "attribute_count",
+                    "distinct_attribute_count",
+                    "max_depth",
+                    "comment_count",
+                    "pi_count",
+                    "cdata_count",
+                    "text_length",
+                    "section_count",
+                    "property_count",
+                    "analysis_status",
+                    "notes",
+                    "file_id",
+                ],
+            ),
+            (
+                "markup_elements_table",
+                [
+                    "markup_element_id",
+                    "markup_file_id",
+                    "tag_name",
+                    "qualified_name",
+                    "namespace_prefix",
+                    "namespace_uri",
+                    "occurrence_count",
+                    "min_depth",
+                    "max_depth",
+                    "total_child_count",
+                    "max_children",
+                    "leaf_count",
+                    "text_bearing_count",
+                    "total_text_length",
+                    "distinct_attribute_count",
+                    "attribute_names",
+                    "sample_text",
+                    "is_root",
+                    "ordinal",
+                    "file_id",
+                ],
+            ),
+            (
+                "markup_attributes_table",
+                [
+                    "markup_attribute_id",
+                    "markup_file_id",
+                    "markup_element_id",
+                    "element_tag",
+                    "attribute_name",
+                    "namespace_prefix",
+                    "occurrence_count",
+                    "distinct_value_count",
+                    "value_type",
+                    "sample_value",
+                    "min_length",
+                    "max_length",
+                    "file_id",
+                ],
+            ),
+            (
+                "markup_namespaces_table",
+                [
+                    "markup_namespace_id",
+                    "markup_file_id",
+                    "prefix",
+                    "uri",
+                    "is_default",
+                    "element_usage_count",
+                    "file_id",
+                ],
+            ),
+            (
+                "markup_sections_table",
+                [
+                    "markup_section_id",
+                    "markup_file_id",
+                    "section_name",
+                    "section_type",
+                    "section_path",
+                    "depth",
+                    "ordinal",
+                    "element_tag",
+                    "child_count",
+                    "text_length",
+                    "title",
+                    "file_id",
+                ],
+            ),
+            (
+                "markup_properties_table",
+                [
+                    "property_id",
+                    "markup_file_id",
+                    "property_name",
+                    "property_value",
+                    "value_type",
+                    "group_name",
+                    "file_id",
+                ],
+            ),
+            ("markup_file_index", ["mfi_id", "file_id", "entity_kind", "entity_id"]),
         ]
 
         for table_name, cols in specs:
@@ -2941,7 +3817,9 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
             lines.append(f"\n-- Ingesting {q(table_name)}")
             for row in rows:
                 vals = ", ".join(esc(row.get(c)) for c in cols)
-                lines.append(f"INSERT INTO {q(table_name)} ({col_sql}) VALUES ({vals});")
+                lines.append(
+                    f"INSERT INTO {q(table_name)} ({col_sql}) VALUES ({vals});"
+                )
 
         return lines
 
@@ -2956,15 +3834,39 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
         ]
 
         specs = [
-            ("archive_index",
-             ["archive_id", "file_id", "archive_name", "archive_format",
-              "member_count", "compressed_size", "extracted_size", "extractable",
-              "extraction_status", "sub_database", "sub_file_count",
-              "sub_shard_summary", "depth", "notes"]),
-            ("archive_members",
-             ["member_id", "archive_id", "member_path", "member_kind",
-              "member_size", "compressed_size", "modified", "analyzer_class",
-              "file_id"]),
+            (
+                "archive_index",
+                [
+                    "archive_id",
+                    "file_id",
+                    "archive_name",
+                    "archive_format",
+                    "member_count",
+                    "compressed_size",
+                    "extracted_size",
+                    "extractable",
+                    "extraction_status",
+                    "sub_database",
+                    "sub_file_count",
+                    "sub_shard_summary",
+                    "depth",
+                    "notes",
+                ],
+            ),
+            (
+                "archive_members",
+                [
+                    "member_id",
+                    "archive_id",
+                    "member_path",
+                    "member_kind",
+                    "member_size",
+                    "compressed_size",
+                    "modified",
+                    "analyzer_class",
+                    "file_id",
+                ],
+            ),
         ]
 
         for table_name, cols in specs:
@@ -2975,7 +3877,9 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
             lines.append(f"\n-- Ingesting {q(table_name)}")
             for row in rows:
                 vals = ", ".join(esc(row.get(c)) for c in cols)
-                lines.append(f"INSERT INTO {q(table_name)} ({col_sql}) VALUES ({vals});")
+                lines.append(
+                    f"INSERT INTO {q(table_name)} ({col_sql}) VALUES ({vals});"
+                )
 
         return lines
 
@@ -2990,22 +3894,71 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
         ]
 
         specs = [
-            ("binary_index",
-             ["binary_id", "file_id", "file_name", "binary_format", "format_family",
-              "category", "subcategory", "architecture", "bitness", "endianness",
-              "entry_point", "is_stripped", "is_dynamic", "is_pic", "section_count",
-              "symbol_count", "import_count", "export_count", "sha256", "size",
-              "entropy", "detected_via", "notes", "error"]),
-            ("binary_sections",
-             ["section_id", "binary_id", "ordinal", "name", "sec_type",
-              "virtual_address", "file_offset", "size", "flags", "entropy"]),
-            ("binary_symbols",
-             ["symbol_id", "binary_id", "name", "sym_kind", "binding", "address",
-              "size", "section", "is_import", "is_export", "library"]),
-            ("binary_imports",
-             ["import_id", "binary_id", "library", "symbol", "kind"]),
-            ("binary_properties",
-             ["property_id", "binary_id", "prop_group", "prop_name", "prop_value"]),
+            (
+                "binary_index",
+                [
+                    "binary_id",
+                    "file_id",
+                    "file_name",
+                    "binary_format",
+                    "format_family",
+                    "category",
+                    "subcategory",
+                    "architecture",
+                    "bitness",
+                    "endianness",
+                    "entry_point",
+                    "is_stripped",
+                    "is_dynamic",
+                    "is_pic",
+                    "section_count",
+                    "symbol_count",
+                    "import_count",
+                    "export_count",
+                    "sha256",
+                    "size",
+                    "entropy",
+                    "detected_via",
+                    "notes",
+                    "error",
+                ],
+            ),
+            (
+                "binary_sections",
+                [
+                    "section_id",
+                    "binary_id",
+                    "ordinal",
+                    "name",
+                    "sec_type",
+                    "virtual_address",
+                    "file_offset",
+                    "size",
+                    "flags",
+                    "entropy",
+                ],
+            ),
+            (
+                "binary_symbols",
+                [
+                    "symbol_id",
+                    "binary_id",
+                    "name",
+                    "sym_kind",
+                    "binding",
+                    "address",
+                    "size",
+                    "section",
+                    "is_import",
+                    "is_export",
+                    "library",
+                ],
+            ),
+            ("binary_imports", ["import_id", "binary_id", "library", "symbol", "kind"]),
+            (
+                "binary_properties",
+                ["property_id", "binary_id", "prop_group", "prop_name", "prop_value"],
+            ),
         ]
 
         for table_name, cols in specs:
@@ -3016,7 +3969,9 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
             lines.append(f"\n-- Ingesting {q(table_name)}")
             for row in rows:
                 vals = ", ".join(esc(row.get(c)) for c in cols)
-                lines.append(f"INSERT INTO {q(table_name)} ({col_sql}) VALUES ({vals});")
+                lines.append(
+                    f"INSERT INTO {q(table_name)} ({col_sql}) VALUES ({vals});"
+                )
 
         return lines
 
@@ -3029,9 +3984,20 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
             "-- 6f. Ingesting Format Conversions (opaque/legacy -> renderable)",
             "-- ========================================================",
         ]
-        cols = ["conversion_id", "file_id", "source_file", "source_path",
-                "source_ext", "target_format", "status", "method", "tool",
-                "output_file", "output_size", "detail"]
+        cols = [
+            "conversion_id",
+            "file_id",
+            "source_file",
+            "source_path",
+            "source_ext",
+            "target_format",
+            "status",
+            "method",
+            "tool",
+            "output_file",
+            "output_size",
+            "detail",
+        ]
         rows = self.conversions.get("format_conversions", [])
         if not rows:
             return lines
@@ -3039,7 +4005,9 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
         lines.append(f"\n-- Ingesting {q('format_conversions')}")
         for row in rows:
             vals = ", ".join(esc(row.get(c)) for c in cols)
-            lines.append(f"INSERT INTO {q('format_conversions')} ({col_sql}) VALUES ({vals});")
+            lines.append(
+                f"INSERT INTO {q('format_conversions')} ({col_sql}) VALUES ({vals});"
+            )
         return lines
 
     def _generate_analysis_inserts(self) -> List[str]:
@@ -3058,9 +4026,19 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
         rows = self.conversions.get("conversion_analysis", [])
         if not rows:
             return lines
-        cols = ["analysis_id", "conversion_id", "file_id", "source_file",
-                "source_ext", "artifact_file", "kind", "status", "summary",
-                "detail", "metrics_json"]
+        cols = [
+            "analysis_id",
+            "conversion_id",
+            "file_id",
+            "source_file",
+            "source_ext",
+            "artifact_file",
+            "kind",
+            "status",
+            "summary",
+            "detail",
+            "metrics_json",
+        ]
         col_sql = ", ".join(q(c) for c in cols)
         lines.append(f"\n-- Ingesting {q('conversion_analysis')}")
         for row in rows:
@@ -3078,15 +4056,22 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
                 "detail": row.get("detail"),
                 "metrics_json": (
                     json.dumps(metrics, default=str, ensure_ascii=False)
-                    if metrics is not None else None
+                    if metrics is not None
+                    else None
                 ),
             }
             vals = ", ".join(esc(record.get(c)) for c in cols)
-            lines.append(f"INSERT INTO {q('conversion_analysis')} ({col_sql}) VALUES ({vals});")
+            lines.append(
+                f"INSERT INTO {q('conversion_analysis')} ({col_sql}) VALUES ({vals});"
+            )
         return lines
 
     def _generate_footer(self) -> str:
-        lines = ["-- ========================================================", "-- 7. Finalize & Commit", "-- ========================================================"]
+        lines = [
+            "-- ========================================================",
+            "-- 7. Finalize & Commit",
+            "-- ========================================================",
+        ]
         if self.dialect == "sqlite":
             # SQLite scripts run in autocommit (no explicit BEGIN), so a bare COMMIT
             # would fail with "no transaction is active" under executescript / the CLI.
@@ -3169,8 +4154,9 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
                 result.append((label, "\n".join(lines)))
         return result
 
-    def export_to_sqlite_db_concurrent(self, db_path: str = "repository.db",
-                                       workers: Optional[int] = None):
+    def export_to_sqlite_db_concurrent(
+        self, db_path: str = "repository.db", workers: Optional[int] = None
+    ):
         """
         Materialize the SQLite database with the table structure created once,
         then the per-table INSERT blocks injected by a pool of concurrent worker
@@ -3189,12 +4175,16 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
             workers = max(1, (os.cpu_count() or 2))
 
         # 1. Build structure once (drops + DDL + triggers), single-threaded.
-        structure = "\n\n".join(s for s in (
-            self._generate_header(),
-            self._generate_drop_tables() if self.drop_existing else "",
-            self._generate_ddl(),
-            self._generate_triggers(),
-        ) if s.strip())
+        structure = "\n\n".join(
+            s
+            for s in (
+                self._generate_header(),
+                self._generate_drop_tables() if self.drop_existing else "",
+                self._generate_ddl(),
+                self._generate_triggers(),
+            )
+            if s.strip()
+        )
 
         conn = sqlite3.connect(db_path)
         conn.execute("PRAGMA journal_mode = WAL")
@@ -3234,12 +4224,16 @@ EXECUTE FUNCTION {self.schema_name}.update_timestamp_column();""")
 
         if failures:
             detail = "\n".join(f"  {lbl}: {err}" for lbl, err in failures)
-            raise RuntimeError(f"concurrent injection failed for {len(failures)} block(s):\n{detail}")
+            raise RuntimeError(
+                f"concurrent injection failed for {len(failures)} block(s):\n{detail}"
+            )
 
         # 3. Finalize.
         conn = sqlite3.connect(db_path)
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("PRAGMA optimize")
         conn.close()
-        print(f"Direct SQLite binary database created (concurrent, {workers} workers, "
-              f"{len(blocks)} table blocks): {db_path}")
+        print(
+            f"Direct SQLite binary database created (concurrent, {workers} workers, "
+            f"{len(blocks)} table blocks): {db_path}"
+        )

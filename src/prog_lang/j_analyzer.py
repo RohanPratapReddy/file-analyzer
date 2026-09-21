@@ -13,14 +13,14 @@
 #
 # Comment token is 'NB.' to end of line; strings use single quotes.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z][A-Za-z0-9_]*"
 # a J explicit definition RHS begins with one of these shapes
 _DEF_RE = re.compile(
-    r"\b(?:verb|adverb|conjunction|monad|dyad)\b|"
-    r"\bdefine\b|\{\{|[1-4]\s*:\s*")
+    r"\b(?:verb|adverb|conjunction|monad|dyad)\b|" r"\bdefine\b|\{\{|[1-4]\s*:\s*"
+)
 
 
 class JAnalyzer(RegexCodeAnalyzer):
@@ -30,11 +30,9 @@ class JAnalyzer(RegexCodeAnalyzer):
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ("'",)
 
-    _ASSIGN = re.compile(
-        r"^[ \t]*(" + _ID + r")\s*=[.:]\s*(.*)$", re.MULTILINE)
+    _ASSIGN = re.compile(r"^[ \t]*(" + _ID + r")\s*=[.:]\s*(.*)$", re.MULTILINE)
     _COCLASS = re.compile(r"^[ \t]*coclass\s+'([^']+)'", re.MULTILINE)
-    _LOAD = re.compile(r"^[ \t]*(?:load|loadd|require)\s+'([^']+)'",
-                       re.MULTILINE)
+    _LOAD = re.compile(r"^[ \t]*(?:load|loadd|require)\s+'([^']+)'", re.MULTILINE)
 
     def _register_types(self, file_id, text, path):
         clean = self._strip_comments(text)
@@ -48,7 +46,8 @@ class JAnalyzer(RegexCodeAnalyzer):
             for part in re.split(r"\s+", m.group(1).strip()):
                 if part:
                     self._add_import(
-                        file_id, part.replace("\\", "/").split("/")[-1], part)
+                        file_id, part.replace("\\", "/").split("/")[-1], part
+                    )
 
         for m in self._COCLASS.finditer(clean):
             self._add_class(file_id, m.group(1), description="j locale")
@@ -56,7 +55,6 @@ class JAnalyzer(RegexCodeAnalyzer):
         for m in self._ASSIGN.finditer(clean):
             name, rhs = m.group(1), m.group(2)
             if _DEF_RE.search(rhs):
-                self._add_function(file_id, name, [], [],
-                                   description="j verb")
+                self._add_function(file_id, name, [], [], description="j verb")
             else:
                 self._add_variable(file_id, name)

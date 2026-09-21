@@ -10,7 +10,7 @@
 #   (fn obj.method [self a] ...)                    -> function (table method)
 #   (macro when-let [b ...] ...)                    -> function (macro)
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _SYM = r"[A-Za-z_][A-Za-z0-9_%?!*+./<>=-]*"
@@ -65,7 +65,7 @@ class FennelAnalyzer(RegexCodeAnalyzer):
         """Parameters live in the ``[...]`` immediately following the name."""
         lb = text.find("[", pos)
         # make sure no other opener comes first (defensive)
-        for ch in text[pos:lb if lb != -1 else len(text)]:
+        for ch in text[pos : lb if lb != -1 else len(text)]:
             if ch in "([{":
                 return []
             if not ch.isspace():
@@ -73,7 +73,7 @@ class FennelAnalyzer(RegexCodeAnalyzer):
         if lb == -1:
             return []
         rb = self._find_matching(text, lb, "[", "]")
-        inner = text[lb + 1:rb - 1]
+        inner = text[lb + 1 : rb - 1]
         params = []
         for tok in re.findall(_SYM, inner):
             if tok in ("&", "&as"):

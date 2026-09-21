@@ -15,6 +15,7 @@ class JclAnalyzer(ShellScriptBase):
     ``//DD DD DSN=...``            -> variable (a DD statement)
     ``// INCLUDE MEMBER=x``        -> import
     """
+
     LANG_KEY = "jcl"
     EXTENSIONS = (".jcl", ".proclib")
     LINE_COMMENTS = ("//*",)
@@ -69,8 +70,9 @@ class JclAnalyzer(ShellScriptBase):
             if name in seen_var or name == "*":
                 continue
             seen_var.add(name)
-            self._add_variable(file_id, name, m.group(2).strip()[:120] or None,
-                               scope="dd")
+            self._add_variable(
+                file_id, name, m.group(2).strip()[:120] or None, scope="dd"
+            )
 
         for m in self._INCLUDE.finditer(clean):
             tgt = m.group(1)
@@ -78,8 +80,12 @@ class JclAnalyzer(ShellScriptBase):
                 seen_imp.add(tgt)
                 self._add_sourced(file_id, tgt, keyword="INCLUDE")
 
-        self._record_module_meta(file_id, jobs_or_procs=sorted(seen_cls) or None,
-                                 steps=len(seen_fn), dd_statements=len(seen_var))
+        self._record_module_meta(
+            file_id,
+            jobs_or_procs=sorted(seen_cls) or None,
+            steps=len(seen_fn),
+            dd_statements=len(seen_var),
+        )
 
 
 class RexxAnalyzer(ShellScriptBase):
@@ -89,14 +95,16 @@ class RexxAnalyzer(ShellScriptBase):
     ``call name``                           -> import (internal/external routine)
     ``var = expr``                          -> variable
     """
+
     LANG_KEY = "rexx"
     EXTENSIONS = (".rexx",)
     LINE_COMMENTS = ()
     BLOCK_COMMENTS = (("/*", "*/"),)
     STRING_DELIMS = ('"', "'")
 
-    _LABEL = re.compile(r"(?m)^[ \t]*([A-Za-z_]\w*)[ \t]*:(?![=])[ \t]*(PROCEDURE)?",
-                        re.IGNORECASE)
+    _LABEL = re.compile(
+        r"(?m)^[ \t]*([A-Za-z_]\w*)[ \t]*:(?![=])[ \t]*(PROCEDURE)?", re.IGNORECASE
+    )
     _ASSIGN = re.compile(r"(?m)^[ \t]*([A-Za-z_]\w*)[ \t]*=(?!=)[ \t]*(.+)")
     _CALL = re.compile(r"(?mi)^[ \t]*call[ \t]+([A-Za-z_]\w*)")
 
@@ -110,8 +118,10 @@ class RexxAnalyzer(ShellScriptBase):
                 continue
             seen_fn.add(name)
             self._add_shell_function(
-                file_id, name,
-                description="rexx procedure" if m.group(2) else "rexx label")
+                file_id,
+                name,
+                description="rexx procedure" if m.group(2) else "rexx label",
+            )
 
         seen_var = set()
         for m in self._ASSIGN.finditer(clean):
@@ -119,8 +129,9 @@ class RexxAnalyzer(ShellScriptBase):
             if name in seen_var or name.upper() in ("IF", "DO", "END", "THEN", "ELSE"):
                 continue
             seen_var.add(name)
-            self._add_variable(file_id, name, m.group(2).strip()[:120] or None,
-                               scope="rexx")
+            self._add_variable(
+                file_id, name, m.group(2).strip()[:120] or None, scope="rexx"
+            )
 
         seen_imp = set()
         for m in self._CALL.finditer(clean):
@@ -130,8 +141,9 @@ class RexxAnalyzer(ShellScriptBase):
             seen_imp.add(name)
             self._add_command_dep(file_id, name)
 
-        self._record_module_meta(file_id, routines=len(seen_fn),
-                                 variables=len(seen_var), calls=len(seen_imp))
+        self._record_module_meta(
+            file_id, routines=len(seen_fn), variables=len(seen_var), calls=len(seen_imp)
+        )
 
 
 class ClistAnalyzer(ShellScriptBase):
@@ -141,6 +153,7 @@ class ClistAnalyzer(ShellScriptBase):
     ``SET &var = value``                -> variable
     ``&label:`` / ``DO ... END`` blocks -> metadata
     """
+
     LANG_KEY = "clist"
     EXTENSIONS = (".clist",)
     LINE_COMMENTS = ()
@@ -157,21 +170,27 @@ class ClistAnalyzer(ShellScriptBase):
         params = []
         for m in self._PROC.finditer(clean):
             params = m.group(2).split()
-            self._add_shell_function(file_id, path.stem, params=params,
-                                     description="clist proc")
-            break     # a CLIST has a single PROC header
+            self._add_shell_function(
+                file_id, path.stem, params=params, description="clist proc"
+            )
+            break  # a CLIST has a single PROC header
 
         seen_var = set()
         for m in self._SET.finditer(clean):
             name = m.group(1)
             if name not in seen_var:
                 seen_var.add(name)
-                self._add_variable(file_id, name, m.group(2).strip()[:120] or None,
-                                   scope="clist")
+                self._add_variable(
+                    file_id, name, m.group(2).strip()[:120] or None, scope="clist"
+                )
 
         controls = len(self._CONTROL.findall(clean))
-        self._record_module_meta(file_id, parameters=params or None,
-                                 variables=len(seen_var), control_blocks=controls)
+        self._record_module_meta(
+            file_id,
+            parameters=params or None,
+            variables=len(seen_var),
+            control_blocks=controls,
+        )
 
 
 class ClpAnalyzer(ShellScriptBase):
@@ -182,6 +201,7 @@ class ClpAnalyzer(ShellScriptBase):
     ``CALL PGM(name)`` / ``CALLPRC``    -> import
     ``TAG label``                       -> metadata (branch label)
     """
+
     LANG_KEY = "ibmi-cl"
     EXTENSIONS = (".clp",)
     LINE_COMMENTS = ()
@@ -198,8 +218,9 @@ class ClpAnalyzer(ShellScriptBase):
 
         for m in self._PGM.finditer(clean):
             params = re.findall(r"&(\w+)", m.group(1) or "")
-            self._add_shell_function(file_id, path.stem, params=params,
-                                     description="ibm-i cl program")
+            self._add_shell_function(
+                file_id, path.stem, params=params, description="ibm-i cl program"
+            )
             break
 
         seen_var = set()
@@ -216,8 +237,7 @@ class ClpAnalyzer(ShellScriptBase):
                 seen_imp.add(name)
                 self._add_command_dep(file_id, name)
 
-        self._record_module_meta(file_id, variables=len(seen_var),
-                                 calls=len(seen_imp))
+        self._record_module_meta(file_id, variables=len(seen_var), calls=len(seen_imp))
 
 
 class DclAnalyzer(ShellScriptBase):
@@ -227,6 +247,7 @@ class DclAnalyzer(ShellScriptBase):
     ``$ name = value`` / ``$ name == value`` -> variable (local / global symbol)
     ``$ @file`` / ``$ CALL routine``   -> import
     """
+
     LANG_KEY = "dcl"
     EXTENSIONS = (".dcl",)
     LINE_COMMENTS = ("$!",)
@@ -255,8 +276,9 @@ class DclAnalyzer(ShellScriptBase):
                 continue
             seen_var.add(name)
             scope = "global-symbol" if m.group(2) == "==" else "local-symbol"
-            self._add_variable(file_id, name, m.group(3).strip()[:120] or None,
-                               scope=scope)
+            self._add_variable(
+                file_id, name, m.group(3).strip()[:120] or None, scope=scope
+            )
 
         seen_imp = set()
         for m in self._AT.finditer(clean):
@@ -270,5 +292,4 @@ class DclAnalyzer(ShellScriptBase):
                 seen_imp.add(name)
                 self._add_sourced(file_id, name, keyword="CALL")
 
-        self._record_module_meta(file_id, labels=len(seen_fn),
-                                 symbols=len(seen_var))
+        self._record_module_meta(file_id, labels=len(seen_fn), symbols=len(seen_var))

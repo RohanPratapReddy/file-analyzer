@@ -14,7 +14,7 @@
 #
 # Case-insensitive keywords. Comments: '*' or '**' line-lead, '/*' inline; "'".
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 # Natural identifiers may carry #, +, & sigils and internal hyphens/dots.
@@ -24,15 +24,18 @@ _NID = r"[#&+]?[A-Za-z][A-Za-z0-9_.#/-]*"
 class NaturalAnalyzer(RegexCodeAnalyzer):
     LANG_KEY = "natural"
     EXTENSIONS = (".nat", ".nsp", ".nsn")
-    LINE_COMMENTS = ()          # handled by custom cleaner (col-1 '*'/'/*')
+    LINE_COMMENTS = ()  # handled by custom cleaner (col-1 '*'/'/*')
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ("'", '"')
 
     _SUBROUTINE = re.compile(r"(?im)^\s*DEFINE\s+SUBROUTINE\s+(" + _NID + r")")
-    _FUNCTION = re.compile(r"(?im)^\s*DEFINE\s+FUNCTION\s+(" + _NID + r")"
-                           r"(?:\s+RETURNS?\s*\(([^)]*)\))?")
-    _CALLNAT = re.compile(r"(?im)^\s*(?:CALLNAT|FETCH(?:\s+RETURN|\s+REPEAT)?|"
-                          r"CALL)\s+'([^']+)'")
+    _FUNCTION = re.compile(
+        r"(?im)^\s*DEFINE\s+FUNCTION\s+(" + _NID + r")"
+        r"(?:\s+RETURNS?\s*\(([^)]*)\))?"
+    )
+    _CALLNAT = re.compile(
+        r"(?im)^\s*(?:CALLNAT|FETCH(?:\s+RETURN|\s+REPEAT)?|" r"CALL)\s+'([^']+)'"
+    )
     _INCLUDE = re.compile(r"(?im)^\s*INCLUDE\s+(" + _NID + r")")
     # level-numbered data field:  `1 #NAME (A20)`  /  `2 #SUB`
     _FIELD = re.compile(r"(?im)^\s*([1-9])\s+(" + _NID + r")\b")
@@ -65,14 +68,16 @@ class NaturalAnalyzer(RegexCodeAnalyzer):
                 self._add_import(file_id, name, name)
 
         for m in self._SUBROUTINE.finditer(clean):
-            self._add_function(file_id, m.group(1), [], [],
-                               description="natural subroutine")
+            self._add_function(
+                file_id, m.group(1), [], [], description="natural subroutine"
+            )
         for m in self._FUNCTION.finditer(clean):
             outs = []
             if m.group(2):
                 outs = [self._add_output(m.group(2).strip())]
-            self._add_function(file_id, m.group(1), [], outs,
-                               description="natural function")
+            self._add_function(
+                file_id, m.group(1), [], outs, description="natural function"
+            )
 
         seen_var = set()
         for m in self._FIELD.finditer(clean):

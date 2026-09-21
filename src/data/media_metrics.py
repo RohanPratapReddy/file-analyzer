@@ -82,12 +82,12 @@ class MediaMetricExtractor:
         self.detector_model = detector_model
         self.detector_score = float(detector_score)
 
-        self._loaded = False           # weight-free deps resolved?
+        self._loaded = False  # weight-free deps resolved?
         self._audio_fns: Optional[tuple] = None
-        self._bank = None              # DynamicsFeatureBank instance (reused)
+        self._bank = None  # DynamicsFeatureBank instance (reused)
         self._luma_fn = None
         self._torch = None
-        self._detector = None          # (processor, model) once downloaded
+        self._detector = None  # (processor, model) once downloaded
         self._detector_failed = False
 
     # ------------------------------------------------------------------
@@ -104,16 +104,26 @@ class MediaMetricExtractor:
         AI = "sentinel.backend.src.modules.models.ai"
         try:
             import torch  # noqa
+
             self._torch = torch
         except Exception:
             return False
         # audio pipeline
         try:
             from importlib import import_module
-            samples = import_module(AI + ".encoder.audio.audio_encoder.acquisition.samples")
-            spectral = import_module(AI + ".encoder.audio.audio_encoder.acquisition.spectral")
-            extract = import_module(AI + ".encoder.audio.audio_encoder.dynamics.extract")
-            catalog = import_module(AI + ".encoder.audio.audio_encoder.dynamics.catalog")
+
+            samples = import_module(
+                AI + ".encoder.audio.audio_encoder.acquisition.samples"
+            )
+            spectral = import_module(
+                AI + ".encoder.audio.audio_encoder.acquisition.spectral"
+            )
+            extract = import_module(
+                AI + ".encoder.audio.audio_encoder.dynamics.extract"
+            )
+            catalog = import_module(
+                AI + ".encoder.audio.audio_encoder.dynamics.catalog"
+            )
             self._audio_fns = (
                 samples.audio_to_samples_tensor,
                 spectral.samples_to_spectral_tensors,
@@ -125,6 +135,7 @@ class MediaMetricExtractor:
         # vision bank
         try:
             from importlib import import_module
+
             vmod = import_module(AI + ".decoder.vision.pipeline.dynamics_features")
             self._bank = vmod.DynamicsFeatureBank().eval()
             self._luma_fn = getattr(vmod, "_luma", None)
@@ -138,8 +149,9 @@ class MediaMetricExtractor:
     def _load_image_tensor(self, path: Union[str, Path]):
         """RGB float32 (1,3,H,W) in [0,1], long side clamped to ``image_max_side``."""
         torch = self._torch
-        from PIL import Image
         import numpy as np
+        from PIL import Image
+
         with Image.open(path) as im:
             im = im.convert("RGB")
             w, h = im.size
@@ -147,7 +159,7 @@ class MediaMetricExtractor:
             if m > self.image_max_side:
                 s = self.image_max_side / float(m)
                 im = im.resize((max(1, int(w * s)), max(1, int(h * s))))
-            arr = np.asarray(im, dtype="float32") / 255.0    # (H,W,3)
+            arr = np.asarray(im, dtype="float32") / 255.0  # (H,W,3)
         t = torch.from_numpy(arr).permute(2, 0, 1).unsqueeze(0).contiguous()
         return t
 
@@ -176,42 +188,60 @@ class MediaMetricExtractor:
             # --- GLCM texture (contrast, homogeneity, energy, entropy, corr) ---
             try:
                 g = bank._glcm(luma)
-                out.update(glcm_contrast=f(g[0]), glcm_homogeneity=f(g[1]),
-                           glcm_energy=f(g[2]), glcm_entropy=f(g[3]),
-                           glcm_correlation=f(g[4]))
+                out.update(
+                    glcm_contrast=f(g[0]),
+                    glcm_homogeneity=f(g[1]),
+                    glcm_energy=f(g[2]),
+                    glcm_entropy=f(g[3]),
+                    glcm_correlation=f(g[4]),
+                )
             except Exception:
                 pass
             # --- Gibbs / information energies ---
             try:
                 e = bank._energy_info(luma, mask)
-                out.update(gradient_energy=f(e[0]), sharpness=f(e[1]),
-                           total_variation=f(e[2]), gibbs_energy=f(e[3]),
-                           intensity_entropy=f(e[4]), negentropy=f(e[7]),
-                           mean_luma=f(e[9]))
+                out.update(
+                    gradient_energy=f(e[0]),
+                    sharpness=f(e[1]),
+                    total_variation=f(e[2]),
+                    gibbs_energy=f(e[3]),
+                    intensity_entropy=f(e[4]),
+                    negentropy=f(e[7]),
+                    mean_luma=f(e[9]),
+                )
             except Exception:
                 pass
             # --- radial power spectrum ---
             try:
-                s = bank._spectrum(luma)          # 16 radial + ent + centroid
+                s = bank._spectrum(luma)  # 16 radial + ent + centroid
                 radial = s[:16]
                 hf = float(radial[8:].sum())
-                out.update(spectral_entropy=f(s[16]), spectral_centroid=f(s[17]),
-                           high_freq_ratio=hf)
+                out.update(
+                    spectral_entropy=f(s[16]),
+                    spectral_centroid=f(s[17]),
+                    high_freq_ratio=hf,
+                )
             except Exception:
                 pass
             # --- keypoint / edge density ---
             try:
                 k = bank._keypoints(luma)
-                out.update(corner_density=f(k[0]), corner_response=f(k[1]),
-                           edge_density=f(k[5]))
+                out.update(
+                    corner_density=f(k[0]),
+                    corner_response=f(k[1]),
+                    edge_density=f(k[5]),
+                )
             except Exception:
                 pass
             # --- Gabor oriented-energy anisotropy ---
             try:
-                gb = bank._gabor(luma).reshape(4, 4)   # 4 orient x [absmean,std,absmax,posfrac]
+                gb = bank._gabor(luma).reshape(
+                    4, 4
+                )  # 4 orient x [absmean,std,absmax,posfrac]
                 absmean = gb[:, 0]
-                out.update(gabor_energy=f(absmean.mean()),
-                           gabor_anisotropy=f(absmean.std()))
+                out.update(
+                    gabor_energy=f(absmean.mean()), gabor_anisotropy=f(absmean.std())
+                )
             except Exception:
                 pass
             # --- LBP micro-texture (entropy + uniformity of riu2 hist) ---
@@ -219,22 +249,28 @@ class MediaMetricExtractor:
                 lb = bank._lbp(luma)
                 lb = lb / (lb.sum() + 1e-8)
                 ent = float(-(lb * (lb + 1e-8).log()).sum())
-                out.update(lbp_entropy=ent, lbp_uniformity=f((lb ** 2).sum()))
+                out.update(lbp_entropy=ent, lbp_uniformity=f((lb**2).sum()))
             except Exception:
                 pass
             # --- colour moments / colorfulness ---
             try:
                 c = bank._color_moments(img, mask)
-                out.update(red_mean=f(c[0]), green_mean=f(c[3]), blue_mean=f(c[6]),
-                           chroma=f(c[11]), colorfulness=f(c[12]),
-                           brightness_range=f(c[15]))
+                out.update(
+                    red_mean=f(c[0]),
+                    green_mean=f(c[3]),
+                    blue_mean=f(c[6]),
+                    chroma=f(c[11]),
+                    colorfulness=f(c[12]),
+                    brightness_range=f(c[15]),
+                )
             except Exception:
                 pass
             # --- symmetry ---
             try:
                 sy = bank._symmetry(luma, mask)
-                out.update(symmetry_lr=f(sy[0]), symmetry_tb=f(sy[1]),
-                           symmetry_rot180=f(sy[2]))
+                out.update(
+                    symmetry_lr=f(sy[0]), symmetry_tb=f(sy[1]), symmetry_rot180=f(sy[2])
+                )
             except Exception:
                 pass
             # --- structure-tensor posture (coherence, orientation entropy) ---
@@ -246,9 +282,11 @@ class MediaMetricExtractor:
             # --- wavelet sub-band energies (per level) ---
             try:
                 wv = bank._wavelet(luma).reshape(3, 3)
-                out.update(wavelet_energy_l1=f(wv[0].mean()),
-                           wavelet_energy_l2=f(wv[1].mean()),
-                           wavelet_energy_l3=f(wv[2].mean()))
+                out.update(
+                    wavelet_energy_l1=f(wv[0].mean()),
+                    wavelet_energy_l2=f(wv[1].mean()),
+                    wavelet_energy_l3=f(wv[2].mean()),
+                )
             except Exception:
                 pass
             # --- DCT DC / AC energy ---
@@ -258,8 +296,11 @@ class MediaMetricExtractor:
             except Exception:
                 pass
         # round for compact storage
-        return {k: round(v, 6) for k, v in out.items()
-                if isinstance(v, float) and math.isfinite(v)}
+        return {
+            k: round(v, 6)
+            for k, v in out.items()
+            if isinstance(v, float) and math.isfinite(v)
+        }
 
     def image_metrics(self, path: Union[str, Path]) -> Dict[str, float]:
         if not self._ensure_loaded() or self._bank is None:
@@ -278,13 +319,26 @@ class MediaMetricExtractor:
         import json
         import shutil
         import subprocess
+
         if not shutil.which("ffprobe"):
             return None
         try:
             r = subprocess.run(
-                ["ffprobe", "-v", "error", "-select_streams", "a:0",
-                 "-show_entries", "stream=sample_rate", "-of", "json", path],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30,
+                [
+                    "ffprobe",
+                    "-v",
+                    "error",
+                    "-select_streams",
+                    "a:0",
+                    "-show_entries",
+                    "stream=sample_rate",
+                    "-of",
+                    "json",
+                    path,
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=30,
             )
             if r.returncode != 0:
                 return None
@@ -305,7 +359,9 @@ class MediaMetricExtractor:
         torch = self._torch
         import shutil
         import subprocess
+
         import numpy as np
+
         if shutil.which("ffmpeg"):
             sr = self._ffprobe_sr(str(path)) or 0
             try:
@@ -317,8 +373,9 @@ class MediaMetricExtractor:
                 if sr <= 0:
                     sr = 22050
                 cmd += ["-i", str(path), "-ac", "1", "-ar", str(sr), "-f", "f32le", "-"]
-                r = subprocess.run(cmd, stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE, timeout=120)
+                r = subprocess.run(
+                    cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120
+                )
                 if r.returncode == 0 and r.stdout:
                     a = np.frombuffer(r.stdout, dtype="<f4")
                     if a.size:
@@ -328,7 +385,9 @@ class MediaMetricExtractor:
         # stdlib wave fallback (PCM WAV only)
         try:
             import wave
+
             import numpy as np
+
             with wave.open(str(path), "rb") as w:
                 sr = w.getframerate()
                 nch = w.getnchannels()
@@ -360,15 +419,18 @@ class MediaMetricExtractor:
             if keep > 0 and wav.numel() > keep:
                 wav = wav[:keep]
             bundle = to_samples(
-                wav, self.audio_fs_khz, phase_count=1,
-                fs_src_khz=sr / 1000.0, mono=True,
+                wav,
+                self.audio_fs_khz,
+                phase_count=1,
+                fs_src_khz=sr / 1000.0,
+                mono=True,
             )
             X = bundle["X"]
             if not isinstance(X, torch.Tensor) or X.numel() == 0:
                 return {}
             spectral = to_spectral(X, self.audio_fs_khz)
-            feats = extract275(X, self.audio_fs_khz, spectral=spectral)   # (n,P,275)
-            agg = feats.reshape(-1, feats.shape[-1]).mean(dim=0)          # (275,)
+            feats = extract275(X, self.audio_fs_khz, spectral=spectral)  # (n,P,275)
+            agg = feats.reshape(-1, feats.shape[-1]).mean(dim=0)  # (275,)
             out: Dict[str, float] = {}
             for name, sl in group_slices.items():
                 v = float(agg[sl].mean())
@@ -391,7 +453,7 @@ class MediaMetricExtractor:
         torch = self._torch
         try:
             import cv2
-            import numpy as np
+
             cap = cv2.VideoCapture(str(path))
             if not cap.isOpened():
                 cap.release()
@@ -399,7 +461,11 @@ class MediaMetricExtractor:
             total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
             k = max(1, self.video_frames)
             if total > 0:
-                idxs = [int(i * (total - 1) / max(1, k - 1)) for i in range(k)] if k > 1 else [0]
+                idxs = (
+                    [int(i * (total - 1) / max(1, k - 1)) for i in range(k)]
+                    if k > 1
+                    else [0]
+                )
             else:
                 idxs = list(range(k))
             per_frame: List[Dict[str, float]] = []
@@ -432,8 +498,10 @@ class MediaMetricExtractor:
                     out["vid_" + key] = round(sum(vals) / len(vals), 6)
             # temporal motion: mean abs inter-frame luma difference
             if len(lumas) > 1:
-                diffs = [float((lumas[i] - lumas[i - 1]).abs().mean())
-                         for i in range(1, len(lumas))]
+                diffs = [
+                    float((lumas[i] - lumas[i - 1]).abs().mean())
+                    for i in range(1, len(lumas))
+                ]
                 out["motion_mean"] = round(sum(diffs) / len(diffs), 6)
             out["frames_sampled"] = len(per_frame)
             return out
@@ -457,12 +525,15 @@ class MediaMetricExtractor:
                 except Exception:
                     sys.modules["torchaudio"] = None  # type: ignore[assignment]
             from transformers import AutoImageProcessor, AutoModelForObjectDetection
+
             kw = {}
             if self.models_dir is not None:
                 self.models_dir.mkdir(parents=True, exist_ok=True)
                 kw["cache_dir"] = str(self.models_dir)
             proc = AutoImageProcessor.from_pretrained(self.detector_model, **kw)
-            model = AutoModelForObjectDetection.from_pretrained(self.detector_model, **kw).eval()
+            model = AutoModelForObjectDetection.from_pretrained(
+                self.detector_model, **kw
+            ).eval()
             self._detector = (proc, model)
         except Exception:
             self._detector_failed = True
@@ -478,11 +549,13 @@ class MediaMetricExtractor:
         torch = self._torch
         try:
             import json
+
             from PIL import Image
+
             proc, model = det
             with Image.open(path) as im:
                 im = im.convert("RGB")
-                size = im.size[::-1]   # (h, w)
+                size = im.size[::-1]  # (h, w)
                 inputs = proc(images=im, return_tensors="pt")
             with torch.no_grad():
                 outputs = model(**inputs)
@@ -493,8 +566,10 @@ class MediaMetricExtractor:
             labels = results["labels"].tolist()
             scores = results["scores"].tolist()
             id2label = getattr(model.config, "id2label", {})
-            named = [(id2label.get(int(l), str(l)), round(float(s), 4))
-                     for l, s in zip(labels, scores)]
+            named = [
+                (id2label.get(int(l), str(l)), round(float(s), 4))
+                for l, s in zip(labels, scores)
+            ]
             named.sort(key=lambda t: t[1], reverse=True)
             distinct = sorted({n for n, _ in named})
             return {
@@ -502,8 +577,9 @@ class MediaMetricExtractor:
                 "distinct_classes": len(distinct),
                 "top_objects": json.dumps(named[:8]),
                 "class_labels": json.dumps(distinct[:16]),
-                "mean_confidence": round(sum(s for _, s in named) / len(named), 4)
-                if named else 0.0,
+                "mean_confidence": (
+                    round(sum(s for _, s in named) / len(named), 4) if named else 0.0
+                ),
                 "detector_model": self.detector_model,
             }
         except Exception as err:

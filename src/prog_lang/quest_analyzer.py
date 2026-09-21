@@ -16,16 +16,42 @@
 # `//` and `/* */` are comments; `"` / `'` delimit strings; the C control
 # keywords (if/for/while/switch/return/sizeof) are never read as function names.
 import re
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_]\w*"
 _TYPE = r"[A-Za-z_]\w*(?:\s*\*+|\s+\*+)?"
-_KEYWORDS = {"if", "for", "while", "switch", "return", "sizeof", "else",
-             "do", "case", "default", "typedef", "struct", "union", "enum",
-             "static", "inline", "const", "extern", "void"}
+_KEYWORDS = {
+    "if",
+    "for",
+    "while",
+    "switch",
+    "return",
+    "sizeof",
+    "else",
+    "do",
+    "case",
+    "default",
+    "typedef",
+    "struct",
+    "union",
+    "enum",
+    "static",
+    "inline",
+    "const",
+    "extern",
+    "void",
+}
 # QuEST register / handle types whose declarations are worth surfacing as data.
-_QUREG_TYPES = ("Qureg", "DensityMatrix", "QuESTEnv", "PauliHamil",
-                "ComplexMatrixN", "DiagonalOp", "SubDiagonalOp")
+_QUREG_TYPES = (
+    "Qureg",
+    "DensityMatrix",
+    "QuESTEnv",
+    "PauliHamil",
+    "ComplexMatrixN",
+    "DiagonalOp",
+    "SubDiagonalOp",
+)
 
 
 class QuestAnalyzer(RegexCodeAnalyzer):
@@ -37,20 +63,24 @@ class QuestAnalyzer(RegexCodeAnalyzer):
 
     _INCLUDE = re.compile(r'(?m)^[ \t]*#\s*include\s+[<"]([^>"]+)[>"]')
     # function definition:  RET name(args) {
-    _FUNC = re.compile(r"(?m)^[ \t]*(?:static\s+|inline\s+|extern\s+)*"
-                       r"(?:" + _TYPE + r")\s+(" + _ID + r")\s*\(([^;{]*)\)\s*\{")
+    _FUNC = re.compile(
+        r"(?m)^[ \t]*(?:static\s+|inline\s+|extern\s+)*"
+        r"(?:" + _TYPE + r")\s+(" + _ID + r")\s*\(([^;{]*)\)\s*\{"
+    )
     # QuEST register / handle declaration
-    _QUREG = re.compile(r"(?m)^[ \t]*(?:" + "|".join(_QUREG_TYPES) +
-                        r")\s+(" + _ID + r")\s*[=;]")
+    _QUREG = re.compile(
+        r"(?m)^[ \t]*(?:" + "|".join(_QUREG_TYPES) + r")\s+(" + _ID + r")\s*[=;]"
+    )
     # typedef struct { ... } Name;   and   struct Name {
-    _TYPEDEF = re.compile(r"(?ms)\btypedef\s+(?:struct|union|enum)\b[^;{]*\{.*?\}\s*("
-                          + _ID + r")\s*;")
-    _RECORD = re.compile(r"(?m)^[ \t]*(?:struct|union|enum)\s+(" + _ID +
-                         r")\s*\{")
+    _TYPEDEF = re.compile(
+        r"(?ms)\btypedef\s+(?:struct|union|enum)\b[^;{]*\{.*?\}\s*(" + _ID + r")\s*;"
+    )
+    _RECORD = re.compile(r"(?m)^[ \t]*(?:struct|union|enum)\s+(" + _ID + r")\s*\{")
     # plain top-level scalar declaration:  qreal x = ...;  int n;
-    _VARDECL = re.compile(r"(?m)^[ \t]*(?:qreal|qcomp|int|long|unsigned|double|"
-                          r"float|char|short|Complex|enum\s+\w+)\s+(" + _ID +
-                          r")\s*(?:=|;|\[)")
+    _VARDECL = re.compile(
+        r"(?m)^[ \t]*(?:qreal|qcomp|int|long|unsigned|double|"
+        r"float|char|short|Complex|enum\s+\w+)\s+(" + _ID + r")\s*(?:=|;|\[)"
+    )
 
     def _extract_entities(self, file_id, text, path):
         clean = self._strip_comments(text)
@@ -96,5 +126,6 @@ class QuestAnalyzer(RegexCodeAnalyzer):
                     pname = parts[-1] if len(parts) > 1 else a
                     ptype = " ".join(parts[:-1]) if len(parts) > 1 else None
                     arg_ids.append(self._add_arg(pname, ptype))
-            self._add_function(file_id, name, arg_ids, [],
-                               description="QuEST/C function")
+            self._add_function(
+                file_id, name, arg_ids, [], description="QuEST/C function"
+            )

@@ -46,7 +46,7 @@
 # `;` and `//` start comments; a `*` in column 1 is an HLASM comment line;
 # keywords are case-insensitive.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_$@#.?][A-Za-z0-9_$@#.?]*"
@@ -66,17 +66,21 @@ class MacroAsmAnalyzer(RegexCodeAnalyzer):
     # LABEL:  or  PDP-1 LABEL,   (label must not start with a digit)
     _LABEL = re.compile(r"(?m)^[ \t]*(" + _ID + r")[ \t]*([:,])[ \t]*(.*)$")
     # data-defining directives (rest of a label line) => the label names data
-    _DATADIR = re.compile(r"(?i)^\.?(WORD|BYTE|BLKW|BLKB|BLKL|ASCI[IZ]|RAD50|"
-                          r"RAD40|LONG|QUAD|FLT[24]|PACKED|DB|DW|DD|DQ|DT|DS|"
-                          r"DC|FDB|FCB|FCC|RMB|EVEN|ODD)\b")
+    _DATADIR = re.compile(
+        r"(?i)^\.?(WORD|BYTE|BLKW|BLKB|BLKL|ASCI[IZ]|RAD50|"
+        r"RAD40|LONG|QUAD|FLT[24]|PACKED|DB|DW|DD|DQ|DT|DS|"
+        r"DC|FDB|FCB|FCC|RMB|EVEN|ODD)\b"
+    )
     _PROC = re.compile(r"(?mi)^[ \t]*(" + _ID + r")\s+PROC\b")
-    _CLASS = re.compile(r"(?mi)^[ \t]*(" + _ID + r")\s+(?:SEGMENT|STRUCT|"
-                        r"STRUC|UNION|RECORD)\b")
-    _EQU = re.compile(r"(?mi)^[ \t]*(" + _ID + r")\s+(?:EQU|SET|SETA|SETB|"
-                      r"SETC)\b")
+    _CLASS = re.compile(
+        r"(?mi)^[ \t]*(" + _ID + r")\s+(?:SEGMENT|STRUCT|" r"STRUC|UNION|RECORD)\b"
+    )
+    _EQU = re.compile(r"(?mi)^[ \t]*(" + _ID + r")\s+(?:EQU|SET|SETA|SETB|" r"SETC)\b")
     _ASSIGN = re.compile(r"(?mi)^[ \t]*(" + _ID + r")\s*=")
-    _INCLUDE = re.compile(r'(?mi)^[ \t]*(?:\.INCLUDE\s+"([^"]+)"|'
-                          r'INCLUDE\s+([^\s;]+)|COPY\s+([^\s;]+))')
+    _INCLUDE = re.compile(
+        r'(?mi)^[ \t]*(?:\.INCLUDE\s+"([^"]+)"|'
+        r"INCLUDE\s+([^\s;]+)|COPY\s+([^\s;]+))"
+    )
 
     def _extract_entities(self, file_id, text, path):
         clean = self._strip_comments(text)
@@ -93,7 +97,7 @@ class MacroAsmAnalyzer(RegexCodeAnalyzer):
         # next non-blank prototype line (optionally preceded by a label).
         for i, ln in enumerate(lines):
             if re.match(r"(?i)^[ \t]*MACRO[ \t]*$", ln):
-                for nxt in lines[i + 1:]:
+                for nxt in lines[i + 1 :]:
                     if not nxt.strip():
                         continue
                     toks = nxt.split()
@@ -144,8 +148,7 @@ class MacroAsmAnalyzer(RegexCodeAnalyzer):
                 self._add_variable(file_id, name, None, scope="label")
             else:
                 seen_fn.add(low)
-                self._add_function(file_id, name, [], [],
-                                   description="assembler label")
+                self._add_function(file_id, name, [], [], description="assembler label")
 
         for m in self._INCLUDE.finditer(clean):
             src = m.group(1) or m.group(2) or m.group(3)
@@ -153,5 +156,6 @@ class MacroAsmAnalyzer(RegexCodeAnalyzer):
                 src = src.strip("'\"")
                 if src.lower() not in seen_i:
                     seen_i.add(src.lower())
-                    self._add_import(file_id, src.replace("\\", "/").split("/")[-1],
-                                     src)
+                    self._add_import(
+                        file_id, src.replace("\\", "/").split("/")[-1], src
+                    )

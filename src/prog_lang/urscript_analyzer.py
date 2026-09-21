@@ -12,7 +12,7 @@
 #
 # Python-like: comments '#'; strings '"' and "'". No imports/classes.
 import re
-from pathlib import Path
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_][A-Za-z0-9_]*"
@@ -25,8 +25,7 @@ class URScriptAnalyzer(RegexCodeAnalyzer):
     BLOCK_COMMENTS = ()
     STRING_DELIMS = ('"', "'")
 
-    _FUNC = re.compile(r"(?m)^\s*(?:def|thread|sec)\s+(" + _ID +
-                       r")\s*\(([^)]*)\)\s*:")
+    _FUNC = re.compile(r"(?m)^\s*(?:def|thread|sec)\s+(" + _ID + r")\s*\(([^)]*)\)\s*:")
     _GLOBAL = re.compile(r"(?m)^\s*(?:global|local)\s+(" + _ID + r")\s*=(?!=)")
     _ASSIGN = re.compile(r"(?m)^\s*(" + _ID + r")\s*=(?!=)")
 
@@ -39,8 +38,9 @@ class URScriptAnalyzer(RegexCodeAnalyzer):
         func_names = set()
         for m in self._FUNC.finditer(clean):
             args = self._ur_args(m.group(2))
-            self._add_function(file_id, m.group(1), args, [],
-                               description="urscript function")
+            self._add_function(
+                file_id, m.group(1), args, [], description="urscript function"
+            )
             func_names.add(m.group(1))
 
         seen = set()

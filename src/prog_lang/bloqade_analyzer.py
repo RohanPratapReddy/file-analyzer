@@ -19,6 +19,7 @@
 #
 # `#` starts a comment; `"` delimits strings; keywords are case-sensitive.
 import re
+
 from .regex_base import RegexCodeAnalyzer
 
 _ID = r"[A-Za-z_]\w*"
@@ -32,14 +33,15 @@ class BloqadeAnalyzer(RegexCodeAnalyzer):
     STRING_DELIMS = ('"',)
 
     _IMPORT = re.compile(r"(?m)^[ \t]*(?:using|import)\s+(" + _ID + r")")
-    _SEQ = re.compile(r"(?m)^[ \t]*(?:sequence|hamiltonian|program|protocol)\s+("
-                      + _ID + r")\b")
+    _SEQ = re.compile(
+        r"(?m)^[ \t]*(?:sequence|hamiltonian|program|protocol)\s+(" + _ID + r")\b"
+    )
     _FUNC = re.compile(r"(?m)^[ \t]*function\s+(" + _ID + r")\s*\(([^)]*)\)")
     # waveform NAME(args) = ...   -> function ;   waveform NAME = ...  -> variable
-    _WAVEFORM = re.compile(r"(?m)^[ \t]*waveform\s+(" + _ID +
-                           r")\s*(\(([^)]*)\))?\s*=")
-    _REGISTER = re.compile(r"(?m)^[ \t]*(?:register|lattice|atoms)\s+(" + _ID +
-                           r")\s*=")
+    _WAVEFORM = re.compile(r"(?m)^[ \t]*waveform\s+(" + _ID + r")\s*(\(([^)]*)\))?\s*=")
+    _REGISTER = re.compile(
+        r"(?m)^[ \t]*(?:register|lattice|atoms)\s+(" + _ID + r")\s*="
+    )
 
     def _extract_entities(self, file_id, text, path):
         clean = self._strip_comments(text)
