@@ -1068,7 +1068,7 @@ def _e_doctext(text, kind, fam, label, byte_size, encoding, lc):
     pstart = 0
 
     def _flush_para(end_line: int):
-        nonlocal pending_para, pstart
+        nonlocal pending_para  # pstart is only read here -> closure, no nonlocal
         if pending_para:
             txt = " ".join(pending_para).strip()
             if txt:
