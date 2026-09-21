@@ -248,3 +248,8 @@ repository_schema.sql
 # analyzers, e.g. code_analysis.json / polyglot_analysis.json) -- run outputs,
 # not source.
 *_analysis.json
+
+# Local scratch / dump folders (case variants) -- never tracked.
+DUMP/
+dump/
+Dump/
