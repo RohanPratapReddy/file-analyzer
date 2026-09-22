@@ -2,111 +2,75 @@
 requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
+# ---------------------------------------------------------------------------
+# ``file-analyzer`` is a thin META-PACKAGE since the 3-wheel split. It carries no
+# code: installing it pulls the *analysis profile* -- the pure-stdlib client
+# foundation plus the analyzer engine -- so ``pip install file-analyzer`` keeps
+# working for existing users and lands exactly what an analysis node needs. The
+# database-hosting server is a deliberate, separate ``file-analyzer-server``
+# install (installing it here would reintroduce the combined bloat the split
+# removed). The platform actually lives in three wheels that merge into one
+# PEP 420 ``file_analyzer`` namespace:
+#
+#   packages/client  -> file-analyzer-client  (stdlib foundation + read-only DB)
+#   packages/server  -> file-analyzer-server  (the database-hosting server)
+#   packages/engine  -> file-analyzer-engine  (the analyzer fleet, this meta pulls it)
+#
+# Version + the two lockstep runtime pins are supplied by setup.py, which
+# single-sources the version from packages/client/file_analyzer/_version.py.
+# ---------------------------------------------------------------------------
 [project]
 name = "file-analyzer"
-# Version is the single source of truth in file_analyzer/_version.py, read
-# statically by setuptools (see [tool.setuptools.dynamic] below). Bump it there
-# for a release.
-dynamic = ["version"]
-description = "Repository intelligence platform: turns a source tree into a queryable SQLite/PostgreSQL database of code, schemas, data, archives, binaries and docs -- without executing it -- plus a live background monitor, an MCP agent-enrichment tier, and a document-intelligence engine."
+dynamic = ["version", "dependencies"]
+description = "Meta-package for the file-analyzer platform: installs the analysis profile (client foundation + analyzer engine). The database-hosting server ships separately as file-analyzer-server."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { file = "LICENSE" }
 authors = [{ name = "Rohan Pratap Reddy Ravula" }]
 keywords = ["static-analysis", "code-intelligence", "repository", "sqlite", "mcp", "ai-agent", "repository-monitor", "incremental-analysis", "document-intelligence"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Topic :: Software Development :: Libraries",
     "Topic :: Software Development :: Quality Assurance",
 ]
-# The pure-stdlib core needs nothing installed. Optional extras below upgrade
-# individual formats from a partial profile to a full deep-parse (see
-# requirements.txt for the complete, annotated list) and enable the MCP server.
-dependencies = []
 
+# Convenience extras that forward to the engine's own extras (and, for `server`,
+# to the separate server wheel), so the historical `pip install file-analyzer[...]`
+# invocations keep resolving. The base install stays lean (client + engine only).
 [project.optional-dependencies]
-# AI-agent integration: the MCP server (python -m mcp_server). Pinned to mcp 1.x
-# -- the server uses the v1 FastMCP API, which 2.x renamed/changed (FastMCP ->
-# MCPServer in mcp.server.mcpserver). This same pin also powers the DocumentParser
-# Part-B/C multi-agent connectors (file_analyzer/document/agent_mcp.py) over MCP
-# stdio; the HTTP transport and native vendor SDKs are documented in
-# requirements-agent.txt.
-agent = ["mcp[cli]>=1.2,<2"]
-
-# Remote database backends for the monitor's durable dumps (the continuous change
-# log + the session-summary dump, file_analyzer/monitor/change_log.py +
-# session_log.py). OPTIONAL and remote-only: both dumps default to a local SQLite
-# file (pure stdlib, nothing to install). Install one of these ONLY to point a
-# dump at a remote server via a connection URL (postgresql://... / mysql://...).
-# The drivers are imported lazily inside file_analyzer/monitor/store.py, so the
-# core stays stdlib-at-import even with these uninstalled.
-monitor-postgres = ["psycopg[binary]>=3.1"]
-monitor-mysql = ["PyMySQL>=1.1"]
-
-# ---------------------------------------------------------------------------
-# DocumentParser document-intelligence engine (Parts A / B / C).
-# Every layer has a pure-stdlib implementation -- Part-A static metrics, the
-# Part-B agent+code loop transport, and ALL Part-C evaluation metrics
-# (evaluation_metrics.py: CER/WER/BLEU/METEOR/chrF/ROUGE/TEDS/mAP/REDS/ANLS/
-# ECE/PSI + a deterministic RAG judge) run WITHOUT anything below. These extras
-# are OPTIONAL accelerators / reference backends; see requirements.txt and
-# docs/document-engine-libraries.md (spec section 6) for the full mapping and
-# the system binaries (Tesseract, qpdf, exiftool, veraPDF) that are not pip pkgs.
-# ---------------------------------------------------------------------------
-# Parts A1-A5: PDF / office structure + text-layer extraction.
-parse = [
-    "pdfplumber",
-    "pdfminer.six",
-    "pikepdf",
-    "python-docx",
-    "oletools",
-]
-# Parts A6-A8: OCR / image-quality (pytesseract needs the system tesseract).
-ocr = [
-    "scikit-image",
-    "pytesseract",
-]
-# Parts A11-A12: PII detection + linguistic features.
-pii = [
-    "phonenumbers",
-    "python-stdnum",
-    "presidio-analyzer",
-    "spacy",
-    "textstat",
-]
-# Part C: reference metric backends that cross-check the stdlib evaluators, plus
-# the LLM-judge RAG harnesses (which drive the same agent connectors as `agent`).
-eval = [
-    "jiwer",
-    "sacrebleu",
-    "nltk",
-    "lxml",
-    "zss",
-    "scikit-learn",
-    "jsonschema",
-    "tiktoken",
-    "ragas",
-    "deepeval",
-]
-# Everything for the document engine at once.
-document = [
-    "file-analyzer[parse,ocr,pii,eval]",
-]
+agent = ["file-analyzer-engine[agent]"]
+monitor-postgres = ["file-analyzer-engine[monitor-postgres]"]
+monitor-mysql = ["file-analyzer-engine[monitor-mysql]"]
+parse = ["file-analyzer-engine[parse]"]
+ocr = ["file-analyzer-engine[ocr]"]
+pii = ["file-analyzer-engine[pii]"]
+eval = ["file-analyzer-engine[eval]"]
+document = ["file-analyzer-engine[document]"]
+# Opt-in: also install the database-hosting server alongside the analysis profile.
+server = ["file-analyzer-server"]
 
 [project.urls]
 Homepage = "https://github.com/RohanPratapReddy/file-analyzer"
 Repository = "https://github.com/RohanPratapReddy/file-analyzer"
 
-# Code style is enforced in CI (`black --check` / `isort --check`). Pin the same
-# tool versions here and in .github/workflows/python-app.yml so a local run and
-# the runner agree byte-for-byte. isort's "black" profile makes the two agree on
-# import wrapping.
+# This meta ships no importable code -- an empty package set keeps the wheel to
+# just metadata (the deps are what do the work).
+[tool.setuptools]
+packages = []
+
+# ---------------------------------------------------------------------------
+# Shared developer tooling for the whole repo (all three packages + tests). The
+# CI style gates run `black --check` / `isort --check` against these settings, so
+# a local run and the runner agree byte-for-byte. Pin the same tool versions here
+# and in .github/workflows/python-app.yml. isort's "black" profile makes the two
+# agree on import wrapping.
 # target-version caps at py310 to match the CI runner (actions/setup-python
 # 3.10): black skips its AST-equivalence safety check when the running Python is
 # older than a listed target, and the emitted style is identical for py39-py310.
+# ---------------------------------------------------------------------------
 [tool.black]
 line-length = 88
 target-version = ["py39", "py310"]
@@ -115,72 +79,10 @@ target-version = ["py39", "py310"]
 profile = "black"
 line_length = 88
 
-[project.scripts]
-# Invoke from anywhere, no `python -m` and no specific cwd:
-#     file-analyzer /path/to/repo --out ./artifacts --quiet
-file-analyzer = "file_analyzer.main:run"
-#     file-analyzer-mcp        # start the MCP server over stdio
-file-analyzer-mcp = "mcp_server:main"
-#     file-analyzer-monitor /path/to/repo --interval 2   # background monitor
-file-analyzer-monitor = "file_analyzer.__main__:main"
-#
-# Runtime containment: the two CLI entrypoints above (`file-analyzer` /
-# `file_analyzer.main` and `file-analyzer-monitor` / `python -m file_analyzer`)
-# REFUSE to run on bare-metal host hardware -- they only start inside a container
-# (Docker/Podman/containerd/LXC/Kubernetes) or a virtual machine. The check is
-# real, stdlib-only, and lives in file_analyzer/core/runtime_guard.py; it runs
-# after argument parsing (so `--help` still works anywhere) and exits with code 3
-# on refusal. Deliberate opt-out for an already-isolated bare-metal box: set
-# FILE_ANALYZER_ALLOW_BARE_METAL=1. The MCP server (`file-analyzer-mcp`) is
-# unaffected. See docs/runtime-containment.md.
-
-# Ship the `file_analyzer` package and its subpackages. The Go/Java reader/plane
-# trees have no __init__.py (they are not importable Python), so they are not
-# picked up as packages here -- they travel as package-data instead (see below)
-# so the build-on-demand `go build` / `javac` fast paths work from an installed
-# wheel.
-# Read the version from file_analyzer/_version.py at build time. The module holds
-# only a literal assignment, so setuptools extracts it by AST parsing WITHOUT
-# importing the `file_analyzer` package (no analyzer-fleet import during build).
-[tool.setuptools.dynamic]
-version = { attr = "file_analyzer._version.__version__" }
-
-[tool.setuptools.packages.find]
-include = ["file_analyzer*"]
-
-# The MCP server lives at the repository root (a top-level module, not part of
-# the `file_analyzer` package) so that importing it does not pull in
-# file_analyzer/__init__.py and the whole analyzer fleet -- keeping server
-# startup fast. It must still ship in the wheel, so declare it as a standalone
-# module.
-[tool.setuptools]
-py-modules = ["mcp_server"]
-
-# Non-package data dirs are located at runtime via __file__ paths, so they must
-# travel inside the wheel: the extension catalog + IANA timezone tables, the
-# analysis-view SQL/JSON artifacts, and the Go/Java source trees + JDBC jars that
-# the plane runner (file_analyzer.router) and the view readers (file_analyzer.views)
-# build on demand.
-[tool.setuptools.package-data]
-"file_analyzer" = ["tables/*.json"]
-"file_analyzer.views" = [
-    "sql/*.json",
-    "sql/*.sql",
-    "go/*.go",
-    "go/go.mod",
-    "go/go.sum",
-    "java/*.java",
-    "java/*.jar",
-]
-"file_analyzer.router" = [
-    "go/*.go",
-    "go/go.mod",
-    "java/*.java",
-]
-# The background monitor ships its own Go worker-pool source so the same
-# build-on-demand `go build` fast path works from an installed wheel; the
-# Python fallback pool needs nothing extra.
-"file_analyzer.monitor" = [
-    "go/*.go",
-    "go/go.mod",
-]
+# The real test suite lives in tests/. Pin testpaths so a bare `pytest` from the
+# repo root collects only it -- and never wanders into the packages/ trees, where
+# analyzer modules whose names happen to match pytest's `test_*` glob (e.g.
+# file_analyzer/prog_lang/test_def_analyzer.py, the analyzer for `.test` files)
+# would otherwise be picked up and fail to import under the PEP 420 namespace.
+[tool.pytest.ini_options]
+testpaths = ["tests"]

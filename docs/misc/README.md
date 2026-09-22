@@ -1,6 +1,6 @@
 # MiscAnalyzer — the terminal (long-tail) plane
 
-**Package:** `file_analyzer/misc` · **Import:** `from file_analyzer import MiscAnalyzer` · **Component:** `misc`
+**Package:** `file_analyzer/misc` · **Import:** `from file_analyzer.engine import MiscAnalyzer` · **Component:** `misc`
 
 ## What it does
 `MiscAnalyzer` is the parent/super-class of the terminal `misc` analysis plane.
@@ -63,7 +63,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`.
 
 ### Python
 ```python
-from file_analyzer import MiscAnalyzer
+from file_analyzer.engine import MiscAnalyzer
 eng = MiscAnalyzer(file_paths=[...], dump_file_type="memory")
 tables = eng.analyze()
 # non-code plane: also rewrite local ids -> repository ids and build the index

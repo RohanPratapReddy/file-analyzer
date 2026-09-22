@@ -1,6 +1,6 @@
 # DocumentAnalyzer — the document plane
 
-**Package:** `file_analyzer/document` · **Import:** `from file_analyzer import DocumentAnalyzer` · **Component:** `document`
+**Package:** `file_analyzer/document` · **Import:** `from file_analyzer.engine import DocumentAnalyzer` · **Component:** `document`
 
 ## What it does
 `DocumentAnalyzer` is the parent/super-class of the `document` analysis plane.
@@ -60,7 +60,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`.
 
 ### Python
 ```python
-from file_analyzer import DocumentAnalyzer
+from file_analyzer.engine import DocumentAnalyzer
 eng = DocumentAnalyzer(file_paths=[...], dump_file_type="memory")
 tables = eng.analyze()
 # non-code plane: also rewrite local ids -> repository ids and build the index

@@ -1,6 +1,6 @@
 # RepositoryDatabaseGenerator — the normalized SQL dump + SQLite builder
 
-**Package:** `file_analyzer/core` · **Import:** `from file_analyzer import RepositoryDatabaseGenerator` · **Component:** `dbgen` / `db`
+**Package:** `file_analyzer/core` · **Import:** `from file_analyzer.engine import RepositoryDatabaseGenerator` · **Component:** `dbgen` / `db`
 
 ## What it does
 
@@ -84,7 +84,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`; outpu
 ### Python
 
 ```python
-from file_analyzer import RepositoryDatabaseGenerator
+from file_analyzer.engine import RepositoryDatabaseGenerator
 
 generator = RepositoryDatabaseGenerator(
     folder_tables=(folders, extensions, files),

@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "file-analyzer-client"
+description = "Tiny, dependency-free client for the file-analyzer platform: connect to a hosted server, read/query a local .db offline, and (optionally) run analysis when the engine wheel is installed."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Proprietary" }
+authors = [{ name = "Rohan Pratap Reddy Ravula" }]
+dynamic = ["version"]
+
+# The client is intentionally pure standard library -- zero runtime dependencies.
+dependencies = []
+
+[project.optional-dependencies]
+# Opt in to local analysis by pulling the analyzer fleet alongside the client.
+engine = ["file-analyzer-engine"]
+
+[tool.setuptools.dynamic]
+version = { attr = "file_analyzer._version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["file_analyzer*"]
+namespaces = true
+
+# The client ships its own concurrent Go view reader (built on demand at runtime
+# via `go build`), so the Go source tree must travel inside the wheel.
+[tool.setuptools.package-data]
+"file_analyzer.client" = [
+    "go/*.go",
+    "go/go.mod",
+    "go/go.sum",
+]

@@ -1,6 +1,6 @@
 # SchemaAnalyzer — schema-definition parser (SQL DDL + IDL families)
 
-**Package:** `file_analyzer/schema` · **Import:** `from file_analyzer import SchemaAnalyzer` · **Component:** `schema`
+**Package:** `file_analyzer/schema` · **Import:** `from file_analyzer.engine import SchemaAnalyzer` · **Component:** `schema`
 
 ## What it does
 
@@ -76,7 +76,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`.
 ### Python
 
 ```python
-from file_analyzer import SchemaAnalyzer
+from file_analyzer.engine import SchemaAnalyzer
 eng = SchemaAnalyzer(file_paths=[...], dump_file_type="memory")
 tables = eng.analyze()
 # non-code plane: rewrite local file ids -> repository file ids and populate

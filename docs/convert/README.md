@@ -1,6 +1,6 @@
 # FormatConverter (+ TextAnalyzer) — the conversion helpers
 
-**Package:** `file_analyzer/convert` · **Imports:** `from file_analyzer import FormatConverter, TextAnalyzer` (both re-exported) · **Pipeline stage:** renderable transcoding (step 4d in `AnalysisEngine.run()`; **no `--component`** — controlled by `--no-conversions` / `--no-conversion-analysis` / `--conversions-dir`).
+**Package:** `file_analyzer/convert` · **Imports:** `from file_analyzer.engine import FormatConverter, TextAnalyzer` (both re-exported) · **Pipeline stage:** renderable transcoding (step 4d in `AnalysisEngine.run()`; **no `--component`** — controlled by `--no-conversions` / `--no-conversion-analysis` / `--conversions-dir`).
 
 ## What it does
 
@@ -107,7 +107,7 @@ written to `/artifacts` (`ARTIFACTS_DIR`). Keep `--conversions-dir` under
 ## Python (direct use)
 
 ```python
-from file_analyzer import FormatConverter, TextAnalyzer
+from file_analyzer.engine import FormatConverter, TextAnalyzer
 
 conv = FormatConverter(allow_external=True)      # allow_external=False = hermetic
 conv.target_for("legacy.pcx")                    # -> "png" (or None)

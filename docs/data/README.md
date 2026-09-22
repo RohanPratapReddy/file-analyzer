@@ -1,6 +1,6 @@
 # DataAnalyzer — metadata/stats/sampling-only data profiler
 
-**Package:** `file_analyzer/data` · **Import:** `from file_analyzer import DataAnalyzer` · **Component:** `data`
+**Package:** `file_analyzer/data` · **Import:** `from file_analyzer.engine import DataAnalyzer` · **Component:** `data`
 
 ## What it does
 
@@ -82,7 +82,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`.
 ### Python
 
 ```python
-from file_analyzer import DataAnalyzer
+from file_analyzer.engine import DataAnalyzer
 eng = DataAnalyzer(file_paths=[...], dump_file_type="memory")
 tables = eng.analyze()
 # non-code plane: rewrite local file ids -> repository file ids and populate

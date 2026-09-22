@@ -29,7 +29,7 @@ from file_analyzer.monitor.session_log import (  # noqa: E402
     SessionSummaryStore,
     classify_sentiment,
 )
-from file_analyzer.monitor.store import (  # noqa: E402
+from file_analyzer.store import (  # noqa: E402
     DIALECT_MYSQL,
     DIALECT_POSTGRES,
     DIALECT_SQLITE,

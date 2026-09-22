@@ -22,7 +22,7 @@ code and data the operator is **authorized** to analyze. It records **metadata,
 structure and statistics** — sizes, hashes, entropy, counts, structural header
 fields, schema shapes — **never raw file payloads**, and it redacts secrets and
 personal data from the little free text it keeps. This is a hard boundary enforced
-in code by [`file_analyzer/core/guardrails.py`](file_analyzer/core/guardrails.py)
+in code by [`file_analyzer/core/guardrails.py`](packages/engine/file_analyzer/core/guardrails.py)
 (`guardrails v1.0`); the full policy is in
 [`ACCEPTABLE_USE.md`](ACCEPTABLE_USE.md) and any CLI prints it via
 `python -m file_analyzer.main --acceptable-use`.
@@ -79,14 +79,22 @@ warm it ahead of time at install/registration (e.g. in a Dockerfile or CI), run
 `python -m mcp_server --precompile` once — it bytecode-compiles `file_analyzer/`, imports
 the engine, and exits. Disable the background warm-up with `FILE_ANALYZER_MCP_NO_WARM=1`.
 
+> **Containment:** the MCP server (like the CLI) runs the analysis engine, so it
+> **only starts inside a container or a VM** — never on bare-metal host hardware
+> (refuses with exit code `3`; override with `FILE_ANALYZER_ALLOW_BARE_METAL=1`).
+> Register it with a containerized command, e.g. `claude mcp add file-analyzer --
+> docker run -i --rm -v "$PWD:/work" -w /work <image> python -m mcp_server`. Only
+> the **SDK** (`import file_analyzer.engine`) is exempt — an embedding app owns its own
+> isolation. See [`docs/runtime-containment.md`](docs/runtime-containment.md).
+
 Tools exposed:
 
 | Tool | What it does |
 |---|---|
-| `analyze_repository(path, out_dir?, dialect?, no_git?, workers?, plane_workers?, injection_workers?)` | Build the database. The analysis planes fan out across Go/Java when available; returns a summary incl. the `database` path and a `toolchains` map. |
+| `analyze_repository(path, out_dir?, dialect?, no_git?, workers?, plane_workers?, injection_workers?)` | Build the database. The analysis plane fans out across concurrent Go workers when available; returns a summary incl. the `database` path and a `toolchains` map. |
 | `query(sql, db_path, limit?)` | Run a **single read-only** `SELECT`/`WITH` against the database. |
 | `list_views(db_path)` | List the installed `v_*` analysis views. |
-| `read_views(db_path, views?, limit?, engine?, workers?)` | **Bulk-read** many `v_*` views in one call. `engine="auto"` splits them across the Go and Java readers concurrently, falling back to concurrent Python when no toolchain is present. |
+| `read_views(db_path, views?, limit?, engine?, workers?)` | **Bulk-read** many `v_*` views in one call. `engine="auto"` reads them through the Go reader's concurrent worker pool, falling back to concurrent Python when the toolchain is absent. |
 | `describe_schema(db_path, include_views?)` | Base tables + columns, plus the view catalog SQL. |
 | `run_component(component, path, out_dir?)` | Run one analyzer block (a language/plane/`census`) in isolation. |
 | `list_components()` | Enumerate valid `run_component` names. |
@@ -139,11 +147,11 @@ won't have the `v_schema_*` views).
 
 **One view vs. many.** Use `query` for a single view or a custom `SELECT`. To pull
 a whole batch of views (or all of them) at once, use `read_views` — with
-`engine="auto"` it partitions the set across the native Go and Java readers and
-runs them at the same wall-clock time, so a wide sweep of large views is faster
-than issuing one `query` per view. It transparently falls back to a concurrent
-pure-Python read when neither toolchain is on PATH; for a handful of small views,
-`engine="python"` avoids the subprocess/JVM start-up and is quickest.
+`engine="auto"` it hands the set to the native Go reader, which fans out across a
+goroutine pool, so a wide sweep of large views is faster than issuing one `query`
+per view. It transparently falls back to a concurrent pure-Python read when the
+Go toolchain is not on PATH; for a handful of small views, `engine="python"`
+avoids the subprocess start-up and is quickest.
 
 ---
 
@@ -151,7 +159,7 @@ pure-Python read when neither toolchain is on PATH; for a handful of small views
 
 - **Acceptable use first.** Honor the Phase 0 gate above on every task: authorized
   trees only, no secret/copyright harvesting, no defeating the redaction. The
-  policy is importable (`from file_analyzer import PROHIBITED_USES, ACCEPTABLE_USE,
+  policy is importable (`from file_analyzer.engine import PROHIBITED_USES, ACCEPTABLE_USE,
   acceptable_use_banner`) and printed by `--acceptable-use`.
 - **No verbatim payload; secrets/PII are redacted.** The analyzers persist metadata
   and counts, not file contents (the old `sample_strings` dump was removed). The

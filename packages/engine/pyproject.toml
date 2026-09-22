@@ -1,0 +1,157 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "file-analyzer-engine"
+description = "The analyzer fleet for the file-analyzer platform: turns a source tree into a queryable SQLite/PostgreSQL database of code, schemas, data, archives, binaries and docs -- without executing it -- plus a live background monitor, an MCP agent-enrichment tier, and a document-intelligence engine."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Rohan Pratap Reddy Ravula" }]
+keywords = ["static-analysis", "code-intelligence", "repository", "sqlite", "mcp", "ai-agent", "repository-monitor", "incremental-analysis", "document-intelligence"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Quality Assurance",
+]
+# Version is single-sourced from file_analyzer/_version.py (client wheel) and read
+# at build time by setup.py; see that file. It is declared dynamic here.
+dynamic = ["version"]
+
+# The engine builds on the small client wheel: it re-exports the client's
+# FileAnalyzerDatabase / open_database and uses the stdlib foundation
+# (runtime_guard, store, tokens, naming). The client is pure stdlib, so this adds
+# no heavyweight transitive dependency. The DB-hosting server
+# (file-analyzer-server) is deliberately NOT a dependency -- the engine only
+# reaches it via FileAnalyzerClient.server(), which imports it lazily.
+dependencies = ["file-analyzer-client>=1.0.0,<2"]
+
+[project.optional-dependencies]
+# AI-agent integration: the MCP server (python -m mcp_server / file-analyzer-mcp).
+# Pinned to mcp 1.x -- the server uses the v1 FastMCP API, which 2.x changed. This
+# same pin also powers the DocumentParser Part-B/C multi-agent connectors
+# (file_analyzer/document/agent_mcp.py) over MCP stdio.
+agent = ["mcp[cli]>=1.2,<2"]
+
+# Remote database backends for the monitor's durable dumps (the continuous change
+# log + the session-summary dump). OPTIONAL and remote-only: both dumps default to
+# a local SQLite file (pure stdlib). Install one of these ONLY to point a dump at
+# a remote server via a connection URL. The drivers are imported lazily inside
+# file_analyzer.store (client wheel), so the fleet stays stdlib-at-import without
+# them.
+monitor-postgres = ["psycopg[binary]>=3.1"]
+monitor-mysql = ["PyMySQL>=1.1"]
+
+# ---------------------------------------------------------------------------
+# DocumentParser document-intelligence engine (Parts A / B / C). Every layer has
+# a pure-stdlib implementation; these extras are OPTIONAL accelerators / reference
+# backends. See docs/document-engine-libraries.md for the full mapping and the
+# system binaries (Tesseract, qpdf, exiftool, veraPDF) that are not pip packages.
+# ---------------------------------------------------------------------------
+# Parts A1-A5: PDF / office structure + text-layer extraction.
+parse = [
+    "pdfplumber",
+    "pdfminer.six",
+    "pikepdf",
+    "python-docx",
+    "oletools",
+]
+# Parts A6-A8: OCR / image-quality (pytesseract needs the system tesseract).
+ocr = [
+    "scikit-image",
+    "pytesseract",
+]
+# Parts A11-A12: PII detection + linguistic features.
+pii = [
+    "phonenumbers",
+    "python-stdnum",
+    "presidio-analyzer",
+    "spacy",
+    "textstat",
+]
+# Part C: reference metric backends that cross-check the stdlib evaluators, plus
+# the LLM-judge RAG harnesses.
+eval = [
+    "jiwer",
+    "sacrebleu",
+    "nltk",
+    "lxml",
+    "zss",
+    "scikit-learn",
+    "jsonschema",
+    "tiktoken",
+    "ragas",
+    "deepeval",
+]
+# Everything for the document engine at once.
+document = [
+    "file-analyzer-engine[parse,ocr,pii,eval]",
+]
+
+[project.scripts]
+# Invoke from anywhere, no `python -m` and no specific cwd:
+#     file-analyzer /path/to/repo --out ./artifacts --quiet
+file-analyzer = "file_analyzer.main:run"
+#     file-analyzer-mcp        # start the MCP server over stdio
+file-analyzer-mcp = "mcp_server:main"
+#     file-analyzer-monitor /path/to/repo --interval 2   # background monitor
+file-analyzer-monitor = "file_analyzer.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/RohanPratapReddy/file-analyzer"
+Repository = "https://github.com/RohanPratapReddy/file-analyzer"
+
+[tool.black]
+line-length = 88
+target-version = ["py39", "py310"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+# The three wheels share the `file_analyzer` namespace via PEP 420 (no
+# __init__.py at the namespace root). Discover this wheel's contribution -- the
+# analyzer subpackages plus the `file_analyzer.engine` facade -- with
+# namespace-aware find.
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["file_analyzer*"]
+namespaces = true
+
+# The MCP server lives at the wheel root (a top-level module, not part of the
+# `file_analyzer` namespace) so importing it does not pull in the analyzer fleet
+# -- keeping server startup fast. It must still ship in the wheel, so declare it
+# as a standalone module.
+[tool.setuptools]
+py-modules = ["mcp_server"]
+
+# Non-package data dirs are located at runtime via __file__ paths, so they must
+# travel inside the wheel: the extension catalog + IANA timezone tables, the
+# analysis-view SQL/JSON artifacts, and the Go source trees that the plane runner
+# (file_analyzer.router) and the view reader (file_analyzer.views) build on demand.
+[tool.setuptools.package-data]
+"file_analyzer" = ["tables/*.json"]
+"file_analyzer.views" = [
+    "sql/*.json",
+    "sql/*.sql",
+    "go/*.go",
+    "go/go.mod",
+    "go/go.sum",
+]
+"file_analyzer.core" = [
+    "go/*.go",
+    "go/go.mod",
+    "go/go.sum",
+]
+"file_analyzer.router" = [
+    "go/*.go",
+    "go/go.mod",
+]
+"file_analyzer.monitor" = [
+    "go/*.go",
+    "go/go.mod",
+]

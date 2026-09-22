@@ -1,4 +1,4 @@
-# views — the analysis views + concurrent readers layer
+# views — the analysis views + concurrent reader layer
 
 **Package:** `file_analyzer/views` · **Import:** `from file_analyzer.views import VIEW_CATALOG, VIEW_PREFIX, ViewDef, catalog_by_name, views_ddl, install_views_sqlite, append_views_to_sql_dump, export_catalog_json, write_sql_artifacts, sqlite_present_tables, list_views, read_view, read_all_views` (this package is imported as `file_analyzer.views`; it is **not** re-exported from the `file_analyzer` top level) · CLI: `python -m file_analyzer.views {install,dump,emit,artifacts,list,read}`
 
@@ -7,15 +7,14 @@
 `file_analyzer/views` is the **single source of truth** for the ready-made analysis views
 (`v_*`) that denormalize the engine's raw relational output into ready-to-read
 summaries. The views are defined once in Python
-([`catalog.py`](../../file_analyzer/views/catalog.py)); the builder installs them into
+([`catalog.py`](../../packages/engine/file_analyzer/views/catalog.py)); the builder installs them into
 every `repository.db` the engine produces and mirrors them into the
-`repository_schema.sql` dump; the Python reader and the bundled Go + Java reader
-programs then simply **discover** the installed `VIEW` objects from the database
-catalog and `SELECT *` from them — no reader embeds any query SQL.
+`repository_schema.sql` dump; the Python reader and the bundled Go reader program
+then simply **discover** the installed `VIEW` objects from the database catalog
+and `SELECT *` from them — no reader embeds any query SQL.
 
 Add or change a view in `catalog.py` and every consumer (Python reader, Go
-reader, Java reader, the Postgres/Docker backend) picks it up with no code
-change.
+reader, the Postgres/Docker backend) picks it up with no code change.
 
 ## Key APIs / functions (real names + signatures from source)
 
@@ -65,7 +64,7 @@ Per-dialect wrapping is the only difference: `sqlite` →
 
 ## CLI (views only)
 
-`python -m file_analyzer.views <command>` ([`__main__.py`](../../file_analyzer/views/__main__.py)):
+`python -m file_analyzer.views <command>` ([`__main__.py`](../../packages/engine/file_analyzer/views/__main__.py)):
 
 | command | args | what it does |
 |---------|------|--------------|
@@ -116,16 +115,15 @@ Each is created as a DB object named `v_<name>` (e.g. the view
 - **Python** — `read_view` / `read_all_views`.
 - **Go reader** (`file_analyzer/views/go/main.go`) — pure-Go SQLite driver
   `modernc.org/sqlite` (no cgo / no gcc).
-- **Java reader** (`file_analyzer/views/java/RepositoryReader.java`, JDK 17+) — bundled
-  `sqlite-jdbc-3.45.3.0.jar` + `slf4j-api-2.0.13.jar` jars.
 - **Docker/Postgres backend** — `.sql` dumps already carry the appended
   `CREATE OR REPLACE VIEW` statements; for `.db` artifacts loaded via `pgloader`
   (tables only), the loader then applies `file_analyzer/views/sql/views.pgsql.sql`.
 
-Both the Go and Java readers are functionally equivalent: they **discover** the
-installed views from the catalog (`SELECT name FROM sqlite_master WHERE
-type='view'`) rather than embedding query SQL, and read every view across a pool
-of workers. CLI flags for both: `-source`, `-workers`, `-repeat`, `-verbose`.
+The Go reader **discovers** the installed views from the catalog (`SELECT name
+FROM sqlite_master WHERE type='view'`) rather than embedding query SQL, and reads
+every view across a pool of goroutine workers. CLI flags: `-source`, `-workers`,
+`-repeat`, `-verbose`. When the Go toolchain is absent, `native_reader.py` falls
+back to a concurrent pure-Python read with the same discovered-views contract.
 
 ### Docker
 
@@ -179,13 +177,13 @@ arguments after the service name become the new entrypoint's argv.)
   read-only `VIEW` objects over existing tables and never touches table data;
   re-running it is safe (`CREATE VIEW IF NOT EXISTS`, and the `.sql` section is
   marker-delimited so it is replaced, not duplicated).
-- **Read-only guarantees (Go + Java readers), enforced in layers.**
+- **Read-only guarantees (Go reader), enforced in layers.**
   1. Open mode `mode=ro` (`SQLITE_OPEN_READONLY`).
   2. Every pooled connection sets `PRAGMA query_only = true`.
   3. A start-up **write canary** (`CREATE TABLE __readonly_canary__`) that must
      *fail* — if the write ever succeeds, the program aborts.
-  4. Query-only code paths only (`db.Query*` in Go, `Statement.executeQuery` in
-     Java) — no `Exec`/`executeUpdate`, no transactions, no commits.
+  4. Query-only code paths only (`db.Query*` in Go) — no `Exec`, no transactions,
+     no commits.
   The Python reader mirrors this with `mode=ro` + `PRAGMA query_only = ON`.
 - **SQL must stay portable** across SQLite and PostgreSQL: pure `SELECT`/`WITH`,
   no DDL/DML; reserved-word columns (`"count"`, `"value"`) are double-quoted so
@@ -199,5 +197,5 @@ arguments after the service name become the new entrypoint's argv.)
 
 - [../USAGE.md](../USAGE.md) — the `python -m file_analyzer.main` entry point and the
   `--no-views` gate.
-- repo [README.md](../../README.md) — the "views layer" and "concurrent readers
-  (Go + Java)" sections (build/run instructions and Docker wiring).
+- repo [README.md](../../README.md) — the "views layer" and "concurrent reader
+  (Go)" sections (build/run instructions and Docker wiring).

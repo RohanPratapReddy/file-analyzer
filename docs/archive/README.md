@@ -1,6 +1,6 @@
 # ArchiveAnalyzer — the archive-traversal pipeline stage
 
-**Package:** `file_analyzer/archive` · **Import:** `from file_analyzer import ArchiveAnalyzer` (re-exported) · **Pipeline stage:** archive containers (step 4b in `AnalysisEngine.run()`; **no `--component`** — controlled by `--no-archives` / `--max-archive-depth`).
+**Package:** `file_analyzer/archive` · **Import:** `from file_analyzer.engine import ArchiveAnalyzer` (re-exported) · **Pipeline stage:** archive containers (step 4b in `AnalysisEngine.run()`; **no `--component`** — controlled by `--no-archives` / `--max-archive-depth`).
 
 ## What it does
 
@@ -112,7 +112,7 @@ etc. off it) and the pre-selected archive rows — so direct use in isolation is
 awkward; normally you let `AnalysisEngine` drive it. The shape is:
 
 ```python
-from file_analyzer import ArchiveAnalyzer
+from file_analyzer.engine import ArchiveAnalyzer
 
 # `engine` is the owning AnalysisEngine; archive_files are router rows
 # [{"file_id": ..., "file_location": ...}, ...] for the `archive` class.

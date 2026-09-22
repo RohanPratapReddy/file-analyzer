@@ -1,14 +1,26 @@
-# Publishes file-analyzer to PyPI when a GitHub Release is published.
-# Uses PyPI Trusted Publishing (OIDC) — no API tokens needed.
+# Publishes the file-analyzer platform to PyPI when a GitHub Release is published.
+# Uses PyPI Trusted Publishing (OIDC) -- no API tokens needed.
+#
+# Since the 3-wheel split this release ships FOUR PyPI projects from one dist/:
+#   - file-analyzer-client   (packages/client)
+#   - file-analyzer-server   (packages/server)
+#   - file-analyzer-engine   (packages/engine)
+#   - file-analyzer          (root meta-package: pulls client + engine)
+# gh-action-pypi-publish routes each dist to its project by the name in its
+# metadata; a single OIDC token works as long as EVERY project trusts this
+# workflow.
+#
 # Prereqs (one-time):
-#   1. On PyPI, add a Trusted Publisher for project "file-analyzer":
+#   1. On PyPI, add a Trusted Publisher to EACH of the four projects above:
 #      owner=RohanPratapReddy, repo=file-analyzer,
 #      workflow=python-publish.yml, environment=pypi
-#   2. Create a GitHub environment named "pypi" (Settings → Environments).
-#   3. Bump __version__ in file_analyzer/_version.py before each release (the single
-#      source of truth; pyproject reads it via setuptools `dynamic = ["version"]`,
-#      and the SDK / CLIs / MCP handshake all follow it). Then publish a GitHub
-#      Release whose tag matches (e.g. v0.1.0) to trigger this workflow.
+#   2. Create a GitHub environment named "pypi" (Settings -> Environments).
+#   3. Bump __version__ in packages/client/file_analyzer/_version.py before each
+#      release -- the single source of truth. Every wheel's build reads it (the
+#      client via setuptools `attr:`, the server/engine/meta via their setup.py
+#      shims), and the SDK / CLIs / MCP handshake all follow it. The meta pins the
+#      client + engine wheels to that exact version. Then publish a GitHub Release
+#      whose tag matches (e.g. v1.0.0) to trigger this workflow.
 name: Upload Python Package
 
 on:
@@ -28,10 +40,22 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Build release distributions
+      - name: Build release distributions (3 wheels + meta)
         run: |
           python -m pip install --upgrade build
-          python -m build
+          rm -rf dist && mkdir -p dist
+          # Build the client FIRST: the server/engine/meta setup.py shims
+          # single-source the version by AST-reading
+          # packages/client/file_analyzer/_version.py, and --no-isolation runs each
+          # setup.py in-tree so that sibling path resolves. All four are pure-Python
+          # `py3-none-any` wheels; we intentionally ship wheels only (an sdist of a
+          # single package could not see the sibling _version.py).
+          for pkg in client server engine; do
+            python -m build --wheel --no-isolation -o dist "packages/$pkg"
+          done
+          # The file-analyzer meta-package (repo root).
+          python -m build --wheel --no-isolation -o dist .
+          ls -1 dist
 
       - name: Upload distributions
         uses: actions/upload-artifact@v4

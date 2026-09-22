@@ -1,6 +1,6 @@
 # `file_analyzer/shell` — shell / command-language / automation-script analyzers folded into `code`
 
-**Package:** `file_analyzer/shell` · **Import:** `from file_analyzer import ShellScriptAnalyzer` (and the individual analyzers, e.g. `from file_analyzer import PosixShellAnalyzer`) · **Component:** `code` / `polyglot` (shell files are analyzed as part of the code plane) · `<ClassName>` for a single dialect
+**Package:** `file_analyzer/shell` · **Import:** `from file_analyzer.engine import ShellScriptAnalyzer` (and the individual analyzers, e.g. `from file_analyzer.engine import PosixShellAnalyzer`) · **Component:** `code` / `polyglot` (shell files are analyzed as part of the code plane) · `<ClassName>` for a single dialect
 
 ## What it does
 
@@ -52,7 +52,7 @@ each one owns. A collision (two analyzers claiming the same suffix) raises a
 Because it is derived, the authoritative list of owned extensions is the union of
 the `EXTENSIONS` tuples of the classes in the `_ANALYZERS` tuple (each analyzer
 module documents its own). Read the live set with
-`from file_analyzer import SHELL_EXT_MAP; sorted(SHELL_EXT_MAP)`.
+`from file_analyzer.engine import SHELL_EXT_MAP; sorted(SHELL_EXT_MAP)`.
 
 ## Run it standalone
 
@@ -104,14 +104,14 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`
 ### Python
 
 ```python
-from file_analyzer import ShellScriptAnalyzer     # standalone dispatcher over SHELL_EXT_MAP
+from file_analyzer.engine import ShellScriptAnalyzer     # standalone dispatcher over SHELL_EXT_MAP
 tables = ShellScriptAnalyzer(
     file_paths=["deploy.sh", "build.tcl"],
     dump_file_type="memory",
 ).analyze()
 
 # or a single dialect analyzer (same call shape as prog_lang):
-from file_analyzer import PosixShellAnalyzer
+from file_analyzer.engine import PosixShellAnalyzer
 sh_tables = PosixShellAnalyzer(file_paths=["deploy.sh"], dump_file_type="memory").analyze()
 ```
 

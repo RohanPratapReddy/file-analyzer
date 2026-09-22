@@ -1,6 +1,6 @@
 # RepositoryAnalyzer — the repository file census
 
-**Package:** `file_analyzer/core` · **Import:** `from file_analyzer import RepositoryAnalyzer` · **Component:** `census` / `repo`
+**Package:** `file_analyzer/core` · **Import:** `from file_analyzer.engine import RepositoryAnalyzer` · **Component:** `census` / `repo`
 
 ## What it does
 
@@ -36,7 +36,7 @@ contents.
 |--------|---------|-------|
 | `generate()` | `Optional[Tuple[folders, extensions, files]]` | Gathers → filters → builds tables → exports. Returns `None` if git gathering failed (not a git repo). Also stashes `self.folders/.extensions/.files`. |
 | `build_analyzer_mapping()` | `List[dict]` | One `{file_id, file_location, analyzer_class}` row per file (via `file_analyzer.router.routing.build_mapping`). Requires `generate()` first; files no engine claims get `analyzer_class: None`. |
-| `emit_analyzer_mapping(temp_dir)` | `Path` | Writes `temp/mapping.json` (mapping + per-class `shards`) and `temp/repo_tables.json` (folders/extensions/files) for the Go/Java planes. Returns the temp dir. |
+| `emit_analyzer_mapping(temp_dir)` | `Path` | Writes `temp/mapping.json` (mapping + per-class `shards`) and `temp/repo_tables.json` (folders/extensions/files) for the Go plane. Returns the temp dir. |
 
 ## Run it standalone
 
@@ -74,7 +74,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`; outpu
 ### Python
 
 ```python
-from file_analyzer import RepositoryAnalyzer
+from file_analyzer.engine import RepositoryAnalyzer
 
 repo = RepositoryAnalyzer(
     dir_path=".",
@@ -131,7 +131,7 @@ router planes, and the three tables become `folder_tables` for
   file is gone or the epoch is unrepresentable (never fabricated). Use
   `unpack_timestamp64` to decode.
 - **The 9-bit `tz_id` in each timestamp is a foreign key into the IANA timezone
-  tables** in [`file_analyzer/tables/`](../../file_analyzer/tables), built verbatim from the IANA tz
+  tables** in [`file_analyzer/tables/`](../../packages/engine/file_analyzer/tables), built verbatim from the IANA tz
   database (data.iana.org):
   - `iana_local_timezones.json` (used when the `local_tz` flag = **1**) — the
     comprehensive per-zone catalog: one row per real IANA canonical zone

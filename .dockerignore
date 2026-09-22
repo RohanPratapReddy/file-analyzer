@@ -21,7 +21,6 @@ file_analyzer/views/go/repo-reader.exe
 file_analyzer/views/go/*.exe
 file_analyzer/router/go/analysis-plane
 file_analyzer/router/go/*.exe
-file_analyzer/router/java/out/
 
 # (The AnalysisEngine artifacts are NOT baked into any image -- they are
 #  bind-mounted at runtime: /artifacts (loader/reader/engine) and /workspace

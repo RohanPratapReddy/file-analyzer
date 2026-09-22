@@ -5,7 +5,7 @@
       "type": "function",
       "function": {
         "name": "analyze_repository",
-        "description": "Analyze a repository and build a queryable SQLite database of everything in it (files, per-language symbols and imports, DB schemas, data-file profiles, archives, binaries, configs, docs). Never executes the code. The analysis planes fan out across Go and Java workers when those toolchains are on PATH (falling back to concurrent Python otherwise). Returns a JSON summary including the `database` path to pass to query/list_views/describe_schema, plus counts, the installed v_* views, and a `toolchains` map reporting which native fast paths were available.",
+        "description": "Analyze a repository and build a queryable SQLite database of everything in it (files, per-language symbols and imports, DB schemas, data-file profiles, archives, binaries, configs, docs). Never executes the code. The analysis planes fan out across concurrent Go workers when the toolchain is on PATH (falling back to concurrent Python otherwise). Returns a JSON summary including the `database` path to pass to query/list_views/describe_schema, plus counts, the installed v_* views, and a `toolchains` map reporting whether the native fast path was available.",
         "parameters": {
           "type": "object",
           "properties": {
@@ -32,7 +32,7 @@
             },
             "plane_workers": {
               "type": "integer",
-              "description": "Concurrency for the Go/Java analysis planes. Default: CPU count."
+              "description": "Concurrency for the Go analysis plane. Default: CPU count."
             },
             "injection_workers": {
               "type": "integer",
@@ -89,7 +89,7 @@
       "type": "function",
       "function": {
         "name": "read_views",
-        "description": "Bulk-read many v_* analysis views in one call instead of issuing one query per view. With engine='auto' (default) it partitions the views across the native Go and Java readers and runs them at the same wall-clock time, transparently falling back to a concurrent pure-Python read when neither toolchain is on PATH. All reads are strictly read-only. Returns {engine, used, view_count, views:{name:{columns,rows}|{error}}}.",
+        "description": "Bulk-read many v_* analysis views in one call instead of issuing one query per view. With engine='auto' (default) it hands the view set to the native Go reader, which fans out across a goroutine pool, transparently falling back to a concurrent pure-Python read when the Go toolchain is not on PATH. All reads are strictly read-only. Returns {engine, used, view_count, views:{name:{columns,rows}|{error}}}.",
         "parameters": {
           "type": "object",
           "properties": {
@@ -108,11 +108,11 @@
             "engine": {
               "type": "string",
               "enum": ["auto", "native", "python"],
-              "description": "'auto' = native Go/Java if available else Python; 'native' = require the Go/Java readers (error if absent); 'python' = concurrent in-process, no toolchain needed. Default: auto."
+              "description": "'auto' = native Go if available else Python; 'native' = require the Go reader (error if absent); 'python' = concurrent in-process, no toolchain needed. Default: auto."
             },
             "workers": {
               "type": "integer",
-              "description": "Per-language worker count. Default: CPU count."
+              "description": "Worker count. Default: CPU count."
             }
           },
           "required": ["db_path"]

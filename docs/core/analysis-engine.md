@@ -1,11 +1,11 @@
 # AnalysisEngine — the end-to-end repository pipeline orchestrator
 
-**Package:** `file_analyzer/core` · **Import:** `from file_analyzer import AnalysisEngine` · **Component:** engine-only / N/A (it *is* the full pipeline; run it via `python -m file_analyzer.main` with no `--component`)
+**Package:** `file_analyzer/core` · **Import:** `from file_analyzer.engine import AnalysisEngine` · **Component:** engine-only / N/A (it *is* the full pipeline; run it via `python -m file_analyzer.main` with no `--component`)
 
 ## What it does
 
 `AnalysisEngine` runs the whole tabgen flow in one process: the repository
-census, the concurrent Go/Java router planes, cross-file import linkage, the
+census, the concurrent Go router plane (with a pure-Python fallback), cross-file import linkage, the
 optional archive / binary / conversion post-plane stages, the single normalized
 database, and the `v_*` analysis views. It writes exactly the two artifacts the
 rest of the stack loads — `<db>` (binary SQLite) and `<sql>` (text dump) — and
@@ -112,7 +112,7 @@ See the Docker section of [`../../README.md`](../../README.md) for the full cont
 
 ```python
 from pathlib import Path
-from file_analyzer import AnalysisEngine
+from file_analyzer.engine import AnalysisEngine
 
 engine = AnalysisEngine(
     dir_path=Path("."),

@@ -6,6 +6,15 @@ wrapped in live/agentic layers — a background monitor (incremental re-analysis
 MCP agent-enrichment tier, and a document-intelligence engine. Everything you need
 to run it, use it as a library, or understand a single module on its own is here.
 
+> **Packaging.** The platform ships as four PyPI distributions that merge into one
+> importable `file_analyzer` namespace: **`file-analyzer`** (meta = the analysis
+> profile, client + engine — most users want this), **`file-analyzer-client`** (tiny,
+> pure-stdlib; query a hosted server or a local `.db`), **`file-analyzer-engine`**
+> (the analyzer fleet), and **`file-analyzer-server`** (the DB-hosting server, a
+> deliberate separate install). Fleet/SDK imports go through the `file_analyzer.engine`
+> facade. Source for each lives under [`../packages/`](../packages/). Full matrix:
+> [Installation & packaging](../README.md#installation--packaging).
+
 Start here:
 
 - **[USAGE.md](USAGE.md)** — the `python -m file_analyzer.main` CLI surface: every flag for
@@ -13,10 +22,10 @@ Start here:
   block standalone, the `--quiet` pure-JSON contract, and
   [Part 4 — AI agents (MCP)](USAGE.md#part-4--ai-agents-mcp). Read this first.
 - **[../README.md](../README.md)** — project overview: what the tool produces, the
-  views layer, the Go/Java readers, and the Docker workflow.
+  views layer, the Go reader (with Python fallback), and the Docker workflow.
 - **[../AGENTS.md](../AGENTS.md)** — driving `file-analyzer` from an AI agent
   (Claude, opencode, Cursor, Grok, DeepSeek, …): the MCP server
-  ([`mcp_server.py`](../mcp_server.py)), the `--quiet` CLI, and
+  ([`mcp_server.py`](../packages/engine/mcp_server.py)), the `--quiet` CLI, and
   [`../tools.json`](../tools.json) function-calling definitions. A Claude Code skill
   lives at [`../.claude/skills/file-analyzer/SKILL.md`](../.claude/skills/file-analyzer/SKILL.md).
 
@@ -94,14 +103,14 @@ Post-plane stages driven by `AnalysisEngine` flags — no `--component` of their
 ## Infrastructure
 
 - [router/README.md](router/README.md) — pure-Python routing/staging: `resolve_analyzer`, plane priority order, and shard grouping.
-- [views/README.md](views/README.md) — the views layer + Go/Java readers: the `v_*` view catalog, the "present tables only" contract, and the read-only guarantees.
+- [views/README.md](views/README.md) — the views layer + Go reader (with Python fallback): the `v_*` view catalog, the "present tables only" contract, and the read-only guarantees.
 
 ---
 
 Every plane analyzer shares the same standalone shape:
 
 ```python
-from file_analyzer import <Analyzer>
+from file_analyzer.engine import <Analyzer>
 eng = <Analyzer>(file_paths=[...], dump_file_type="memory")
 tables = eng.analyze()
 # non-code planes then map local ids to repository ids:

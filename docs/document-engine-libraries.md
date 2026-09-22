@@ -34,12 +34,12 @@ imports with none of them present.
 Install groups (see `pyproject.toml` extras and `requirements.txt`):
 
 ```bash
-pip install -e ".[parse]"     # A1–A5  PDF / office structure + text
-pip install -e ".[ocr]"       # A6–A8  OCR / image quality
-pip install -e ".[pii]"       # A11–A12 PII + linguistics
-pip install -e ".[eval]"      # C      reference metric backends + LLM judges
-pip install -e ".[document]"  # all of the above
-pip install -e ".[agent]"     # B      MCP subprocess transport (mcp[cli])
+pip install "file-analyzer[parse]"      # A1–A5  PDF / office structure + text
+pip install "file-analyzer[ocr]"        # A6–A8  OCR / image quality
+pip install "file-analyzer[pii]"        # A11–A12 PII + linguistics
+pip install "file-analyzer[eval]"       # C      reference metric backends + LLM judges
+pip install "file-analyzer[document]"   # all of the above
+pip install "file-analyzer[agent]"      # B      MCP subprocess transport (mcp[cli])
 ```
 
 ## Part A — static analysis layers

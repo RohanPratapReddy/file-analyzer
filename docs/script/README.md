@@ -1,6 +1,6 @@
 # `file_analyzer/script` — mainstream command-language / build-script dialects folded into `code`
 
-**Package:** `file_analyzer/script` · **Import:** `from file_analyzer import PowerShellAnalyzer` (and the other dialect classes) · **Component:** `code` / `polyglot` (script files are analyzed as part of the code plane) · `<ClassName>` for a single dialect
+**Package:** `file_analyzer/script` · **Import:** `from file_analyzer.engine import PowerShellAnalyzer` (and the other dialect classes) · **Component:** `code` / `polyglot` (script files are analyzed as part of the code plane) · `<ClassName>` for a single dialect
 
 ## What it does
 
@@ -34,7 +34,7 @@ get their own real hand-written parsers.
 `__init__` iterates a `_ANALYZERS` tuple of the nine classes and registers every
 lower-cased suffix each one owns, raising a `RuntimeError` on any collision. So the
 map can never drift out of sync with the analyzers. Read the live set with
-`from file_analyzer import SCRIPT_EXT_MAP` (it is exported), or `sorted(SCRIPT_EXT_MAP)`.
+`from file_analyzer.engine import SCRIPT_EXT_MAP` (it is exported), or `sorted(SCRIPT_EXT_MAP)`.
 It covers roughly fifteen suffixes across the nine dialects; the authoritative
 list is the union of the classes' `EXTENSIONS` tuples.
 
@@ -88,7 +88,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`
 ### Python
 
 ```python
-from file_analyzer import PowerShellAnalyzer
+from file_analyzer.engine import PowerShellAnalyzer
 tables = PowerShellAnalyzer(
     file_paths=["build.ps1"],
     dump_file_type="memory",

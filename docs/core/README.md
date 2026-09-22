@@ -2,7 +2,7 @@
 
 `file_analyzer/core` is the glue that ties the per-domain analyzers together into one
 repository-analysis pipeline. It holds four classes; the top-level package
-re-exports all of them, so they import flat as `from file_analyzer import ...`.
+re-exports all of them, so they import flat as `from file_analyzer.engine import ...`.
 
 | class | one-line role | component name | doc |
 |-------|---------------|----------------|-----|
@@ -11,8 +11,8 @@ re-exports all of them, so they import flat as `from file_analyzer import ...`.
 | `ImportLinkageAnalyzer` | Cross-file import/symbol resolution over the code tables → `import_linkage`. | `linkage` | [import-linkage.md](import-linkage.md) |
 | `RepositoryDatabaseGenerator` | Consumes every `*_tables` family and emits the `.sql` dump (+ builds the `.db`). | `dbgen` / `db` | [db-generator.md](db-generator.md) |
 
-The router package (`file_analyzer.router`) owns routing and the Go/Java language planes;
-`file_analyzer/core` owns the orchestration around them.
+The router package (`file_analyzer.router`) owns routing and the Go language plane
+(with a pure-Python fallback); `file_analyzer/core` owns the orchestration around them.
 
 ## How the four classes chain
 
@@ -23,7 +23,7 @@ AnalysisEngine.run()          # file_analyzer/core/analysis_engine.py — the or
 │        .generate()               + emit_analyzer_mapping() → temp/mapping.json
 │                                     (per-analyzer-class shards)
 │
-├─ 2. RouterPlanes(...).run(shards)  Go + Java concurrent per-shard fan-out;
+├─ 2. RouterPlanes(...).run(shards)  Go concurrent per-shard fan-out (Python fallback);
 │                                     each file routed by extension to its engine
 │                                     (PolyglotCodeAnalyzer / SchemaAnalyzer /
 │                                      DataAnalyzer / …); tables staged in temp/tables/*.json
@@ -56,5 +56,5 @@ Docker workflow in [`../../README.md`](../../README.md).
 ## See also
 
 - [../USAGE.md](../USAGE.md) — the `python -m file_analyzer.main` CLI surface (full pipeline + component mode).
-- [`../../README.md`](../../README.md) — project overview, the views layer, the Go/Java readers, and the Docker workflow.
+- [`../../README.md`](../../README.md) — project overview, the views layer, the Go reader (with Python fallback), and the Docker workflow.
 - The per-class docs listed in the table above.

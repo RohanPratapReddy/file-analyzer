@@ -1,6 +1,6 @@
 # ConfigAnalyzer — the configuration-file plane
 
-**Package:** `file_analyzer/config` · **Import:** `from file_analyzer import ConfigAnalyzer` · **Component:** `config`
+**Package:** `file_analyzer/config` · **Import:** `from file_analyzer.engine import ConfigAnalyzer` · **Component:** `config`
 
 ## What it does
 `ConfigAnalyzer` decomposes one configuration *file* into normalized, relational
@@ -54,7 +54,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`.
 
 ### Python
 ```python
-from file_analyzer import ConfigAnalyzer
+from file_analyzer.engine import ConfigAnalyzer
 eng = ConfigAnalyzer(file_paths=[...], dump_file_type="memory")
 tables = eng.analyze()
 # non-code plane: also rewrite local ids -> repository ids and build the index

@@ -5,8 +5,8 @@ monitor** that watches a repository, records recent changes, and re-analyzes
 changed files incrementally as agents / users / tools touch them.
 
 ```bash
-python -m file_analyzer monitor <repo> [flags]        # module form (from the repo root)
-file-analyzer-monitor <repo> [flags]         # after `pip install .`
+python -m file_analyzer monitor <repo> [flags]        # module form (after install)
+file-analyzer-monitor <repo> [flags]         # after `pip install file-analyzer`
 python -m file_analyzer <repo>                          # 'monitor' is the default subcommand
 ```
 
@@ -63,8 +63,8 @@ The durable log is **on by default** and writes a local SQLite file under
 | `--change-log-url URL` | — | remote store: `postgresql://…` / `mysql://…`, or a SQLite path |
 | `--change-log-path PATH` | local SQLite | local SQLite path (ignored if a URL is given) |
 
-Remote backends need an optional driver: `pip install ".[monitor-postgres]"` or
-`".[monitor-mysql]"`. Both are imported lazily, so the core stays stdlib-only
+Remote backends need an optional driver: `pip install "file-analyzer[monitor-postgres]"` or
+`"file-analyzer[monitor-mysql]"`. Both are imported lazily, so the core stays stdlib-only
 without them.
 
 ### Worker pool

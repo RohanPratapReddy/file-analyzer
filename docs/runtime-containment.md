@@ -1,18 +1,25 @@
 # Runtime containment — container / VM only
 
-The `file-analyzer` CLI entrypoints **refuse to run directly on bare-metal host
-hardware**. They start only inside a **container** (Docker / Podman / containerd /
-LXC / Kubernetes) or a **virtual machine**. When neither is detected, the process
-writes a refusal banner to stderr and exits with code **`3`**.
+Every **runnable** `file-analyzer` entrypoint — the CLI, the background monitor,
+and the **MCP server** — **refuses to run directly on bare-metal host hardware**.
+They start only inside a **container** (Docker / Podman / containerd / LXC /
+Kubernetes) or a **virtual machine**. When neither is detected, the process writes
+a refusal banner to stderr and exits with code **`3`**.
+
+**The one exception is the SDK.** Importing the engine facade and using its classes
+and functions as a library (`import file_analyzer.engine`, `AnalysisEngine(...)`,
+`scrub(...)`, …) does **not** trigger the guard — an embedding application owns its
+own isolation. Only the surfaces that *run the tool for you* (CLI / monitor / MCP)
+are contained.
 
 This is a real, evidence-based, stdlib-only check — no stubs. It lives in
-[`file_analyzer/core/runtime_guard.py`](../file_analyzer/core/runtime_guard.py) and is enforced at the
-start of both entrypoints.
+[`file_analyzer/runtime_guard.py`](../packages/client/file_analyzer/runtime_guard.py) and is enforced at the
+start of each runnable entrypoint.
 
 ## Why
 
 The engine walks arbitrary repositories and shells out to optional toolchains
-(Go / Java builders, OCR, document parsers). Pinning execution to a container or VM
+(the Go builder, OCR, document parsers). Pinning execution to a container or VM
 keeps that work inside a disposable, isolated boundary instead of the operator's
 own OS — a defense-in-depth default. The engine already never executes analyzed
 code and never stores raw payloads; the containment guard adds an isolation floor
@@ -22,13 +29,18 @@ on top of that.
 
 | Entrypoint | Command forms | Guarded |
 |------------|---------------|:-------:|
-| Full pipeline | `python -m file_analyzer.main …`, `python file_analyzer/main.py …`, `file-analyzer …` | ✅ |
+| Full pipeline | `python -m file_analyzer.main …`, `file-analyzer …` | ✅ |
 | Background monitor | `python -m file_analyzer …`, `file-analyzer-monitor …` | ✅ |
-| MCP server | `python -m mcp_server`, `file-analyzer-mcp` | ❌ (not guarded) |
+| MCP server | `python -m mcp_server`, `file-analyzer-mcp` | ✅ |
+| SDK (library import) | `import file_analyzer.engine`, `AnalysisEngine(...)`, `scrub(...)` | ❌ (by design — caller owns isolation) |
 
-`--help` is **always exempt**: the guard runs *after* argument parsing, so you can
-inspect the flag surface on any host. For the full pipeline, everything past
-`--help` — including `--list-components` and component mode — is behind the guard.
+`--help` and `--version` are **always exempt**: they print and exit before the
+guard runs, so you can inspect the flag surface and read the version on any host.
+For the full pipeline, everything past `--help` — including `--list-components` and
+component mode — is behind the guard. For the MCP server, `--version` and
+`--precompile` are exempt (the latter is a build-time warm-up meant for a
+`Dockerfile` / CI, where `/.dockerenv` is not yet present during `docker build`);
+actually **serving** the tools is guarded.
 
 ## How detection works
 
@@ -128,11 +140,12 @@ GCE, WSL2, …) also satisfies the guard with no extra flags.
 ## Programmatic use
 
 Importing the `file_analyzer` package as a library does **not** trigger the guard — only the
-CLI entrypoints (`file_analyzer.main:run` and `file_analyzer.__main__:main`) enforce it. Library callers
-that want the same policy can call it explicitly:
+runnable entrypoints (`file_analyzer.main:run`, `file_analyzer.__main__:main`, and
+`mcp_server:main`) enforce it. Library callers that want the same policy can call it
+explicitly:
 
 ```python
-from file_analyzer.core.runtime_guard import require_virtualized, inspect_environment
+from file_analyzer.runtime_guard import require_virtualized, inspect_environment
 
 info = inspect_environment()          # inspect without enforcing
 require_virtualized(context="my-app") # enforce: returns info, or SystemExit(3)

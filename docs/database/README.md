@@ -1,6 +1,6 @@
 # DatabaseAnalyzer — on-disk database-store profiler (schema + data)
 
-**Package:** `file_analyzer/database` · **Import:** `from file_analyzer import DatabaseAnalyzer` · **Component:** `database`
+**Package:** `file_analyzer/database` · **Import:** `from file_analyzer.engine import DatabaseAnalyzer` · **Component:** `database`
 
 ## What it does
 
@@ -69,7 +69,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`.
 ### Python
 
 ```python
-from file_analyzer import DatabaseAnalyzer
+from file_analyzer.engine import DatabaseAnalyzer
 eng = DatabaseAnalyzer(file_paths=[...], dump_file_type="memory")
 tables = eng.analyze()
 # non-code plane: rewrite local file ids -> repository file ids and populate

@@ -1,6 +1,6 @@
 # `file_analyzer/prog_lang` — the polyglot code analyzer family
 
-**Package:** `file_analyzer/prog_lang` · **Import:** `from file_analyzer import PolyglotCodeAnalyzer` (and any `{Lang}Analyzer`, e.g. `from file_analyzer import RustAnalyzer`) · **Component:** `code` / `polyglot` (whole plane) · `<ClassName>` (a single language)
+**Package:** `file_analyzer/prog_lang` · **Import:** `from file_analyzer.engine import PolyglotCodeAnalyzer` (and any `{Lang}Analyzer`, e.g. `from file_analyzer.engine import RustAnalyzer`) · **Component:** `code` / `polyglot` (whole plane) · `<ClassName>` (a single language)
 
 ## What it does
 
@@ -35,7 +35,7 @@ The package has three layers:
    Each declares the extensions it owns via its `EXTENSIONS` tuple / its entry in
    `EXT_MAP`, and emits the identical `code_tables` shape. Every class exported
    from the package is listed in `file_analyzer/prog_lang/__init__.py` `__all__` and is
-   re-exported from `file_analyzer` (so `from file_analyzer import RustAnalyzer` works).
+   re-exported from `file_analyzer.engine` (so `from file_analyzer.engine import RustAnalyzer` works).
 
 3. **`PolyglotCodeAnalyzer`** (`polyglot.py`) — the dispatcher. It routes each
    input file to the right `{Lang}Analyzer` via `EXT_MAP`, runs each, and merges
@@ -142,7 +142,7 @@ The public constructor mirrors what component mode calls
 (`engine_cls(file_paths=[...], dump_file_type="memory")` then `.analyze()`):
 
 ```python
-from file_analyzer import PolyglotCodeAnalyzer
+from file_analyzer.engine import PolyglotCodeAnalyzer
 
 eng = PolyglotCodeAnalyzer(
     file_paths=["a.py", "b.rs", "c.go"],   # list[str | Path]
@@ -151,7 +151,7 @@ eng = PolyglotCodeAnalyzer(
 tables = eng.analyze()                      # -> the code_tables dict
 
 # A single language analyzer has the same call shape:
-from file_analyzer import RustAnalyzer
+from file_analyzer.engine import RustAnalyzer
 rust_tables = RustAnalyzer(file_paths=["lib.rs"], dump_file_type="memory").analyze()
 ```
 

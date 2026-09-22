@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "file-analyzer-server"
+description = "The database-hosting server for the file-analyzer platform: session-token catalog, PROJECT_ROOT-{token}-{db} storage in SQLite/Postgres/MySQL, detached PID lifecycle, chunked rotating backups, and a token-authenticated HTTP control plane."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Rohan Pratap Reddy Ravula" }]
+keywords = ["database-server", "sqlite", "postgresql", "mysql", "file-analyzer"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Database :: Database Engines/Servers",
+]
+# Version is single-sourced from file_analyzer/_version.py (client wheel) and read
+# at build time by setup.py; see that file. It is declared dynamic here.
+dynamic = ["version"]
+
+# The server builds on the small client wheel (foundation: tokens, naming, store,
+# runtime_guard, and the ServerClient). The client is pure stdlib, so this adds no
+# heavyweight transitive dependency.
+dependencies = ["file-analyzer-client>=1.0.0,<2"]
+
+[project.optional-dependencies]
+# Remote database backends. The server hosts SQLite with nothing installed; add
+# one of these to host on a remote Postgres/MySQL (drivers are imported lazily by
+# file_analyzer.store.SqlStore, so the server stays stdlib-at-import without them).
+postgres = ["psycopg[binary]>=3.1"]
+mysql = ["PyMySQL>=1.1"]
+
+[project.scripts]
+#     file-analyzer-server run /path/to/repo --backend sqlite
+file-analyzer-server = "file_analyzer.server.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/RohanPratapReddy/file-analyzer"
+Repository = "https://github.com/RohanPratapReddy/file-analyzer"
+
+[tool.black]
+line-length = 88
+target-version = ["py39", "py310"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["file_analyzer*"]
+namespaces = true
+
+# The server ships its own concurrent Go backup pool (built on demand at runtime
+# via `go build`), so the Go source tree must travel inside the wheel.
+[tool.setuptools.package-data]
+"file_analyzer.server" = [
+    "go/*.go",
+    "go/go.mod",
+]

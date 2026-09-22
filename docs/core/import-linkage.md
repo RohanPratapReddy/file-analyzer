@@ -1,6 +1,6 @@
 # ImportLinkageAnalyzer — cross-file import & symbol linkage
 
-**Package:** `file_analyzer/core` · **Import:** `from file_analyzer import ImportLinkageAnalyzer` · **Component:** `linkage`
+**Package:** `file_analyzer/core` · **Import:** `from file_analyzer.engine import ImportLinkageAnalyzer` · **Component:** `linkage`
 
 ## What it does
 
@@ -73,7 +73,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`; outpu
 ### Python
 
 ```python
-from file_analyzer import ImportLinkageAnalyzer
+from file_analyzer.engine import ImportLinkageAnalyzer
 
 linkage = ImportLinkageAnalyzer(
     repository_tables=(folders, extensions, files),

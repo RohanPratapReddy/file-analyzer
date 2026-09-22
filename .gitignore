@@ -221,18 +221,17 @@ __marimo__/
 # file-analyzer: project-specific build outputs & generated artifacts
 # ---------------------------------------------------------------------------
 
-# Go reader/plane binaries (regenerated via `go build`) -- Windows and Unix.
-# The Go SOURCE (plane.go, main.go, go.mod, go.sum) IS tracked; only the
-# compiled binaries are ignored.
+# Go reader/plane/pool binaries (regenerated via `go build`) -- Windows and Unix.
+# The Go SOURCE (*.go, go.mod, go.sum) IS tracked; only the compiled binaries are
+# ignored. Bare names (no slash) match the on-demand binary in any go/ dir under
+# packages/*, whatever the wheel.
 *.exe
-file_analyzer/views/go/repo-reader
-file_analyzer/router/go/analysis-plane
-
-# Java compiled classes (regenerated via `javac`). The bundled JDBC/SLF4J
-# .jar dependencies under file_analyzer/views/java/ ARE intentionally tracked (they are
-# runtime dependencies, not build outputs) -- do NOT add *.jar here.
-*.class
-file_analyzer/views/java/out/
+repo-reader
+analysis-plane
+monitor-pool
+repository-injector
+client-reader
+backup-pool
 
 # AnalysisEngine output artifacts (produced by `python -m file_analyzer.main`):
 # the emitted database, the .sql dump, and the default --out directory.

@@ -1,6 +1,6 @@
 # MarkupAnalyzer — the markup plane
 
-**Package:** `file_analyzer/markup` · **Import:** `from file_analyzer import MarkupAnalyzer` · **Component:** `markup`
+**Package:** `file_analyzer/markup` · **Import:** `from file_analyzer.engine import MarkupAnalyzer` · **Component:** `markup`
 
 ## What it does
 `MarkupAnalyzer` decomposes one markup *file* into normalized, relational tables
@@ -60,7 +60,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`.
 
 ### Python
 ```python
-from file_analyzer import MarkupAnalyzer
+from file_analyzer.engine import MarkupAnalyzer
 eng = MarkupAnalyzer(file_paths=[...], dump_file_type="memory")
 tables = eng.analyze()
 # non-code plane: also rewrite local ids -> repository ids and build the index

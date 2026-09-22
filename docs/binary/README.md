@@ -1,12 +1,12 @@
 # MachineCodeAnalyzer + BinaryFormatParser — the binary plane
 
-**Package:** `file_analyzer/binary` · **Imports:** `from file_analyzer import MachineCodeAnalyzer, BinaryFormatParser, BinaryForensicsAnalyzer` (all re-exported) · **Pipeline stage:** binary deep-parse (step 4c in `AnalysisEngine.run()`; **no `--component`** — controlled by `--no-binary`).
+**Package:** `file_analyzer/binary` · **Imports:** `from file_analyzer.engine import MachineCodeAnalyzer, BinaryFormatParser, BinaryForensicsAnalyzer` (all re-exported) · **Pipeline stage:** binary deep-parse (step 4c in `AnalysisEngine.run()`; **no `--component`** — controlled by `--no-binary`).
 
 ## What it does
 
 The binary plane owns the `binary` routing class and deep-parses every file the
 router assigns to it. It is a post-planes stage, like archives — **not** driven by
-the Go/Java per-shard workers. Three cooperating classes:
+the Go per-shard workers. Three cooperating classes:
 
 - **`MachineCodeAnalyzer`** — the stage entry point. Pure-stdlib `struct` readers
   (no third-party deps, no external tools) for executable / object / bytecode /
@@ -83,7 +83,7 @@ There is **no standalone component mode** for this stage. It is **not** in
 `main.py`'s `_SPECIAL_COMPONENTS`, `_PLANE_COMPONENTS`, or
 `_lang_analyzer_registry()` — `python -m file_analyzer.main --component binary` is not
 valid and it does not appear in `--list-components`. (Note: the component-mode
-`data` / `code` / etc. planes are the Go/Java-driven shard planes; the binary
+`data` / `code` / etc. planes are the Go-driven shard planes; the binary
 plane is a separate post-planes engine stage.) It runs only inside the pipeline:
 
 ```bash
@@ -119,7 +119,7 @@ written to `/artifacts` (`ARTIFACTS_DIR`).
 ## Python (direct use)
 
 ```python
-from file_analyzer import MachineCodeAnalyzer, BinaryFormatParser, BinaryForensicsAnalyzer
+from file_analyzer.engine import MachineCodeAnalyzer, BinaryFormatParser, BinaryForensicsAnalyzer
 
 # Deep-parse a set of routed binary rows. `engine` is optional (read for attrs
 # only); files_rows are [{file_id, file_location, analyzer_class}, ...].

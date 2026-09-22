@@ -5,8 +5,9 @@
 ## What it does
 
 `router` is the pure-Python layer that decides *which analyzer plane owns each
-file* and *how the census is partitioned* for the concurrent Go/Java/Python
-analysis planes. It has three responsibilities, split across four modules:
+file* and *how the census is partitioned* for the concurrent Go (with a
+pure-Python fallback) analysis plane. It has three responsibilities, split
+across four modules:
 
 - **`routing.py`** — the routing decision (`resolve_analyzer`), path
   reconstruction (`reconstruct_paths`), the file→analyzer census
@@ -14,13 +15,13 @@ analysis planes. It has three responsibilities, split across four modules:
   free of heavy imports: the analyzer engines are imported *lazily* (only when
   a plane's extension universe is first needed), so `RepositoryAnalyzer` can
   import it cheaply just to build the mapping.
-- **`planes.py`** — `RouterPlanes`, the coordinator that runs the Go and Java
-  planes concurrently (with a Python fallback), building each toolchain on
-  demand.
-- **`worker.py`** — the per-shard analysis worker CLI each plane fans out to as
+- **`planes.py`** — `RouterPlanes`, the coordinator that runs the Go plane
+  (building the toolchain on demand) and falls back to a concurrent in-process
+  Python worker pool when Go is absent.
+- **`worker.py`** — the per-shard analysis worker CLI the plane fans out to as
   a subprocess.
-- **`go/`, `java/`** — the Go (`plane.go`) and Java (`AnalyzerPlane.java`)
-  plane drivers that invoke `worker.py`; they never touch the database.
+- **`go/`** — the Go (`plane.go`) plane driver that invokes `worker.py` across a
+  goroutine pool; it never touches the database.
 
 Routing keys on the **true (last-component) lowercase suffix** — e.g.
 `foo.tar.gz` and `bar.csv.gz` both resolve via `.gz`, so an archive stage can
@@ -49,12 +50,12 @@ From `file_analyzer/router/routing.py`:
 From `file_analyzer/router/planes.py`:
 
 - `class RouterPlanes(readers_root, temp_dir, python_exe=None, workers_per_plane=None)`
-  with `run(shards: List[Dict]) -> None`. Partitions shard ids across two
-  planes (deterministic: even indices → Go, odd → Java), builds `go build` /
-  `javac` on demand, runs both planes on the same wall clock, and falls back to
-  an in-process Python worker pool for any plane whose toolchain is missing.
-  Verifies every shard produced a `temp/status/<shard_id>.ok` marker and raises
-  `PlaneError` (retaining `temp/`) otherwise.
+  with `run(shards: List[Dict]) -> None`. Hands the full shard set to the Go
+  plane, building `go build` on demand, and its internal `-workers` goroutine
+  pool runs the shards concurrently; if the Go toolchain is missing it falls
+  back to an in-process Python worker pool over the same shards. Verifies every
+  shard produced a `temp/status/<shard_id>.ok` marker and raises `PlaneError`
+  (retaining `temp/`) otherwise.
 - `class PlaneError(RuntimeError)` — raised when one or more shards fail.
 
 From `file_analyzer/router/worker.py`:
@@ -103,7 +104,7 @@ tuple order:
 
 `archive` and `binary` are deliberately excluded: archives are extracted and
 recursed into by a nested `AnalysisEngine`, and binaries are deep-parsed by
-`MachineCodeAnalyzer` — both are dedicated post-planes stages, not Go/Java
+`MachineCodeAnalyzer` — both are dedicated post-planes stages, not Go
 per-shard work. (The `binary_format` route also lands in the `binary` class, so
 those files go through the binary stage too, not a shard.)
 
@@ -153,8 +154,8 @@ docker compose --profile engine run --build engine \
 2. It calls `build_mapping(...)` → `group_into_shards(...)` to turn the census
    into per-plane shards, staged as `temp/mapping.json` + `temp/repo_tables.json`.
 3. `AnalysisEngine` constructs `RouterPlanes(...)` and calls `run(shards)`,
-   which drives the Go + Java planes (or the Python fallback) concurrently; each
-   plane fans out to `worker.py`, one subprocess per shard.
+   which drives the Go plane (or the Python fallback) concurrently; the plane
+   fans out to `worker.py`, one subprocess per shard.
 4. Each worker writes `temp/tables/<shard_id>.json` and a status marker; the
    `archive` / `binary` stages run separately, and
    `RepositoryDatabaseGenerator` injects everything into the database.

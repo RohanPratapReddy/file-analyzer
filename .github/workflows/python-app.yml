@@ -1,4 +1,11 @@
-# Install, lint, smoke-test and test file-analyzer on a single Python version.
+# Build, lint, smoke-test and test the file-analyzer platform on one Python
+# version. The platform ships as THREE wheels that merge into one PEP 420
+# ``file_analyzer`` namespace (no top-level __init__.py):
+#   packages/client  -> file-analyzer-client  (pure-stdlib foundation + RO DB)
+#   packages/server  -> file-analyzer-server  (the database-hosting server)
+#   packages/engine  -> file-analyzer-engine  (the analyzer fleet)
+# This job builds all three, installs them together, and runs the suite against
+# the INSTALLED wheels (mirrored locally in python:3.10-slim before every commit).
 # https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 name: Python application
 
@@ -23,39 +30,58 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Install package and test tools
+      - name: Install build + test tools
         run: |
           python -m pip install --upgrade pip
           # Style tools are version-pinned so `--check` matches the exact
           # formatting committed to the repo (see [tool.black]/[tool.isort] in
-          # pyproject.toml). Bump these three together with a reformat commit.
-          pip install flake8 pytest black==26.5.1 isort==9.0.1
-          # The core is pure-stdlib (project.dependencies is empty); install the
-          # package itself plus the MCP extra. Do NOT install requirements.txt --
-          # those are OPTIONAL deep-parse libs (GDAL, rasterio, ...) that need
-          # system libraries not present on the runner.
-          pip install ".[agent]"
+          # the root pyproject.toml). Bump these three together with a reformat.
+          pip install build flake8 pytest black==26.5.1 isort==9.0.1
+
+      - name: Build all three wheels
+        run: |
+          # Build client FIRST: the server/engine setup.py shims single-source the
+          # version by AST-reading packages/client/file_analyzer/_version.py, and
+          # --no-isolation runs each setup.py in-tree so that sibling path resolves.
+          rm -rf dist && mkdir -p dist
+          for pkg in client server engine; do
+            python -m build --wheel --no-isolation -o dist "packages/$pkg"
+          done
+          ls -1 dist
 
       - name: Check formatting (black + isort)
         run: |
-          # The whole repo is auto-formatted; these gates fail on any drift.
-          black --check --diff .
-          isort --check-only --diff .
+          # The whole source tree is auto-formatted; these gates fail on any drift.
+          black --check --diff packages tests
+          isort --check-only --diff packages tests
 
       - name: Lint with flake8
         run: |
           # Fail only on real errors: syntax errors / undefined names.
-          flake8 file_analyzer mcp_server.py --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 packages tests --count --select=E9,F63,F7,F82 --show-source --statistics
           # Everything else is advisory (never fails the build).
-          flake8 file_analyzer mcp_server.py --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+          flake8 packages tests --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Install the built wheels
+        run: |
+          # Install all three so the suite exercises the merged namespace exactly
+          # as an end user gets it. The engine's [agent] extra pulls the MCP server.
+          pip install dist/file_analyzer_client-*.whl
+          pip install dist/file_analyzer_server-*.whl
+          pip install "$(ls dist/file_analyzer_engine-*.whl)[agent]"
 
       - name: Smoke-test the engine
+        env:
+          # The runner is a VM (the containment guard would pass anyway); set the
+          # opt-out so this step tests entrypoint wiring, not the environment.
+          FILE_ANALYZER_ALLOW_BARE_METAL: "1"
         run: |
           python -m mcp_server --precompile
           python -m file_analyzer.main --list-components --quiet
 
       - name: Test with pytest
         run: |
-          # Tolerate "no tests collected" (exit code 5) until a suite exists.
-          # The `|| ...` keeps `bash -e` from aborting on pytest's exit code.
+          # testpaths=["tests"] (root pyproject) scopes collection to the suite.
+          # Tolerate "no tests collected" (exit code 5). The `|| ...` keeps
+          # `bash -e` from aborting on pytest's exit code.
           pytest -q || [ $? -eq 5 ]

@@ -1,6 +1,6 @@
 # TextualAnalyzer — the text-record plane
 
-**Package:** `file_analyzer/text` · **Import:** `from file_analyzer import TextualAnalyzer` · **Component:** `text`
+**Package:** `file_analyzer/text` · **Import:** `from file_analyzer.engine import TextualAnalyzer` · **Component:** `text`
 
 ## What it does
 `TextualAnalyzer` decomposes one text-record *file* into normalized, relational
@@ -55,7 +55,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`.
 
 ### Python
 ```python
-from file_analyzer import TextualAnalyzer
+from file_analyzer.engine import TextualAnalyzer
 eng = TextualAnalyzer(file_paths=[...], dump_file_type="memory")
 tables = eng.analyze()
 # non-code plane: also rewrite local ids -> repository ids and build the index

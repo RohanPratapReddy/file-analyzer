@@ -19,9 +19,9 @@ python -m file_analyzer.main <source-dir> --component <NAME> --emit out.json
 python -m file_analyzer.main --list-components          # discover valid component names
 ```
 
-Run it as a module (`python -m file_analyzer.main …`, from the repo root so `file_analyzer` imports)
-or by path (`python file_analyzer/main.py …`; `main.py` bootstraps its own package root, so
-it works from any cwd or inside the container).
+Run it as a module (`python -m file_analyzer.main …`, after `pip install file-analyzer`)
+or by path (`python packages/engine/file_analyzer/main.py …`; `main.py` bootstraps its own
+package root, so it works from any cwd or inside the container even without installing).
 
 > **⚠️ Containment: container or VM only.** `python -m file_analyzer.main` (and the monitor,
 > `python -m file_analyzer`) **refuse to run on bare-metal host hardware** — they start only
@@ -47,12 +47,12 @@ debugging and the process exits non-zero.
 You can run the CLI three ways — all equivalent:
 
 ```bash
-python -m file_analyzer.main <source-dir> --out ./artifacts     # from the repo root
-python file_analyzer/main.py <source-dir> --out ./artifacts      # by path, from any cwd
-file-analyzer <source-dir> --out ./artifacts           # after `pip install .`
+python -m file_analyzer.main <source-dir> --out ./artifacts               # after install
+python packages/engine/file_analyzer/main.py <source-dir> --out ./artifacts  # by path, from any cwd
+file-analyzer <source-dir> --out ./artifacts                              # after `pip install file-analyzer`
 ```
 
-`pip install .` (or `pipx install .`) puts a **`file-analyzer`** command on your
+`pip install file-analyzer` (or `pipx install file-analyzer`) puts a **`file-analyzer`** command on your
 `PATH`, invocable from any directory, and a **`file-analyzer-mcp`** command that
 starts the MCP server. Everything documented below applies identically to all
 three forms.
@@ -365,7 +365,7 @@ instead of parsing walls of text.
 ```bash
 pip install -r requirements-agent.txt     # the MCP SDK (mcp[cli])
 python -m mcp_server                       # stdio transport
-#   or, after `pip install .`:  file-analyzer-mcp
+#   or, after `pip install file-analyzer`:  file-analyzer-mcp
 
 # register with an agent (Claude Code shown; others take the same command):
 claude mcp add file-analyzer -- python -m mcp_server
@@ -375,10 +375,10 @@ claude mcp add file-analyzer -- python -m mcp_server
 
 | tool | what it does |
 |------|--------------|
-| `analyze_repository(path, out_dir?, dialect?, no_git?, workers?, plane_workers?, injection_workers?)` | Run the full pipeline; returns the JSON summary incl. the `database` path and a `toolchains` map. The analysis planes fan out across Go/Java when available. Output defaults to `<path>/.file-analyzer`. |
+| `analyze_repository(path, out_dir?, dialect?, no_git?, workers?, plane_workers?, injection_workers?)` | Run the full pipeline; returns the JSON summary incl. the `database` path and a `toolchains` map. The analysis plane fans out across concurrent Go workers when available (concurrent pure-Python fallback otherwise). Output defaults to `<path>/.file-analyzer`. |
 | `query(sql, db_path, limit?)` | Run a **single read-only** `SELECT`/`WITH` against the database (opened `mode=ro` + `PRAGMA query_only`). |
 | `list_views(db_path)` | List the installed `v_*` analysis views. |
-| `read_views(db_path, views?, limit?, engine?, workers?)` | **Bulk-read** many `v_*` views at once. `engine="auto"` splits them across the Go and Java readers concurrently (read-only), falling back to concurrent Python when no toolchain is present. |
+| `read_views(db_path, views?, limit?, engine?, workers?)` | **Bulk-read** many `v_*` views at once. `engine="auto"` reads them through the Go reader's concurrent goroutine pool (read-only), falling back to concurrent Python when the Go toolchain is not present. |
 | `describe_schema(db_path, include_views?)` | Base tables + columns, plus the view catalog SQL. |
 | `run_component(component, path, out_dir?)` | Run one analyzer block (a language/plane/`census`) in isolation — the [Part 2](#part-2--component-mode-run-the-modules-separately) blocks. |
 | `list_components()` | Enumerate valid `run_component` names. |
@@ -412,8 +412,8 @@ JSON-RPC stream.
 
 ## See also
 
-- [`../README.md`](../README.md) — project overview, the views layer, the Go/Java
-  readers, and the Docker workflow.
+- [`../README.md`](../README.md) — project overview, the views layer, the Go
+  reader (with Python fallback), and the Docker workflow.
 - [Part 4 — AI agents (MCP)](#part-4--ai-agents-mcp) and [`../AGENTS.md`](../AGENTS.md)
   — drive the engine from Claude/opencode/Cursor/Grok/DeepSeek/… via the MCP server,
   `tools.json`, or the `--quiet` CLI.
