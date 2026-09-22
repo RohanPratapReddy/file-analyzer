@@ -1,6 +1,6 @@
 # DataAnalyzer — metadata/stats/sampling-only data profiler
 
-**Package:** `src/data` · **Import:** `from src import DataAnalyzer` · **Component:** `data`
+**Package:** `file_analyzer/data` · **Import:** `from file_analyzer import DataAnalyzer` · **Component:** `data`
 
 ## What it does
 
@@ -31,7 +31,7 @@ Routed by extension (curated `_EXT_*` sets checked before the
   `.pt/.pth/.ckpt/.pt2`, GGUF, ONNX, plus ML containers: ONNX Runtime `.ort`,
   TFLite, Keras v3, Flax/JAX msgpack, TFRecord, raw protobuf/GraphDef → tensor
   names, dtypes, shapes, element/byte counts (feeds `data_tensors_table` and
-  `data_model_layers_table`); see `src/data/model_formats.py`.
+  `data_model_layers_table`); see `file_analyzer/data/model_formats.py`.
 - **Images** — raster & vector via Pillow (`_EXT_IMAGE`) → format, mode,
   dimensions, channels, frame counts, embedded metadata.
 - **Audio** — WAV/AIFF deep header parse + compressed formats (`_EXT_AUDIO`) →
@@ -47,9 +47,9 @@ Routed by extension (curated `_EXT_*` sets checked before the
   counts, bounding boxes, CRS.
 - **Serialization** — pickle/joblib via opcode scan, **no code execution**
   (`_EXT_PICKLE`).
-- **Science + asset-text + catalog formats** — see `src/data/science_formats.py`,
-  `src/data/asset_text_formats.py`, and the catalog wiring in
-  `src/data/catalog_text_formats.py` / `catalog_binary_formats.py`.
+- **Science + asset-text + catalog formats** — see `file_analyzer/data/science_formats.py`,
+  `file_analyzer/data/asset_text_formats.py`, and the catalog wiring in
+  `file_analyzer/data/catalog_text_formats.py` / `catalog_binary_formats.py`.
 - **Everything else** → a generic descriptor (size + magic bytes + catalog
   classification).
 
@@ -58,12 +58,12 @@ Routed by extension (curated `_EXT_*` sets checked before the
 ### CLI (component mode)
 
 ```bash
-python -m src.main . --component data --emit data.json
+python -m file_analyzer.main . --component data --emit data.json
 ```
 
 ### Docker (component mode in a container)
 
-The `engine` service runs `python -m src.main`, so pass it the same args (emit into `/artifacts` so the JSON lands on the host):
+The `engine` service runs `python -m file_analyzer.main`, so pass it the same args (emit into `/artifacts` so the JSON lands on the host):
 
 ```bash
 docker compose --profile engine run --build engine \
@@ -82,7 +82,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`.
 ### Python
 
 ```python
-from src import DataAnalyzer
+from file_analyzer import DataAnalyzer
 eng = DataAnalyzer(file_paths=[...], dump_file_type="memory")
 tables = eng.analyze()
 # non-code plane: rewrite local file ids -> repository file ids and populate
@@ -108,7 +108,7 @@ Constructor signature:
 | `data_model_layers_table` | model-layer breakdown for ML container formats |
 | `data_file_index` | `dfi_id, file_id, entity_kind, entity_id` — populated by `link_repository` |
 
-Analysis views in `src/views/catalog.py` that read these:
+Analysis views in `file_analyzer/views/catalog.py` that read these:
 `v_data_datasets_by_modality`, `v_data_datasets_by_category`,
 `v_data_datasets_by_format`, `v_data_analysis_status`, `v_data_largest_tabular`,
 `v_data_columns_by_inferred_type`, `v_data_top_correlations`,
@@ -119,7 +119,7 @@ tables are present.)
 
 ## How it fits the pipeline
 
-Routing id `data` (see `resolve_analyzer` in `src/router/routing.py`), checked
+Routing id `data` (see `resolve_analyzer` in `file_analyzer/router/routing.py`), checked
 after `code`, `schema`, `database`, `archive` and `binary` — so a data-owned
 suffix is never shadowed and code/schema/database/binary extensions win first. As
 a non-code plane, the `data` component (and the real per-shard worker) runs

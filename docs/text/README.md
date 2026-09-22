@@ -1,13 +1,13 @@
 # TextualAnalyzer — the text-record plane
 
-**Package:** `src/text` · **Import:** `from src import TextualAnalyzer` · **Component:** `text`
+**Package:** `file_analyzer/text` · **Import:** `from file_analyzer import TextualAnalyzer` · **Component:** `text`
 
 ## What it does
 `TextualAnalyzer` decomposes one text-record *file* into normalized, relational
 `document → sections → records → fields` tables. For every extension of the seven
 *text-record* content kinds (`data_text`, `text`, `log`, `documentation`,
 `template`, `scientific_data`, `subtitle`) it runs a real, pure-stdlib,
-structure-aware parser (in `src/text/textual_formats.py`) and flattens the result:
+structure-aware parser (in `file_analyzer/text/textual_formats.py`) and flattens the result:
 
 - one **section** row per top-level grouping (a caption track, a log event
   stream, a man-page `.SH` block, a template directive list, a bibliographic
@@ -32,12 +32,12 @@ hard-code a list.
 ## Run it standalone
 ### CLI (component mode)
 ```bash
-python -m src.main . --component text --emit text.json
+python -m file_analyzer.main . --component text --emit text.json
 ```
 
 ### Docker (component mode in a container)
 
-The `engine` service runs `python -m src.main`, so pass it the same args (emit into `/artifacts` so the JSON lands on the host):
+The `engine` service runs `python -m file_analyzer.main`, so pass it the same args (emit into `/artifacts` so the JSON lands on the host):
 
 ```bash
 docker compose --profile engine run --build engine \
@@ -55,7 +55,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`.
 
 ### Python
 ```python
-from src import TextualAnalyzer
+from file_analyzer import TextualAnalyzer
 eng = TextualAnalyzer(file_paths=[...], dump_file_type="memory")
 tables = eng.analyze()
 # non-code plane: also rewrite local ids -> repository ids and build the index
@@ -91,7 +91,7 @@ Together these are the `text_tables` family consumed by
 `RepositoryDatabaseGenerator` (`text_tables=` argument).
 
 ## How it fits the pipeline (routing id; link_repository step)
-Routing id is `text`. In `src/router/routing.py`, `resolve_analyzer` checks
+Routing id is `text`. In `file_analyzer/router/routing.py`, `resolve_analyzer` checks
 `text` after config (and every higher-priority plane); the text suffix set
 already subtracts those planes, so only previously-residual text extensions route
 here. As a non-code plane it runs `link_repository((folders, extensions, files),
@@ -102,7 +102,7 @@ paths)` after `analyze()` to rewrite each row's local `file_id` to the repositor
 ## Notes & gotchas (only verified ones)
 - One bad file never aborts the batch — parse/emit failures are caught, warned,
   and skipped.
-- No `v_*` analysis views are defined for this plane; `src/views/catalog.py`
+- No `v_*` analysis views are defined for this plane; `file_analyzer/views/catalog.py`
   covers only the core/schema/data view families (no `v_text_*` view).
 
 ## See also — [../USAGE.md](../USAGE.md)

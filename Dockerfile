@@ -42,8 +42,8 @@ PGHOST="${PGHOST:-postgres}"
 PGPORT="${PGPORT:-5432}"
 PGUSER="${PGUSER:-sentinel}"
 export PGPASSWORD="${PGPASSWORD:-sentinel}"
-# Postgres CREATE-VIEW DDL for the analysis views (src/views/catalog.py), emitted
-# by `python -m src.views artifacts` and bind-mounted in by compose. pgloader
+# Postgres CREATE-VIEW DDL for the analysis views (file_analyzer/views/catalog.py), emitted
+# by `python -m file_analyzer.views artifacts` and bind-mounted in by compose. pgloader
 # copies TABLES only, so we (re)create the views on the Postgres side after each
 # .db load. It carries ALL views; those whose base tables are absent in a given
 # database simply fail and are skipped (ON_ERROR_STOP is off for this step).
@@ -130,17 +130,17 @@ ENTRYPOINT ["/loader/load.sh"]
 # =============================================================================
 # Optional: containerized Go reader (the read-only VIEW worker).
 # =============================================================================
-# Builds src/views/go into a static binary and runs it against a mounted .db /
+# Builds file_analyzer/views/go into a static binary and runs it against a mounted .db /
 # .sql artifact. It discovers the installed analysis views from the database
 # catalog and reads them concurrently -- the same views the loader materializes
 # on the Postgres side. Gated behind the compose `reader` profile so a plain
-# `docker compose up` never builds Go. Requires src/views/go + src/views/sql to be
+# `docker compose up` never builds Go. Requires file_analyzer/views/go + file_analyzer/views/sql to be
 # in the build context (see .dockerignore).
 FROM golang:1.22-bookworm AS go-build
 WORKDIR /src
-COPY src/views/go/go.mod src/views/go/go.sum ./
+COPY file_analyzer/views/go/go.mod file_analyzer/views/go/go.sum ./
 RUN go mod download
-COPY src/views/go/ ./
+COPY file_analyzer/views/go/ ./
 RUN CGO_ENABLED=0 go build -trimpath -o /repo-reader .
 
 FROM gcr.io/distroless/static-debian12 AS reader
@@ -153,31 +153,31 @@ CMD ["-source", "/artifacts/repository.db"]
 # =============================================================================
 # Optional: the analysis ENGINE (producer of the artifacts everything else loads)
 # =============================================================================
-# Runs `python -m src.main` (the src package entry point) over a source repo
+# Runs `python -m file_analyzer.main` (the file_analyzer package entry point) over a source repo
 # mounted at /workspace and writes repository.db + repository_schema.sql (with
 # the v_* analysis views already installed) into /artifacts. The loader/reader
 # stages above then consume those artifacts. Pure-stdlib core, so a slim Python
 # image suffices; `git` is needed because the census walks git-tracked files.
-# Gated behind the compose `engine` profile. Requires the whole src/ package in
+# Gated behind the compose `engine` profile. Requires the whole file_analyzer/ package in
 # the build context (see .dockerignore).
 FROM python:3.12-slim-bookworm AS engine
 RUN apt-get update \
  && apt-get install -y --no-install-recommends git ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY src/ ./src/
+COPY file_analyzer/ ./file_analyzer/
 ENV PYTHONPATH=/app \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 # Analyze the repo mounted at /workspace; emit artifacts to /artifacts. Override
 # the args in compose (or on the CLI), e.g. add `--dialect postgresql`.
-ENTRYPOINT ["python", "-m", "src.main"]
+ENTRYPOINT ["python", "-m", "file_analyzer.main"]
 CMD ["/workspace", "--out", "/artifacts"]
 
 # =============================================================================
 # Optional: the always-on background MONITOR (incremental re-analysis daemon)
 # =============================================================================
-# Runs `python -m src monitor /workspace` as a long-lived process: it watches the
+# Runs `python -m file_analyzer monitor /workspace` as a long-lived process: it watches the
 # repo mounted at /workspace, records the last 16 changes into the FIFO diff
 # database and re-analyzes changed files across the Go worker pool as they appear.
 #
@@ -189,9 +189,9 @@ CMD ["/workspace", "--out", "/artifacts"]
 #     `docker stop` therefore drains cleanly within stop_grace_period).
 #
 # The Go worker pool is real here: the Go 1.22 toolchain is copied in so the pool
-# builds `src/monitor/go` on first use (GOCACHE/GOPATH point at writable /tmp).
+# builds `file_analyzer/monitor/go` on first use (GOCACHE/GOPATH point at writable /tmp).
 # Without Go it would transparently fall back to the concurrent.futures pool.
-# Gated behind the compose `monitor` profile. Requires the whole src/ package in
+# Gated behind the compose `monitor` profile. Requires the whole file_analyzer/ package in
 # the build context (see .dockerignore).
 FROM python:3.12-slim-bookworm AS monitor
 COPY --from=golang:1.22-bookworm /usr/local/go /usr/local/go
@@ -203,11 +203,11 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends git ca-certificates tini \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY src/ ./src/
+COPY file_analyzer/ ./file_analyzer/
 ENV PYTHONPATH=/app \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 # tini (PID 1) forwards signals and reaps zombies; the monitor itself handles
 # SIGTERM/SIGINT for a clean drain. Watch /workspace; keep state under /artifacts.
-ENTRYPOINT ["tini", "--", "python", "-m", "src", "monitor"]
+ENTRYPOINT ["tini", "--", "python", "-m", "file_analyzer", "monitor"]
 CMD ["/workspace", "--out", "/artifacts", "--interval", "2"]

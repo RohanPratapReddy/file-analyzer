@@ -1,6 +1,6 @@
 # DatabaseAnalyzer — on-disk database-store profiler (schema + data)
 
-**Package:** `src/database` · **Import:** `from src import DatabaseAnalyzer` · **Component:** `database`
+**Package:** `file_analyzer/database` · **Import:** `from file_analyzer import DatabaseAnalyzer` · **Component:** `database`
 
 ## What it does
 
@@ -15,7 +15,7 @@ analyzers:
   properties.
 
 For every catalogued database extension it runs a real, pure-stdlib parser (see
-`src/database/db_formats.py`). It content-sniffs each file and only claims it when
+`file_analyzer/database/db_formats.py`). It content-sniffs each file and only claims it when
 the bytes match. SQLite (and everything SQLite-backed) is fully introspected;
 dBASE/FoxPro/Paradox, Berkeley DB, GNU dbm, Samba TDB, LMDB/mdbx,
 LevelDB/RocksDB SSTables, Redis RDB, djb cdb, QlikView QVD, MS ESE/Jet/ACE,
@@ -28,7 +28,7 @@ degrades to an honest forensic byte profile.
 
 The owned extension set is `DatabaseAnalyzer._known_exts()`, which is
 `db_formats.known_exts()` — the extension→(engine, family) map in
-`src/database/db_formats.py`. It is a broad, qualitative set of database-store
+`file_analyzer/database/db_formats.py`. It is a broad, qualitative set of database-store
 formats (relational engines, key-value/embedded stores, mail stores, columnar
 and accounting stores, etc.). Per-format behavior is one of three tiers:
 
@@ -45,12 +45,12 @@ and accounting stores, etc.). Per-format behavior is one of three tiers:
 ### CLI (component mode)
 
 ```bash
-python -m src.main . --component database --emit database.json
+python -m file_analyzer.main . --component database --emit database.json
 ```
 
 ### Docker (component mode in a container)
 
-The `engine` service runs `python -m src.main`, so pass it the same args (emit into `/artifacts` so the JSON lands on the host):
+The `engine` service runs `python -m file_analyzer.main`, so pass it the same args (emit into `/artifacts` so the JSON lands on the host):
 
 ```bash
 docker compose --profile engine run --build engine \
@@ -69,7 +69,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`.
 ### Python
 
 ```python
-from src import DatabaseAnalyzer
+from file_analyzer import DatabaseAnalyzer
 eng = DatabaseAnalyzer(file_paths=[...], dump_file_type="memory")
 tables = eng.analyze()
 # non-code plane: rewrite local file ids -> repository file ids and populate
@@ -96,14 +96,14 @@ are skipped. Constructor signature:
 | `database_properties_table` | flattened store-level technical metadata (never payload) |
 | `database_file_index` | `dbfi_id, file_id, entity_kind, entity_id` — populated by `link_repository` |
 
-> **No `v_*` views read these.** `src/views/catalog.py` currently ships analysis
+> **No `v_*` views read these.** `file_analyzer/views/catalog.py` currently ships analysis
 > views for the `schema_*` and `data_*` families but none for `database_*`, so no
 > `v_database_*` view is created. The tables are still emitted and loaded into the
 > database by `RepositoryDatabaseGenerator`.
 
 ## How it fits the pipeline
 
-Routing id `database` (see `resolve_analyzer` in `src/router/routing.py`), checked
+Routing id `database` (see `resolve_analyzer` in `file_analyzer/router/routing.py`), checked
 **after** `code` and `schema`. As a non-code plane, the `database` component (and
 the real per-shard worker) runs `link_repository()` after `analyze()` to rewrite
 local file ids to repository ids and fill `database_file_index`.

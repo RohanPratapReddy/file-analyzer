@@ -1,11 +1,11 @@
 # ConfigAnalyzer — the configuration-file plane
 
-**Package:** `src/config` · **Import:** `from src import ConfigAnalyzer` · **Component:** `config`
+**Package:** `file_analyzer/config` · **Import:** `from file_analyzer import ConfigAnalyzer` · **Component:** `config`
 
 ## What it does
 `ConfigAnalyzer` decomposes one configuration *file* into normalized, relational
 key/value tables. For every `config`-type extension it recognizes, it runs a
-real, pure-stdlib parser (in `src/config/config_formats.py`) that turns the file
+real, pure-stdlib parser (in `file_analyzer/config/config_formats.py`) that turns the file
 into a canonical nested Python object (`dict` / `list` / scalar), then flattens
 that tree into fully-normalized `config_*` tables:
 
@@ -31,12 +31,12 @@ Exact suffix membership comes from `config_formats`; do not hard-code a list.
 ## Run it standalone
 ### CLI (component mode)
 ```bash
-python -m src.main . --component config --emit config.json
+python -m file_analyzer.main . --component config --emit config.json
 ```
 
 ### Docker (component mode in a container)
 
-The `engine` service runs `python -m src.main`, so pass it the same args (emit into `/artifacts` so the JSON lands on the host):
+The `engine` service runs `python -m file_analyzer.main`, so pass it the same args (emit into `/artifacts` so the JSON lands on the host):
 
 ```bash
 docker compose --profile engine run --build engine \
@@ -54,7 +54,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`.
 
 ### Python
 ```python
-from src import ConfigAnalyzer
+from file_analyzer import ConfigAnalyzer
 eng = ConfigAnalyzer(file_paths=[...], dump_file_type="memory")
 tables = eng.analyze()
 # non-code plane: also rewrite local ids -> repository ids and build the index
@@ -92,7 +92,7 @@ Together these are the `config_tables` family consumed by
 `RepositoryDatabaseGenerator` (`config_tables=` argument).
 
 ## How it fits the pipeline (routing id; link_repository step)
-Routing id is `config`. In `src/router/routing.py`, `resolve_analyzer` checks
+Routing id is `config`. In `file_analyzer/router/routing.py`, `resolve_analyzer` checks
 `config` **after** code / schema / database / archive / binary / data /
 binary-format — the config suffix set already subtracts every higher-priority
 plane, so only previously-residual config extensions route here. As a non-code
@@ -106,7 +106,7 @@ build `config_file_index`; the final tables come from `get_tables()`.
   `notes` records `tree truncated at <N> nodes`.
 - One bad file never aborts the batch — parse/emit failures are caught, warned,
   and skipped.
-- No `v_*` analysis views are defined for this plane. `src/views/catalog.py`
+- No `v_*` analysis views are defined for this plane. `file_analyzer/views/catalog.py`
   covers only the core/schema/data view families; there is no `v_config_*` view.
 
 ## See also — [../USAGE.md](../USAGE.md)

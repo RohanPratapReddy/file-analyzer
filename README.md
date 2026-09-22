@@ -31,7 +31,7 @@ understood, it records what it could determine and marks the rest, rather than
 fabricating results.
 
 > **⚠️ Runs in a container or VM only.** The CLI entrypoints (`file-analyzer` /
-> `python -m src.main` and the monitor `file-analyzer-monitor` / `python -m src`)
+> `python -m file_analyzer.main` and the monitor `file-analyzer-monitor` / `python -m file_analyzer`)
 > **refuse to run directly on bare-metal host hardware** — they start only inside a
 > container (Docker/Podman/containerd/LXC/Kubernetes) or a virtual machine, exiting
 > with code **3** otherwise. Use the Docker workflow below (recommended), or set
@@ -56,13 +56,13 @@ do it inside a VM/container, or export `FILE_ANALYZER_ALLOW_BARE_METAL=1` first:
 pip install -r requirements.txt
 
 # Analyze a repository (the source must be a git repo, or pass --no-git).
-python -m src.main /path/to/repo --out ./artifacts
+python -m file_analyzer.main /path/to/repo --out ./artifacts
 
 # Postgres-loadable dump instead of SQLite:
-python -m src.main /path/to/repo --out ./artifacts --dialect postgresql
+python -m file_analyzer.main /path/to/repo --out ./artifacts --dialect postgresql
 
 # All flags (works on any host — --help is exempt from the containment guard):
-python -m src.main --help
+python -m file_analyzer.main --help
 ```
 
 Flags: `--out`, `--db`, `--sql`, `--dialect {sqlite,postgresql}`, `--temp`
@@ -126,11 +126,11 @@ for the driving guide and **[`tools.json`](tools.json)** for function-calling
 
 ## Using the pipeline as a library
 
-Import the public classes from the `src` package (run from the repo root so `src`
+Import the public classes from the `file_analyzer` package (run from the repo root so `file_analyzer`
 is importable):
 
 ```python
-from src import (RepositoryAnalyzer, PolyglotCodeAnalyzer, ImportLinkageAnalyzer,
+from file_analyzer import (RepositoryAnalyzer, PolyglotCodeAnalyzer, ImportLinkageAnalyzer,
                  SchemaAnalyzer, DataAnalyzer, RepositoryDatabaseGenerator,
                  AnalysisEngine)
 
@@ -142,26 +142,26 @@ summary = engine.run("/path/to/repo", out_dir="./artifacts")
 
 | package                | role                                                                      |
 |------------------------|---------------------------------------------------------------------------|
-| `src/core/`            | orchestration glue — `analysis_engine`, `repository_analyzer`, `import_linkage`, `db_generator` (re-exported at the package top level). |
-| `src/prog_lang/`       | per-language source analyzers (classes, functions, imports, symbols).     |
-| `src/schema/`          | SQL DDL / IDL schema analyzers → `schema_*` tables.                        |
-| `src/data/`            | data-artifact profiler (metadata / stats / sampling only) → `data_*` tables. |
-| `src/database/`        | database-file analyzers (merges schema + data for DB formats).            |
-| `src/archive/`         | archive traversal (nested, bounded depth).                                |
-| `src/binary/`          | machine-code and binary-format analyzers.                                 |
-| `src/config/`, `src/text/`, `src/markup/`, `src/document/`, `src/script/`, `src/shell/`, `src/misc/` | format-family analyzers for the long tail of file types. |
-| `src/convert/`         | opaque → renderable format conversion helpers.                            |
-| `src/router/`          | pure-Python routing / staging that dispatches files to analyzers.         |
-| `src/views/`           | the views + reads layer (single source of truth — see below).             |
-| `src/tables/` | canonical reference tables — the extension catalog (`file_extensions.json`) and the IANA timezone tables (`iana_local_timezones.json`, `iana_global_timezones.json`). |
+| `file_analyzer/core/`            | orchestration glue — `analysis_engine`, `repository_analyzer`, `import_linkage`, `db_generator` (re-exported at the package top level). |
+| `file_analyzer/prog_lang/`       | per-language source analyzers (classes, functions, imports, symbols).     |
+| `file_analyzer/schema/`          | SQL DDL / IDL schema analyzers → `schema_*` tables.                        |
+| `file_analyzer/data/`            | data-artifact profiler (metadata / stats / sampling only) → `data_*` tables. |
+| `file_analyzer/database/`        | database-file analyzers (merges schema + data for DB formats).            |
+| `file_analyzer/archive/`         | archive traversal (nested, bounded depth).                                |
+| `file_analyzer/binary/`          | machine-code and binary-format analyzers.                                 |
+| `file_analyzer/config/`, `file_analyzer/text/`, `file_analyzer/markup/`, `file_analyzer/document/`, `file_analyzer/script/`, `file_analyzer/shell/`, `file_analyzer/misc/` | format-family analyzers for the long tail of file types. |
+| `file_analyzer/convert/`         | opaque → renderable format conversion helpers.                            |
+| `file_analyzer/router/`          | pure-Python routing / staging that dispatches files to analyzers.         |
+| `file_analyzer/views/`           | the views + reads layer (single source of truth — see below).             |
+| `file_analyzer/tables/` | canonical reference tables — the extension catalog (`file_extensions.json`) and the IANA timezone tables (`iana_local_timezones.json`, `iana_global_timezones.json`). |
 
-## The views layer (`src/views`)
+## The views layer (`file_analyzer/views`)
 
 The analysis views are defined **once**, in Python, and installed into every
 database the engine produces (and mirrored into the `.sql` dump). The Go and Java
 readers embed no query SQL — they **discover** the installed `VIEW` objects from
 the database catalog. Add or change a view in
-[`src/views/catalog.py`](src/views/catalog.py) and every reader, plus the
+[`file_analyzer/views/catalog.py`](file_analyzer/views/catalog.py) and every reader, plus the
 Postgres/Docker backend, picks it up with no code changes.
 
 | module        | role                                                                       |
@@ -170,7 +170,7 @@ Postgres/Docker backend, picks it up with no code changes.
 | `builder.py`  | turns the catalog into real objects: `install_views_sqlite(db)`, `append_views_to_sql_dump(sql)`, `views_ddl(dialect)`, `write_sql_artifacts(dir)`. |
 | `reader.py`   | Python reads over the installed views: `list_views`, `read_view`, `read_all_views`. |
 | `native_reader.py` | concurrent bulk reads: `read_views_native` splits the views across the Go (`go/`) and Java (`java/`) readers and runs them at the same wall-clock time; `read_views_python` is the toolchain-free concurrent fallback. |
-| `__main__.py` | CLI (`python -m src.views …`).                                             |
+| `__main__.py` | CLI (`python -m file_analyzer.views …`).                                             |
 | `sql/`        | generated artifacts: `views.sqlite.sql`, `views.pgsql.sql`, `catalog.json`. |
 | `go/`, `java/` | native concurrent view readers (`-json` mode) that `native_reader.py` builds on demand. |
 | `go/`, `java/`| the Go + Java reader programs (below).                                     |
@@ -183,11 +183,11 @@ skip-logic. Installation is **additive, idempotent, and the only write**: it cre
 read-only `VIEW` objects over existing tables and never touches table data.
 
 ```bash
-python -m src.views install   repository.db
-python -m src.views dump      repository_schema.sql
-python -m src.views list      repository.db
-python -m src.views read      repository.db --view v_extension_distribution
-python -m src.views artifacts src/views/sql       # (re)generate sql/ artifacts
+python -m file_analyzer.views install   repository.db
+python -m file_analyzer.views dump      repository_schema.sql
+python -m file_analyzer.views list      repository.db
+python -m file_analyzer.views read      repository.db --view v_extension_distribution
+python -m file_analyzer.views artifacts file_analyzer/views/sql       # (re)generate sql/ artifacts
 ```
 
 ### View catalog — 33 views over the `v_` prefix
@@ -247,10 +247,10 @@ the original file is never modified and the temp file is deleted on exit).
 Pure-Go SQLite driver (`modernc.org/sqlite`) — no cgo / no gcc needed.
 
 ```bash
-cd src/views/go
+cd file_analyzer/views/go
 go mod tidy          # fetches modernc.org/sqlite
 go build -o repo-reader .
-# repository.db lives four levels up (repo root), from src/views/go:
+# repository.db lives four levels up (repo root), from file_analyzer/views/go:
 ./repo-reader -source ../../../repository.db -workers 6 -repeat 2
 ./repo-reader -source ../../../repository_schema.sql -workers 4
 ```
@@ -258,10 +258,10 @@ go build -o repo-reader .
 ### Java (JDK 17+)
 
 Needs the SQLite JDBC driver (`org.xerial:sqlite-jdbc`) and its runtime dependency
-`org.slf4j:slf4j-api` — both jars ship alongside the source in `src/views/java`.
+`org.slf4j:slf4j-api` — both jars ship alongside the source in `file_analyzer/views/java`.
 
 ```bash
-cd src/views/java
+cd file_analyzer/views/java
 javac -cp "sqlite-jdbc-3.45.3.0.jar" RepositoryReader.java
 # Windows classpath separator is ';', Unix is ':'
 java -cp ".;sqlite-jdbc-3.45.3.0.jar;slf4j-api-2.0.13.jar" RepositoryReader -source ../../../repository.db -workers 6 -repeat 2   # Windows
@@ -278,7 +278,7 @@ Postgres, a one-shot `loader`, and pgAdmin, loading every artifact the engine
 produced (see the compose file header for usage).
 
 An **optional containerized engine** (compose `engine` profile, Dockerfile `engine`
-stage) *produces* those artifacts by running `python -m src.main` against a mounted
+stage) *produces* those artifacts by running `python -m file_analyzer.main` against a mounted
 source repository — so the whole flow can run in containers:
 
 ```bash
@@ -290,7 +290,7 @@ SOURCE_DIR=/path/to/repo ARTIFACTS_DIR=./artifacts \
 ARTIFACTS_DIR=./artifacts docker compose up --build
 ```
 
-The `engine` service runs `python -m src.main` and accepts **any** of its
+The `engine` service runs `python -m file_analyzer.main` and accepts **any** of its
 arguments. Pass them as one `ENGINE_ARGS` string (shell-split and appended to the
 entrypoint), or inline after the service name:
 
@@ -313,7 +313,7 @@ The views are wired in two ways:
 - **`.sql` dumps** (postgresql dialect) already contain the appended
   `CREATE OR REPLACE VIEW` statements, so `psql` creates them on load.
 - **`.db` artifacts** go through `pgloader`, which copies *tables only*; the loader
-  then applies [`src/views/sql/views.pgsql.sql`](src/views/sql/views.pgsql.sql)
+  then applies [`file_analyzer/views/sql/views.pgsql.sql`](file_analyzer/views/sql/views.pgsql.sql)
   (bind-mounted in) to (re)create the views per database. Views over absent tables
   are skipped, matching the SQLite-side contract.
 
@@ -330,5 +330,5 @@ docker compose --profile reader run --build reader -source /artifacts/some_archi
 
 Licensed under the Apache License, Version 2.0 — see [LICENSE](LICENSE). The
 bundled `sqlite-jdbc` (Apache-2.0) and `slf4j-api` (MIT) jars under
-`src/views/java/` are redistributed under their own licenses; see [NOTICE](NOTICE)
+`file_analyzer/views/java/` are redistributed under their own licenses; see [NOTICE](NOTICE)
 for attribution.

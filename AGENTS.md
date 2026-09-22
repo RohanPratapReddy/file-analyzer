@@ -34,7 +34,7 @@ claude mcp add file-analyzer -- python -m mcp_server
 The server starts fast (it doesn't load the analyzer fleet at import) and warms
 that fleet in a background thread so the first tool call runs at full speed. To
 warm it ahead of time at install/registration (e.g. in a Dockerfile or CI), run
-`python -m mcp_server --precompile` once — it bytecode-compiles `src/`, imports
+`python -m mcp_server --precompile` once — it bytecode-compiles `file_analyzer/`, imports
 the engine, and exits. Disable the background warm-up with `FILE_ANALYZER_MCP_NO_WARM=1`.
 
 Tools exposed:
@@ -59,14 +59,14 @@ Every command prints a **JSON result to stdout**. Pass `--quiet` so stdout is
 
 ```bash
 # Analyze a repo (must be a git repo, or add --no-git). Pure-JSON summary on stdout:
-python -m src.main /path/to/repo --out ./artifacts --quiet
+python -m file_analyzer.main /path/to/repo --out ./artifacts --quiet
 
 # Then query the produced database (the v_* views carry the analysis):
 sqlite3 ./artifacts/repository.db "SELECT * FROM v_extension_distribution;"
 
 # Run one building block and get its tables as JSON:
-python -m src.main /path/to/repo --component PythonAnalyzer --emit py.json --quiet
-python -m src.main --list-components --quiet
+python -m file_analyzer.main /path/to/repo --component PythonAnalyzer --emit py.json --quiet
+python -m file_analyzer.main --list-components --quiet
 ```
 
 Exit codes: `0` success · `1` runtime failure (details on stderr) · `2` bad usage.

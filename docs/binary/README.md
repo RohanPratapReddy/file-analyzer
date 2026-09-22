@@ -1,6 +1,6 @@
 # MachineCodeAnalyzer + BinaryFormatParser — the binary plane
 
-**Package:** `src/binary` · **Imports:** `from src import MachineCodeAnalyzer, BinaryFormatParser, BinaryForensicsAnalyzer` (all re-exported) · **Pipeline stage:** binary deep-parse (step 4c in `AnalysisEngine.run()`; **no `--component`** — controlled by `--no-binary`).
+**Package:** `file_analyzer/binary` · **Imports:** `from file_analyzer import MachineCodeAnalyzer, BinaryFormatParser, BinaryForensicsAnalyzer` (all re-exported) · **Pipeline stage:** binary deep-parse (step 4c in `AnalysisEngine.run()`; **no `--component`** — controlled by `--no-binary`).
 
 ## What it does
 
@@ -59,17 +59,17 @@ deep-parse stage).
 
 There is **no standalone component mode** for this stage. It is **not** in
 `main.py`'s `_SPECIAL_COMPONENTS`, `_PLANE_COMPONENTS`, or
-`_lang_analyzer_registry()` — `python -m src.main --component binary` is not
+`_lang_analyzer_registry()` — `python -m file_analyzer.main --component binary` is not
 valid and it does not appear in `--list-components`. (Note: the component-mode
 `data` / `code` / etc. planes are the Go/Java-driven shard planes; the binary
 plane is a separate post-planes engine stage.) It runs only inside the pipeline:
 
 ```bash
 # binary deep-parse on (default)
-python -m src.main <repo> --out ./artifacts
+python -m file_analyzer.main <repo> --out ./artifacts
 
 # skip the binary stage
-python -m src.main <repo> --out ./artifacts --no-binary
+python -m file_analyzer.main <repo> --out ./artifacts --no-binary
 ```
 
 `AnalysisEngine` invokes it as: gather `mapping["mapping"]` rows whose
@@ -78,7 +78,7 @@ python -m src.main <repo> --out ./artifacts --no-binary
 ### Docker
 
 This stage runs as part of the full pipeline inside the `engine` service
-(compose profile `engine`, entrypoint `python -m src.main`); control it with the
+(compose profile `engine`, entrypoint `python -m file_analyzer.main`); control it with the
 same flag:
 
 ```bash
@@ -97,7 +97,7 @@ written to `/artifacts` (`ARTIFACTS_DIR`).
 ## Python (direct use)
 
 ```python
-from src import MachineCodeAnalyzer, BinaryFormatParser, BinaryForensicsAnalyzer
+from file_analyzer import MachineCodeAnalyzer, BinaryFormatParser, BinaryForensicsAnalyzer
 
 # Deep-parse a set of routed binary rows. `engine` is optional (read for attrs
 # only); files_rows are [{file_id, file_location, analyzer_class}, ...].
@@ -132,7 +132,7 @@ The stage returns the `binary_tables` family (the `--tables-json` /
 
 Children (`binary_sections` / `_symbols` / `_imports` / `_properties`) carry a FK
 to their `binary_index` parent. **No `v_*` views** read these tables —
-`src/views/catalog.py` defines no `binary_*` views, so none are ever created.
+`file_analyzer/views/catalog.py` defines no `binary_*` views, so none are ever created.
 Query the base tables directly.
 
 ## Notes & gotchas

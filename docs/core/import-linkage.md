@@ -1,6 +1,6 @@
 # ImportLinkageAnalyzer — cross-file import & symbol linkage
 
-**Package:** `src/core` · **Import:** `from src import ImportLinkageAnalyzer` · **Component:** `linkage`
+**Package:** `file_analyzer/core` · **Import:** `from file_analyzer import ImportLinkageAnalyzer` · **Component:** `linkage`
 
 ## What it does
 
@@ -44,7 +44,7 @@ Each linkage row contains: `linkage_id`, `import_id`, `import_name`,
 
 ```bash
 # Linkage over previously-emitted code + census tables
-python -m src.main --component linkage --tables-json all_tables.json --emit linkage.json
+python -m file_analyzer.main --component linkage --tables-json all_tables.json --emit linkage.json
 ```
 
 `linkage` takes **no** source census — it reads its inputs from `--tables-json`
@@ -54,7 +54,7 @@ python -m src.main --component linkage --tables-json all_tables.json --emit link
 
 ### Docker (component mode in a container)
 
-The `engine` service runs `python -m src.main`, so pass it the same args. `linkage` reads its inputs from `--tables-json` (place that merged JSON under `/artifacts` too so the container can read it) and emits into `/artifacts`:
+The `engine` service runs `python -m file_analyzer.main`, so pass it the same args. `linkage` reads its inputs from `--tables-json` (place that merged JSON under `/artifacts` too so the container can read it) and emits into `/artifacts`:
 
 ```bash
 docker compose --profile engine run --build engine \
@@ -73,7 +73,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`; outpu
 ### Python
 
 ```python
-from src import ImportLinkageAnalyzer
+from file_analyzer import ImportLinkageAnalyzer
 
 linkage = ImportLinkageAnalyzer(
     repository_tables=(folders, extensions, files),
@@ -92,7 +92,7 @@ linkage = ImportLinkageAnalyzer(
 The `import_linkage` table (produced under the JSON key `import_linkage`;
 `RepositoryDatabaseGenerator` consumes it as `import_linkage_table`). Views that
 read it: `v_import_edges`, `v_import_internal_vs_external` (see
-`src/views/sql/catalog.json`).
+`file_analyzer/views/sql/catalog.json`).
 
 ## How it fits the pipeline
 

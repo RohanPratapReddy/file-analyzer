@@ -15,7 +15,7 @@ mcp[cli]>=1.2,<2         # Model Context Protocol SDK (FastMCP, stdio transport)
 # Multi-agent connectors (DocumentParser Parts B & C -- dynamic agent+code loop
 # and the Part-C LLM-as-judge RAG metrics)
 # =============================================================================
-# src/document/agent_mcp.py speaks to external coding agents / LLM providers
+# file_analyzer/document/agent_mcp.py speaks to external coding agents / LLM providers
 # (Claude Code, Claude/Gemini agents, Gemini CLI, Antigravity desktop, Grok,
 # opencode, DeepSeek, Moonshot Kimi, ...) over TWO transports that need NOTHING
 # beyond the stdlib:
@@ -40,5 +40,5 @@ mcp[cli]>=1.2,<2         # Model Context Protocol SDK (FastMCP, stdio transport)
 # Background monitor tools exposed over MCP
 # =============================================================================
 # mcp_server.py also exposes the repository monitor (start_monitor / stop_monitor
-# / monitor_status / recent_changes / scan_now). That layer (src/monitor/) is
+# / monitor_status / recent_changes / scan_now). That layer (file_analyzer/monitor/) is
 # pure stdlib -- it adds NO dependency here beyond the `mcp[cli]` pin above.

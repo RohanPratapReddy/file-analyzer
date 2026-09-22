@@ -1,8 +1,8 @@
-# `src/core` — the orchestration package
+# `file_analyzer/core` — the orchestration package
 
-`src/core` is the glue that ties the per-domain analyzers together into one
+`file_analyzer/core` is the glue that ties the per-domain analyzers together into one
 repository-analysis pipeline. It holds four classes; the top-level package
-re-exports all of them, so they import flat as `from src import ...`.
+re-exports all of them, so they import flat as `from file_analyzer import ...`.
 
 | class | one-line role | component name | doc |
 |-------|---------------|----------------|-----|
@@ -11,13 +11,13 @@ re-exports all of them, so they import flat as `from src import ...`.
 | `ImportLinkageAnalyzer` | Cross-file import/symbol resolution over the code tables → `import_linkage`. | `linkage` | [import-linkage.md](import-linkage.md) |
 | `RepositoryDatabaseGenerator` | Consumes every `*_tables` family and emits the `.sql` dump (+ builds the `.db`). | `dbgen` / `db` | [db-generator.md](db-generator.md) |
 
-The router package (`src.router`) owns routing and the Go/Java language planes;
-`src/core` owns the orchestration around them.
+The router package (`file_analyzer.router`) owns routing and the Go/Java language planes;
+`file_analyzer/core` owns the orchestration around them.
 
 ## How the four classes chain
 
 ```
-AnalysisEngine.run()          # src/core/analysis_engine.py — the orchestrator
+AnalysisEngine.run()          # file_analyzer/core/analysis_engine.py — the orchestrator
 │
 ├─ 1. RepositoryAnalyzer            census: folders / extensions / files
 │        .generate()               + emit_analyzer_mapping() → temp/mapping.json
@@ -44,17 +44,17 @@ AnalysisEngine.run()          # src/core/analysis_engine.py — the orchestrator
 └─ 6. temp/ cleanup (kept on failure for debugging; removed on success)
 ```
 
-Every stage is also runnable in isolation through `python -m src.main --component
+Every stage is also runnable in isolation through `python -m file_analyzer.main --component
 NAME` (see [../USAGE.md](../USAGE.md)); component mode instantiates these same
 classes directly. The per-component docs each mirror the exact call `main.py`
 makes.
 
 Every stage also runs inside the Docker `engine` service (ENTRYPOINT
-`python -m src.main`) — see the Docker section in each per-doc page below and the
+`python -m file_analyzer.main`) — see the Docker section in each per-doc page below and the
 Docker workflow in [`../../README.md`](../../README.md).
 
 ## See also
 
-- [../USAGE.md](../USAGE.md) — the `python -m src.main` CLI surface (full pipeline + component mode).
+- [../USAGE.md](../USAGE.md) — the `python -m file_analyzer.main` CLI surface (full pipeline + component mode).
 - [`../../README.md`](../../README.md) — project overview, the views layer, the Go/Java readers, and the Docker workflow.
 - The per-class docs listed in the table above.

@@ -1,5 +1,5 @@
 """
-Functional tests for the background repository monitor (src/monitor/).
+Functional tests for the background repository monitor (file_analyzer/monitor/).
 
 Everything here runs on a bare interpreter (pure stdlib + the pure-stdlib analyzer
 core), so it matches the CI runner, which installs only ``.[agent]``. The tests
@@ -21,16 +21,20 @@ from pathlib import Path
 
 import pytest
 
-# Make ``import src`` resolve when pytest is run from the repo root.
+# Make ``import file_analyzer`` resolve when pytest is run from the repo root.
 _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from src.monitor.diff_db import ChangeDiffDatabase  # noqa: E402
-from src.monitor.incremental import IncrementalUpdateEngine  # noqa: E402
-from src.monitor.monitor import RepositoryMonitor  # noqa: E402
-from src.monitor.pool import UpdateWorkerPool, _clamp_workers, _partition  # noqa: E402
-from src.monitor.scanner import Scanner  # noqa: E402
+from file_analyzer.monitor.diff_db import ChangeDiffDatabase  # noqa: E402
+from file_analyzer.monitor.incremental import IncrementalUpdateEngine  # noqa: E402
+from file_analyzer.monitor.monitor import RepositoryMonitor  # noqa: E402
+from file_analyzer.monitor.pool import (  # noqa: E402
+    UpdateWorkerPool,
+    _clamp_workers,
+    _partition,
+)
+from file_analyzer.monitor.scanner import Scanner  # noqa: E402
 
 
 # --------------------------------------------------------------------------- #

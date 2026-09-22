@@ -1,6 +1,6 @@
 # USAGE
 
-`python -m src.main` is the single entry point. It has **two modes**:
+`python -m file_analyzer.main` is the single entry point. It has **two modes**:
 
 1. **Full pipeline** (default) — run the whole `AnalysisEngine` over a repository
    and write the `repository.db` + `repository_schema.sql` artifacts (with the
@@ -12,19 +12,19 @@
 
 ```bash
 # full pipeline
-python -m src.main <source-dir> --out ./artifacts
+python -m file_analyzer.main <source-dir> --out ./artifacts
 
 # component mode
-python -m src.main <source-dir> --component <NAME> --emit out.json
-python -m src.main --list-components          # discover valid component names
+python -m file_analyzer.main <source-dir> --component <NAME> --emit out.json
+python -m file_analyzer.main --list-components          # discover valid component names
 ```
 
-Run it as a module (`python -m src.main …`, from the repo root so `src` imports)
-or by path (`python src/main.py …`; `main.py` bootstraps its own package root, so
+Run it as a module (`python -m file_analyzer.main …`, from the repo root so `file_analyzer` imports)
+or by path (`python file_analyzer/main.py …`; `main.py` bootstraps its own package root, so
 it works from any cwd or inside the container).
 
-> **⚠️ Containment: container or VM only.** `python -m src.main` (and the monitor,
-> `python -m src`) **refuse to run on bare-metal host hardware** — they start only
+> **⚠️ Containment: container or VM only.** `python -m file_analyzer.main` (and the monitor,
+> `python -m file_analyzer`) **refuse to run on bare-metal host hardware** — they start only
 > inside a container (Docker/Podman/containerd/LXC/Kubernetes) or a virtual machine,
 > and otherwise exit with code **3** and a refusal banner on stderr. `--help` is
 > exempt (the check runs after argument parsing), so you can always inspect the flag
@@ -47,8 +47,8 @@ debugging and the process exits non-zero.
 You can run the CLI three ways — all equivalent:
 
 ```bash
-python -m src.main <source-dir> --out ./artifacts     # from the repo root
-python src/main.py <source-dir> --out ./artifacts      # by path, from any cwd
+python -m file_analyzer.main <source-dir> --out ./artifacts     # from the repo root
+python file_analyzer/main.py <source-dir> --out ./artifacts      # by path, from any cwd
 file-analyzer <source-dir> --out ./artifacts           # after `pip install .`
 ```
 
@@ -126,19 +126,19 @@ Each flag turns **off** an optional stage (all stages are on by default).
 
 ```bash
 # Default: analyze the current repo into ./artifacts (sqlite artifacts + views)
-python -m src.main . --out ./artifacts
+python -m file_analyzer.main . --out ./artifacts
 
 # Postgres-loadable dump for the docker loader
-python -m src.main . --out ./artifacts --dialect postgresql
+python -m file_analyzer.main . --out ./artifacts --dialect postgresql
 
 # Analyze a read-only tree in a container; stage under a writable dir
-python -m src.main /workspace --out /artifacts --temp /tmp/staging
+python -m file_analyzer.main /workspace --out /artifacts --temp /tmp/staging
 
 # Non-git tree, code only (skip archives/binary/conversions), 8 workers
-python -m src.main ./src --no-git --no-archives --no-binary --no-conversions --workers 8
+python -m file_analyzer.main ./src --no-git --no-archives --no-binary --no-conversions --workers 8
 
 # Keep it lean: no views, no drop statements
-python -m src.main . --out ./artifacts --no-views --no-drop
+python -m file_analyzer.main . --out ./artifacts --no-views --no-drop
 ```
 
 ---
@@ -149,7 +149,7 @@ Component mode bypasses `AnalysisEngine` and runs a single block. Discover the
 valid names first:
 
 ```bash
-python -m src.main --list-components
+python -m file_analyzer.main --list-components
 ```
 
 which prints three groups: **special** (`census`, `linkage`, `dbgen`), **planes**
@@ -176,7 +176,7 @@ census that feeds every source-scanning component; `--out`, `--db`, `--sql`,
 
 ### The modules, one by one
 
-Each component maps to a public class you can also import directly from `src`.
+Each component maps to a public class you can also import directly from `file_analyzer`.
 The right-hand column names the table family it produces (the same families the
 `v_*` views read).
 
@@ -207,22 +207,22 @@ local ones. If nothing matches, the component emits empty tables and warns.
 
 ```bash
 # Census only, with the file->analyzer mapping and shards
-python -m src.main . --component census --mapping --emit repo_tables.json
+python -m file_analyzer.main . --component census --mapping --emit repo_tables.json
 
 # One language analyzer over just its files
-python -m src.main . --component RustAnalyzer --emit rust.json
-python -m src.main . --component PythonAnalyzer --emit py.json
+python -m file_analyzer.main . --component RustAnalyzer --emit rust.json
+python -m file_analyzer.main . --component PythonAnalyzer --emit py.json
 
 # All code, or a single non-code plane
-python -m src.main . --component code   --emit code.json
-python -m src.main . --component data   --emit data.json
-python -m src.main . --component schema --emit schema.json
+python -m file_analyzer.main . --component code   --emit code.json
+python -m file_analyzer.main . --component data   --emit data.json
+python -m file_analyzer.main . --component schema --emit schema.json
 
 # Linkage over previously-emitted code tables
-python -m src.main --component linkage --tables-json all_tables.json --emit linkage.json
+python -m file_analyzer.main --component linkage --tables-json all_tables.json --emit linkage.json
 
 # Build the .sql (+ .db) from a merged tables JSON
-python -m src.main --component dbgen --tables-json all_tables.json \
+python -m file_analyzer.main --component dbgen --tables-json all_tables.json \
     --build-db --db out.db --sql out.sql --dialect postgresql
 ```
 
@@ -248,20 +248,20 @@ run as a chain — useful when you want to inspect or swap one stage:
 
 ```bash
 # 1. census (+ mapping)
-python -m src.main . --component census --mapping --emit repo.json
+python -m file_analyzer.main . --component census --mapping --emit repo.json
 # 2. run the planes you care about
-python -m src.main . --component code   --emit code.json
-python -m src.main . --component data   --emit data.json
-python -m src.main . --component schema --emit schema.json
+python -m file_analyzer.main . --component code   --emit code.json
+python -m file_analyzer.main . --component data   --emit data.json
+python -m file_analyzer.main . --component schema --emit schema.json
 # 3. merge repo.json/code.json/data.json/schema.json into all_tables.json
 #    (folders/extensions/files + code_tables + *_tables), then linkage:
-python -m src.main --component linkage --tables-json all_tables.json --emit linkage.json
+python -m file_analyzer.main --component linkage --tables-json all_tables.json --emit linkage.json
 # 4. add import_linkage to the merged JSON, then generate the database:
-python -m src.main --component dbgen --tables-json all_tables.json --build-db \
+python -m file_analyzer.main --component dbgen --tables-json all_tables.json --build-db \
     --db repository.db --sql repository_schema.sql
 ```
 
-(The default `python -m src.main .` does all of this in one process, with
+(The default `python -m file_analyzer.main .` does all of this in one process, with
 concurrency and the `v_*` views installed — the manual chain is for when you need
 to see or modify an intermediate stage.)
 
@@ -271,7 +271,7 @@ to see or modify an intermediate stage.)
 
 Everything above works unchanged inside the containerized **`engine`** service
 (compose profile `engine`, Dockerfile `engine` stage). Its entrypoint **is**
-`python -m src.main`, so **any argument in Part 1 or Part 2 is passed through
+`python -m file_analyzer.main`, so **any argument in Part 1 or Part 2 is passed through
 verbatim** — you are running the exact same CLI, just in a container.
 
 ### Mounts and env vars
@@ -326,12 +326,12 @@ docker compose --profile engine run --build engine \
 
 ### The views CLI in the container
 
-The `engine` image also contains `src.views`. Override the entrypoint to run it
+The `engine` image also contains `file_analyzer.views`. Override the entrypoint to run it
 against an artifact already in `/artifacts`:
 
 ```bash
 docker compose --profile engine run --build --entrypoint python engine \
-  -m src.views list /artifacts/repository.db
+  -m file_analyzer.views list /artifacts/repository.db
 ```
 
 ### Full stack (Postgres + loader + pgAdmin)
@@ -349,7 +349,7 @@ ARTIFACTS_DIR=./artifacts docker compose up --build
 ```
 
 See [`../README.md`](../README.md) for the full stack details (the `loader`
-applies `src/views/sql/views.pgsql.sql` after each `.db` load, since `pgloader`
+applies `file_analyzer/views/sql/views.pgsql.sql` after each `.db` load, since `pgloader`
 copies tables only) and [`views/README.md`](views/README.md) for the view layer.
 
 ---
@@ -417,7 +417,7 @@ JSON-RPC stream.
 - [Part 4 — AI agents (MCP)](#part-4--ai-agents-mcp) and [`../AGENTS.md`](../AGENTS.md)
   — drive the engine from Claude/opencode/Cursor/Grok/DeepSeek/… via the MCP server,
   `tools.json`, or the `--quiet` CLI.
-- `python -m src.views --help` — install/list/read the `v_*` analysis views over an
+- `python -m file_analyzer.views --help` — install/list/read the `v_*` analysis views over an
   existing database.
 - `docker compose --profile engine run --build engine --help` — the same
   `main.py` argument surface, containerized (pass args via `ENGINE_ARGS`).
@@ -425,5 +425,5 @@ JSON-RPC stream.
   on bare metal, what counts as a container/VM, and the `FILE_ANALYZER_ALLOW_BARE_METAL`
   override.
 - [`monitor.md`](monitor.md) — the always-on background monitor
-  (`python -m src monitor`): incremental re-analysis, durable change log, worker
+  (`python -m file_analyzer monitor`): incremental re-analysis, durable change log, worker
   pool, and the soft MCP agent tier.

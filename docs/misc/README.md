@@ -1,13 +1,13 @@
 # MiscAnalyzer — the terminal (long-tail) plane
 
-**Package:** `src/misc` · **Import:** `from src import MiscAnalyzer` · **Component:** `misc`
+**Package:** `file_analyzer/misc` · **Import:** `from file_analyzer import MiscAnalyzer` · **Component:** `misc`
 
 ## What it does
 `MiscAnalyzer` is the parent/super-class of the terminal `misc` analysis plane.
 Every extension that survives all higher-priority planes (code / schema /
 database / archive / binary / data / config / text / markup / document) and is
 still a *structured, parseable* text format is dispatched to its own child parser
-class (in `src/misc/parsers.py`, each a `MiscTypeParser` subclass), and the
+class (in `file_analyzer/misc/parsers.py`, each a `MiscTypeParser` subclass), and the
 resulting real, structure-aware profile is flattened into normalized `misc_*`
 tables in the shape `document → sections → records → fields (+ file-level
 properties)`:
@@ -40,12 +40,12 @@ These are the last long-tail formats; exact membership comes from `misc_formats`
 ## Run it standalone
 ### CLI (component mode)
 ```bash
-python -m src.main . --component misc --emit misc.json
+python -m file_analyzer.main . --component misc --emit misc.json
 ```
 
 ### Docker (component mode in a container)
 
-The `engine` service runs `python -m src.main`, so pass it the same args (emit into `/artifacts` so the JSON lands on the host):
+The `engine` service runs `python -m file_analyzer.main`, so pass it the same args (emit into `/artifacts` so the JSON lands on the host):
 
 ```bash
 docker compose --profile engine run --build engine \
@@ -63,7 +63,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`.
 
 ### Python
 ```python
-from src import MiscAnalyzer
+from file_analyzer import MiscAnalyzer
 eng = MiscAnalyzer(file_paths=[...], dump_file_type="memory")
 tables = eng.analyze()
 # non-code plane: also rewrite local ids -> repository ids and build the index
@@ -99,7 +99,7 @@ Together these are the `misc_tables` family consumed by
 `RepositoryDatabaseGenerator` (`misc_tables=` argument).
 
 ## How it fits the pipeline (routing id; link_repository step)
-Routing id is `misc`. In `src/router/routing.py`, `resolve_analyzer` checks
+Routing id is `misc`. In `file_analyzer/router/routing.py`, `resolve_analyzer` checks
 `misc` **last** of all planes; its suffix set already subtracts every other
 plane, so only extensions that no earlier plane claimed route here. As a non-code
 plane it runs `link_repository((folders, extensions, files), paths)` after
@@ -111,7 +111,7 @@ plane it runs `link_repository((folders, extensions, files), paths)` after
 - **Wiring requires the class in `group_into_shards`.** Routing correctly returns
   `"misc"` for these files, but the per-shard fan-out only materializes shards for
   the classes listed in the `for cls in (...)` tuple inside `group_into_shards`
-  (`src/router/routing.py`). `"misc"` is present in that tuple today — if it is
+  (`file_analyzer/router/routing.py`). `"misc"` is present in that tuple today — if it is
   ever dropped, the shard never runs and the `misc_*` tables come back missing even
   though routing looks correct.
 - `misc_file_index` uses the id prefix `mfi_id` — the same prefix name the markup
@@ -119,7 +119,7 @@ plane it runs `link_repository((folders, extensions, files), paths)` after
 - One bad file never aborts the batch — parse/emit failures are caught, warned,
   and skipped; a binary payload under one of these extensions degrades to an
   honest forensic profile.
-- No `v_*` analysis views are defined for this plane; `src/views/catalog.py`
+- No `v_*` analysis views are defined for this plane; `file_analyzer/views/catalog.py`
   covers only the core/schema/data view families (no `v_misc_*` view).
 
 ## See also — [../USAGE.md](../USAGE.md)

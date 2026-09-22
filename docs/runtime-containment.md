@@ -6,7 +6,7 @@ LXC / Kubernetes) or a **virtual machine**. When neither is detected, the proces
 writes a refusal banner to stderr and exits with code **`3`**.
 
 This is a real, evidence-based, stdlib-only check — no stubs. It lives in
-[`src/core/runtime_guard.py`](../src/core/runtime_guard.py) and is enforced at the
+[`file_analyzer/core/runtime_guard.py`](../file_analyzer/core/runtime_guard.py) and is enforced at the
 start of both entrypoints.
 
 ## Why
@@ -22,8 +22,8 @@ on top of that.
 
 | Entrypoint | Command forms | Guarded |
 |------------|---------------|:-------:|
-| Full pipeline | `python -m src.main …`, `python src/main.py …`, `file-analyzer …` | ✅ |
-| Background monitor | `python -m src …`, `file-analyzer-monitor …` | ✅ |
+| Full pipeline | `python -m file_analyzer.main …`, `python file_analyzer/main.py …`, `file-analyzer …` | ✅ |
+| Background monitor | `python -m file_analyzer …`, `file-analyzer-monitor …` | ✅ |
 | MCP server | `python -m mcp_server`, `file-analyzer-mcp` | ❌ (not guarded) |
 
 `--help` is **always exempt**: the guard runs *after* argument parsing, so you can
@@ -71,13 +71,13 @@ variable to bypass the guard:
 
 ```bash
 export FILE_ANALYZER_ALLOW_BARE_METAL=1     # also accepts true / yes / on (any case)
-python -m src.main . --out ./artifacts
+python -m file_analyzer.main . --out ./artifacts
 ```
 
 The bypass is **explicit and logged** — a one-line notice goes to stderr:
 
 ```
-[runtime-guard] FILE_ANALYZER_ALLOW_BARE_METAL set -- bypassing the bare-metal guard (src.main).
+[runtime-guard] FILE_ANALYZER_ALLOW_BARE_METAL set -- bypassing the bare-metal guard (file_analyzer.main).
 ```
 
 ## What refusal looks like
@@ -97,7 +97,7 @@ On bare metal without the override, stderr shows:
 
  Run it in one of these instead, for example:
    docker compose run --rm analyzer <args>
-   docker run --rm -v "$PWD:/work" -w /work <image> python -m src.main ...
+   docker run --rm -v "$PWD:/work" -w /work <image> python -m file_analyzer.main ...
 
  Deliberate override (already-isolated bare-metal box only): set
  FILE_ANALYZER_ALLOW_BARE_METAL=1
@@ -119,7 +119,7 @@ SOURCE_DIR=/path/to/repo ARTIFACTS_DIR=./artifacts \
 
 # or a plain docker run
 docker run --rm -v "$PWD:/work" -w /work file-analyzer \
-  python -m src.main /work --out /work/artifacts --quiet
+  python -m file_analyzer.main /work --out /work/artifacts --quiet
 ```
 
 Any VM (VMware, VirtualBox, KVM/QEMU, Hyper-V guest, a cloud instance such as EC2 /
@@ -127,12 +127,12 @@ GCE, WSL2, …) also satisfies the guard with no extra flags.
 
 ## Programmatic use
 
-Importing the `src` package as a library does **not** trigger the guard — only the
-CLI entrypoints (`src.main:run` and `src.__main__:main`) enforce it. Library callers
+Importing the `file_analyzer` package as a library does **not** trigger the guard — only the
+CLI entrypoints (`file_analyzer.main:run` and `file_analyzer.__main__:main`) enforce it. Library callers
 that want the same policy can call it explicitly:
 
 ```python
-from src.core.runtime_guard import require_virtualized, inspect_environment
+from file_analyzer.core.runtime_guard import require_virtualized, inspect_environment
 
 info = inspect_environment()          # inspect without enforcing
 require_virtualized(context="my-app") # enforce: returns info, or SystemExit(3)

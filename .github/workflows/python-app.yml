@@ -45,14 +45,14 @@ jobs:
       - name: Lint with flake8
         run: |
           # Fail only on real errors: syntax errors / undefined names.
-          flake8 src mcp_server.py --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 file_analyzer mcp_server.py --count --select=E9,F63,F7,F82 --show-source --statistics
           # Everything else is advisory (never fails the build).
-          flake8 src mcp_server.py --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+          flake8 file_analyzer mcp_server.py --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
       - name: Smoke-test the engine
         run: |
           python -m mcp_server --precompile
-          python -m src.main --list-components --quiet
+          python -m file_analyzer.main --list-components --quiet
 
       - name: Test with pytest
         run: |

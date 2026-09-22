@@ -1,5 +1,5 @@
 """
-Tests for the monitor's on/off toggles wired through ``python -m src``:
+Tests for the monitor's on/off toggles wired through ``python -m file_analyzer``:
 
 * ``--change-log`` / ``--no-change-log`` -- the durable append-only change log;
 * ``--agents`` / ``--no-agents`` (+ include/exclude/roster/discover) -- the soft
@@ -20,9 +20,9 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from src.__main__ import _split_names, build_parser  # noqa: E402
-from src.monitor.incremental import IncrementalUpdateEngine  # noqa: E402
-from src.monitor.monitor import RepositoryMonitor  # noqa: E402
+from file_analyzer.__main__ import _split_names, build_parser  # noqa: E402
+from file_analyzer.monitor.incremental import IncrementalUpdateEngine  # noqa: E402
+from file_analyzer.monitor.monitor import RepositoryMonitor  # noqa: E402
 
 
 # --------------------------------------------------------------------------- #

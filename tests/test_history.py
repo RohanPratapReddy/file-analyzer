@@ -18,18 +18,18 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-# Make ``import src`` resolve when pytest is run from the repo root.
+# Make ``import file_analyzer`` resolve when pytest is run from the repo root.
 _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from src.monitor.change_log import ChangeLogStore  # noqa: E402
-from src.monitor.monitor import RepositoryMonitor  # noqa: E402
-from src.monitor.session_log import (  # noqa: E402
+from file_analyzer.monitor.change_log import ChangeLogStore  # noqa: E402
+from file_analyzer.monitor.monitor import RepositoryMonitor  # noqa: E402
+from file_analyzer.monitor.session_log import (  # noqa: E402
     SessionSummaryStore,
     classify_sentiment,
 )
-from src.monitor.store import (  # noqa: E402
+from file_analyzer.monitor.store import (  # noqa: E402
     DIALECT_MYSQL,
     DIALECT_POSTGRES,
     DIALECT_SQLITE,
@@ -156,7 +156,10 @@ def test_session_record_and_assess_from_next_prompt(tmp_path):
         sid = store.record_session(
             task_given="add a logging db dump",
             work_done="added change_log.py + session_log.py",
-            files_changed=["src/monitor/change_log.py", "src/monitor/session_log.py"],
+            files_changed=[
+                "file_analyzer/monitor/change_log.py",
+                "file_analyzer/monitor/session_log.py",
+            ],
             improvements="Wire remote drivers. Add tests. Verify CI on Linux.",
         )
         row = store.get_session(sid)

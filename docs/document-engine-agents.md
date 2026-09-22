@@ -3,7 +3,7 @@
 The DocumentParser dynamic layer (Part B — the agent proposes, code validates,
 errors are fed back, the agent repairs) and the Part-C LLM-as-judge RAG metrics
 both talk to external coding agents and LLM/VLM backends through one connector
-module: [`src/document/agent_mcp.py`](../src/document/agent_mcp.py).
+module: [`file_analyzer/document/agent_mcp.py`](../file_analyzer/document/agent_mcp.py).
 
 Everything here is built on the **standard library** (`urllib`, `subprocess`,
 `threading`, `json`). The only optional dependency is `mcp[cli]` — and even that
@@ -127,7 +127,7 @@ configured agents.
 ## Usage sketch
 
 ```python
-from src.document.agent_mcp import AgentRegistry
+from file_analyzer.document.agent_mcp import AgentRegistry
 
 reg = AgentRegistry(discover=True)          # built-ins + desktop-configured MCP
 print(reg.available())                       # honestly reachable right now

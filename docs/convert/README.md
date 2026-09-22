@@ -1,6 +1,6 @@
 # FormatConverter (+ TextAnalyzer) — the conversion helpers
 
-**Package:** `src/convert` · **Imports:** `from src import FormatConverter, TextAnalyzer` (both re-exported) · **Pipeline stage:** renderable transcoding (step 4d in `AnalysisEngine.run()`; **no `--component`** — controlled by `--no-conversions` / `--no-conversion-analysis` / `--conversions-dir`).
+**Package:** `file_analyzer/convert` · **Imports:** `from file_analyzer import FormatConverter, TextAnalyzer` (both re-exported) · **Pipeline stage:** renderable transcoding (step 4d in `AnalysisEngine.run()`; **no `--component`** — controlled by `--no-conversions` / `--no-conversion-analysis` / `--conversions-dir`).
 
 ## What it does
 
@@ -61,18 +61,18 @@ Controlling flags:
 There is **no standalone component mode** for this stage. Neither
 `FormatConverter` nor `TextAnalyzer` is in `main.py`'s `_SPECIAL_COMPONENTS`,
 `_PLANE_COMPONENTS`, or `_lang_analyzer_registry()`, so
-`python -m src.main --component convert` is not valid and it does not appear in
+`python -m file_analyzer.main --component convert` is not valid and it does not appear in
 `--list-components`. It runs only inside the pipeline:
 
 ```bash
 # transcode + analyze (default), custom output dir
-python -m src.main <repo> --out ./artifacts --conversions-dir ./artifacts/renderable
+python -m file_analyzer.main <repo> --out ./artifacts --conversions-dir ./artifacts/renderable
 
 # transcode but do not deep-parse the rendered artifacts
-python -m src.main <repo> --out ./artifacts --no-conversion-analysis
+python -m file_analyzer.main <repo> --out ./artifacts --no-conversion-analysis
 
 # skip conversions entirely
-python -m src.main <repo> --out ./artifacts --no-conversions
+python -m file_analyzer.main <repo> --out ./artifacts --no-conversions
 ```
 
 `AnalysisEngine` attempts every censused file with a renderable route
@@ -84,7 +84,7 @@ recorded, never breaking an otherwise-successful run.
 ### Docker
 
 This stage runs as part of the full pipeline inside the `engine` service
-(compose profile `engine`, entrypoint `python -m src.main`); control it with the
+(compose profile `engine`, entrypoint `python -m file_analyzer.main`); control it with the
 same flags:
 
 ```bash
@@ -107,7 +107,7 @@ written to `/artifacts` (`ARTIFACTS_DIR`). Keep `--conversions-dir` under
 ## Python (direct use)
 
 ```python
-from src import FormatConverter, TextAnalyzer
+from file_analyzer import FormatConverter, TextAnalyzer
 
 conv = FormatConverter(allow_external=True)      # allow_external=False = hermetic
 conv.target_for("legacy.pcx")                    # -> "png" (or None)
@@ -140,7 +140,7 @@ The stage feeds the `conversion_tables` family (the `--tables-json` /
   outcomes are logged as `not_analyzed`. Analyzable targets:
   `ANALYZABLE_TARGETS = {png, wav, mp4, pdf, txt, gif, html, htm}`.
 
-**No `v_*` views** read these tables — `src/views/catalog.py` defines no
+**No `v_*` views** read these tables — `file_analyzer/views/catalog.py` defines no
 `conversion_*` / `format_conversions` views, so none are ever created. Query the
 base tables directly.
 

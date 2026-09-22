@@ -1,5 +1,5 @@
 """
-Tests for the bare-metal containment guard (``src/core/runtime_guard.py``).
+Tests for the bare-metal containment guard (``file_analyzer/core/runtime_guard.py``).
 
 The CLI entrypoints must run only inside a container or a VM. These tests pin the
 *enforcement contract* independently of the machine the suite happens to run on
@@ -20,7 +20,7 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from src.core import runtime_guard as rg  # noqa: E402
+from file_analyzer.core import runtime_guard as rg  # noqa: E402
 
 
 def _bare_metal(monkeypatch):
@@ -91,7 +91,7 @@ def test_allows_in_vm(monkeypatch):
 def test_cli_run_refuses_on_bare_metal(monkeypatch, capsys):
     """The main.py entrypoint itself refuses before doing any work."""
     _bare_metal(monkeypatch)
-    from src.main import run
+    from file_analyzer.main import run
 
     with pytest.raises(SystemExit) as excinfo:
         run(["--list-components"])
@@ -104,6 +104,6 @@ def test_cli_run_allowed_when_virtualized(monkeypatch):
     monkeypatch.delenv(rg.OVERRIDE_ENV, raising=False)
     monkeypatch.setattr(rg, "detect_container", lambda: ("docker", ["x"]))
     monkeypatch.setattr(rg, "detect_virtual_machine", lambda: (None, []))
-    from src.main import run
+    from file_analyzer.main import run
 
     assert run(["--list-components"]) == 0

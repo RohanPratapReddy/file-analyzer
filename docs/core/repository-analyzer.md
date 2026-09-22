@@ -1,6 +1,6 @@
 # RepositoryAnalyzer — the repository file census
 
-**Package:** `src/core` · **Import:** `from src import RepositoryAnalyzer` · **Component:** `census` / `repo`
+**Package:** `file_analyzer/core` · **Import:** `from file_analyzer import RepositoryAnalyzer` · **Component:** `census` / `repo`
 
 ## What it does
 
@@ -27,7 +27,7 @@ contents.
 | `exclude_file_signatures` | `None` → `[]` | File-name exclude signatures (same matching). |
 | `ignore_files` | `None` → `[]` | Exact file names to skip. |
 | `ignore_dirs` | `None` → `['__pycache__', '.git', '.venv', 'venv', 'env', '.pytest_cache']` | Directory names to skip. **Passing a value replaces the default set entirely** (only applied when `git_tracked=False`, i.e. the `os.walk` path). |
-| `extension_catalog_path` | `None` → `src/extention-table/file_extensions.json` | Path to the authoritative extension-id catalog. |
+| `extension_catalog_path` | `None` → `file_analyzer/extention-table/file_extensions.json` | Path to the authoritative extension-id catalog. |
 | `extension_catalog` | `None` | An explicit `{extension_name: extension_id}` map that wins over the on-disk catalog. |
 
 ## Key methods
@@ -35,7 +35,7 @@ contents.
 | method | returns | notes |
 |--------|---------|-------|
 | `generate()` | `Optional[Tuple[folders, extensions, files]]` | Gathers → filters → builds tables → exports. Returns `None` if git gathering failed (not a git repo). Also stashes `self.folders/.extensions/.files`. |
-| `build_analyzer_mapping()` | `List[dict]` | One `{file_id, file_location, analyzer_class}` row per file (via `src.router.routing.build_mapping`). Requires `generate()` first; files no engine claims get `analyzer_class: None`. |
+| `build_analyzer_mapping()` | `List[dict]` | One `{file_id, file_location, analyzer_class}` row per file (via `file_analyzer.router.routing.build_mapping`). Requires `generate()` first; files no engine claims get `analyzer_class: None`. |
 | `emit_analyzer_mapping(temp_dir)` | `Path` | Writes `temp/mapping.json` (mapping + per-class `shards`) and `temp/repo_tables.json` (folders/extensions/files) for the Go/Java planes. Returns the temp dir. |
 
 ## Run it standalone
@@ -44,10 +44,10 @@ contents.
 
 ```bash
 # Census only
-python -m src.main . --component census --emit repo_tables.json
+python -m file_analyzer.main . --component census --emit repo_tables.json
 
 # Census + the file->analyzer mapping and per-class shards
-python -m src.main . --component census --mapping --emit repo_tables.json
+python -m file_analyzer.main . --component census --mapping --emit repo_tables.json
 ```
 
 `--mapping` additionally emits `mapping` and `shards` keys (via
@@ -55,7 +55,7 @@ python -m src.main . --component census --mapping --emit repo_tables.json
 
 ### Docker (component mode in a container)
 
-The `engine` service runs `python -m src.main`, so pass it the same args (emit into `/artifacts` so the JSON lands on the host):
+The `engine` service runs `python -m file_analyzer.main`, so pass it the same args (emit into `/artifacts` so the JSON lands on the host):
 
 ```bash
 docker compose --profile engine run --build engine \
@@ -74,7 +74,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`; outpu
 ### Python
 
 ```python
-from src import RepositoryAnalyzer
+from file_analyzer import RepositoryAnalyzer
 
 repo = RepositoryAnalyzer(
     dir_path=".",
@@ -101,7 +101,7 @@ Three table families (the same the `v_*` file/extension/folder views read):
 | `files` | `file_id`, `file_name`, `file_extension_id`, `size`, `units`, `location` (list of folder ids, root-first), `created_at_ts64`, `modified_at_ts64` |
 
 Views that read these: `v_file_inventory`, `v_extension_distribution`,
-`v_folder_tree_depth` (see `src/views/sql/catalog.json`).
+`v_folder_tree_depth` (see `file_analyzer/views/sql/catalog.json`).
 
 ## How it fits the pipeline
 
@@ -131,7 +131,7 @@ router planes, and the three tables become `folder_tables` for
   file is gone or the epoch is unrepresentable (never fabricated). Use
   `unpack_timestamp64` to decode.
 - **The 9-bit `tz_id` in each timestamp is a foreign key into the IANA timezone
-  tables** in [`src/tables/`](../../src/tables), built verbatim from the IANA tz
+  tables** in [`file_analyzer/tables/`](../../file_analyzer/tables), built verbatim from the IANA tz
   database (data.iana.org):
   - `iana_local_timezones.json` (used when the `local_tz` flag = **1**) — the
     comprehensive per-zone catalog: one row per real IANA canonical zone

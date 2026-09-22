@@ -9,11 +9,11 @@ Third-party components redistributed with this project
 --------------------------------------------------------------------------------
 
 This distribution bundles the following third-party binary artifacts under
-`src/views/java/`. They are the property of their respective owners and are
+`file_analyzer/views/java/`. They are the property of their respective owners and are
 redistributed here under their own licenses, which are unchanged by this project.
 
 1. SQLite JDBC Driver (sqlite-jdbc)
-   File:     src/views/java/sqlite-jdbc-3.45.3.0.jar
+   File:     file_analyzer/views/java/sqlite-jdbc-3.45.3.0.jar
    Project:  https://github.com/xerial/sqlite-jdbc
    License:  Apache License, Version 2.0
              https://www.apache.org/licenses/LICENSE-2.0
@@ -21,7 +21,7 @@ redistributed here under their own licenses, which are unchanged by this project
    public-domain SQLite library (https://www.sqlite.org/copyright.html).
 
 2. SLF4J API (slf4j-api)
-   File:     src/views/java/slf4j-api-2.0.13.jar
+   File:     file_analyzer/views/java/slf4j-api-2.0.13.jar
    Project:  https://www.slf4j.org/
    License:  MIT License
              https://www.slf4j.org/license.html

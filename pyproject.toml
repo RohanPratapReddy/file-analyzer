@@ -4,8 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "file-analyzer"
-# Version is the single source of truth in src/_version.py, read statically by
-# setuptools (see [tool.setuptools.dynamic] below). Bump it there for a release.
+# Version is the single source of truth in file_analyzer/_version.py, read
+# statically by setuptools (see [tool.setuptools.dynamic] below). Bump it there
+# for a release.
 dynamic = ["version"]
 description = "Repository intelligence platform: turns a source tree into a queryable SQLite/PostgreSQL database of code, schemas, data, archives, binaries and docs -- without executing it -- plus a live background monitor, an MCP agent-enrichment tier, and a document-intelligence engine."
 readme = "README.md"
@@ -30,17 +31,18 @@ dependencies = []
 # AI-agent integration: the MCP server (python -m mcp_server). Pinned to mcp 1.x
 # -- the server uses the v1 FastMCP API, which 2.x renamed/changed (FastMCP ->
 # MCPServer in mcp.server.mcpserver). This same pin also powers the DocumentParser
-# Part-B/C multi-agent connectors (src/document/agent_mcp.py) over MCP stdio; the
-# HTTP transport and native vendor SDKs are documented in requirements-agent.txt.
+# Part-B/C multi-agent connectors (file_analyzer/document/agent_mcp.py) over MCP
+# stdio; the HTTP transport and native vendor SDKs are documented in
+# requirements-agent.txt.
 agent = ["mcp[cli]>=1.2,<2"]
 
 # Remote database backends for the monitor's durable dumps (the continuous change
-# log + the session-summary dump, src/monitor/change_log.py + session_log.py).
-# OPTIONAL and remote-only: both dumps default to a local SQLite file (pure
-# stdlib, nothing to install). Install one of these ONLY to point a dump at a
-# remote server via a connection URL (postgresql://... / mysql://...). The
-# drivers are imported lazily inside src/monitor/store.py, so the core stays
-# stdlib-at-import even with these uninstalled.
+# log + the session-summary dump, file_analyzer/monitor/change_log.py +
+# session_log.py). OPTIONAL and remote-only: both dumps default to a local SQLite
+# file (pure stdlib, nothing to install). Install one of these ONLY to point a
+# dump at a remote server via a connection URL (postgresql://... / mysql://...).
+# The drivers are imported lazily inside file_analyzer/monitor/store.py, so the
+# core stays stdlib-at-import even with these uninstalled.
 monitor-postgres = ["psycopg[binary]>=3.1"]
 monitor-mysql = ["PyMySQL>=1.1"]
 
@@ -116,49 +118,52 @@ line_length = 88
 [project.scripts]
 # Invoke from anywhere, no `python -m` and no specific cwd:
 #     file-analyzer /path/to/repo --out ./artifacts --quiet
-file-analyzer = "src.main:run"
+file-analyzer = "file_analyzer.main:run"
 #     file-analyzer-mcp        # start the MCP server over stdio
 file-analyzer-mcp = "mcp_server:main"
 #     file-analyzer-monitor /path/to/repo --interval 2   # background monitor
-file-analyzer-monitor = "src.__main__:main"
+file-analyzer-monitor = "file_analyzer.__main__:main"
 #
-# Runtime containment: the two CLI entrypoints above (`file-analyzer` / `src.main`
-# and `file-analyzer-monitor` / `python -m src`) REFUSE to run on bare-metal host
-# hardware -- they only start inside a container (Docker/Podman/containerd/LXC/
-# Kubernetes) or a virtual machine. The check is real, stdlib-only, and lives in
-# src/core/runtime_guard.py; it runs after argument parsing (so `--help` still
-# works anywhere) and exits with code 3 on refusal. Deliberate opt-out for an
-# already-isolated bare-metal box: set FILE_ANALYZER_ALLOW_BARE_METAL=1. The MCP
-# server (`file-analyzer-mcp`) is unaffected. See docs/runtime-containment.md.
+# Runtime containment: the two CLI entrypoints above (`file-analyzer` /
+# `file_analyzer.main` and `file-analyzer-monitor` / `python -m file_analyzer`)
+# REFUSE to run on bare-metal host hardware -- they only start inside a container
+# (Docker/Podman/containerd/LXC/Kubernetes) or a virtual machine. The check is
+# real, stdlib-only, and lives in file_analyzer/core/runtime_guard.py; it runs
+# after argument parsing (so `--help` still works anywhere) and exits with code 3
+# on refusal. Deliberate opt-out for an already-isolated bare-metal box: set
+# FILE_ANALYZER_ALLOW_BARE_METAL=1. The MCP server (`file-analyzer-mcp`) is
+# unaffected. See docs/runtime-containment.md.
 
-# The package is literally named `src` (the existing public API is `from src
-# import ...`); ship it and its subpackages. The Go/Java reader/plane trees have
-# no __init__.py (they are not importable Python), so they are not picked up as
-# packages here -- they travel as package-data instead (see below) so the
-# build-on-demand `go build` / `javac` fast paths work from an installed wheel.
-# Read the version from src/_version.py at build time. The module holds only a
-# literal assignment, so setuptools extracts it by AST parsing WITHOUT importing
-# the `src` package (no analyzer-fleet import during the build).
+# Ship the `file_analyzer` package and its subpackages. The Go/Java reader/plane
+# trees have no __init__.py (they are not importable Python), so they are not
+# picked up as packages here -- they travel as package-data instead (see below)
+# so the build-on-demand `go build` / `javac` fast paths work from an installed
+# wheel.
+# Read the version from file_analyzer/_version.py at build time. The module holds
+# only a literal assignment, so setuptools extracts it by AST parsing WITHOUT
+# importing the `file_analyzer` package (no analyzer-fleet import during build).
 [tool.setuptools.dynamic]
-version = { attr = "src._version.__version__" }
+version = { attr = "file_analyzer._version.__version__" }
 
 [tool.setuptools.packages.find]
-include = ["src*"]
+include = ["file_analyzer*"]
 
 # The MCP server lives at the repository root (a top-level module, not part of
-# the `src` package) so that importing it does not pull in `src/__init__.py` and
-# the whole analyzer fleet -- keeping server startup fast. It must still ship in
-# the wheel, so declare it as a standalone module.
+# the `file_analyzer` package) so that importing it does not pull in
+# file_analyzer/__init__.py and the whole analyzer fleet -- keeping server
+# startup fast. It must still ship in the wheel, so declare it as a standalone
+# module.
 [tool.setuptools]
 py-modules = ["mcp_server"]
 
 # Non-package data dirs are located at runtime via __file__ paths, so they must
 # travel inside the wheel: the extension catalog + IANA timezone tables, the
 # analysis-view SQL/JSON artifacts, and the Go/Java source trees + JDBC jars that
-# the plane runner (src.router) and the view readers (src.views) build on demand.
+# the plane runner (file_analyzer.router) and the view readers (file_analyzer.views)
+# build on demand.
 [tool.setuptools.package-data]
-"src" = ["tables/*.json"]
-"src.views" = [
+"file_analyzer" = ["tables/*.json"]
+"file_analyzer.views" = [
     "sql/*.json",
     "sql/*.sql",
     "go/*.go",
@@ -167,7 +172,7 @@ py-modules = ["mcp_server"]
     "java/*.java",
     "java/*.jar",
 ]
-"src.router" = [
+"file_analyzer.router" = [
     "go/*.go",
     "go/go.mod",
     "java/*.java",
@@ -175,7 +180,7 @@ py-modules = ["mcp_server"]
 # The background monitor ships its own Go worker-pool source so the same
 # build-on-demand `go build` fast path works from an installed wheel; the
 # Python fallback pool needs nothing extra.
-"src.monitor" = [
+"file_analyzer.monitor" = [
     "go/*.go",
     "go/go.mod",
 ]

@@ -1,13 +1,13 @@
-# Background monitor — `python -m src monitor`
+# Background monitor — `python -m file_analyzer monitor`
 
 Beyond the one-shot pipeline, `file-analyzer` ships a **long-running background
 monitor** that watches a repository, records recent changes, and re-analyzes
 changed files incrementally as agents / users / tools touch them.
 
 ```bash
-python -m src monitor <repo> [flags]        # module form (from the repo root)
+python -m file_analyzer monitor <repo> [flags]        # module form (from the repo root)
 file-analyzer-monitor <repo> [flags]         # after `pip install .`
-python -m src <repo>                          # 'monitor' is the default subcommand
+python -m file_analyzer <repo>                          # 'monitor' is the default subcommand
 ```
 
 > **⚠️ Container / VM only.** Like the main CLI, the monitor **refuses to run on
@@ -95,14 +95,14 @@ deterministic re-analysis is untouched.
 ## Examples
 
 ```bash
-python -m src monitor .                          # watch the cwd, 2s cadence
-python -m src monitor /repo --interval 1         # faster cadence
-python -m src monitor /repo --once               # one scan cycle, then exit (JSON)
-python -m src monitor /repo --max-workers 200 --min-workers 20
-python -m src monitor /repo --no-go              # force the Python fallback pool
-python -m src monitor /repo --no-change-log      # FIFO ring only (no durable log)
-python -m src monitor /repo --agents             # enrich each change via MCP agents
-python -m src monitor /repo --agents --agents-include claude,gpt --agent-roster claude
+python -m file_analyzer monitor .                          # watch the cwd, 2s cadence
+python -m file_analyzer monitor /repo --interval 1         # faster cadence
+python -m file_analyzer monitor /repo --once               # one scan cycle, then exit (JSON)
+python -m file_analyzer monitor /repo --max-workers 200 --min-workers 20
+python -m file_analyzer monitor /repo --no-go              # force the Python fallback pool
+python -m file_analyzer monitor /repo --no-change-log      # FIFO ring only (no durable log)
+python -m file_analyzer monitor /repo --agents             # enrich each change via MCP agents
+python -m file_analyzer monitor /repo --agents --agents-include claude,gpt --agent-roster claude
 ```
 
 ## In Docker (compose `monitor` profile)

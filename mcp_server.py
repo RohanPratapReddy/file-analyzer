@@ -1,7 +1,7 @@
 """
 file-analyzer MCP server -- expose the analysis engine to AI agents.
 
-This wraps the same in-process engine the CLI drives (``src.core.AnalysisEngine``
+This wraps the same in-process engine the CLI drives (``file_analyzer.core.AnalysisEngine``
 and the ``--component`` building blocks) behind the Model Context Protocol, so any
 MCP-speaking agent (Claude Code/Desktop, opencode, Cursor, Cline, Windsurf,
 Antigravity, ...) can:
@@ -26,15 +26,15 @@ Register it with an agent, e.g. Claude Code:
 
 Requires the MCP SDK:  pip install "mcp[cli]"
 
-This module deliberately sits at the repository root rather than under ``src``:
-importing anything inside the ``src`` package runs ``src/__init__.py``, which
+This module deliberately sits at the repository root rather than under ``file_analyzer``:
+importing anything inside the ``file_analyzer`` package runs ``file_analyzer/__init__.py``, which
 eagerly loads the whole analyzer fleet (~360 ms). Keeping the server outside the
 package lets the stdio handshake come up fast and defers that cost to the first
 tool call that actually needs the engine.
 
 To avoid paying that ~360 ms on the *first* tool call, ``main()`` fires a
 background warm-up thread (:func:`warm_cache`) at startup that bytecode-compiles
-``src/`` and imports the fleet while the agent is still handshaking. Set
+``file_analyzer/`` and imports the fleet while the agent is still handshaking. Set
 ``FILE_ANALYZER_MCP_NO_WARM=1`` to disable it, or run the one-shot
 
     python -m mcp_server --precompile      # compile + import, then exit
@@ -63,31 +63,31 @@ import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-# This module lives at the repository root (NOT inside the ``src`` package) so
-# that importing it does not trigger ``src/__init__.py`` -- see the note below.
-# Make ``import src`` resolve no matter how this module was launched.
+# This module lives at the repository root (NOT inside the ``file_analyzer`` package) so
+# that importing it does not trigger ``file_analyzer/__init__.py`` -- see the note below.
+# Make ``import file_analyzer`` resolve no matter how this module was launched.
 _READERS_ROOT = Path(__file__).resolve().parent
 if str(_READERS_ROOT) not in sys.path:
     sys.path.insert(0, str(_READERS_ROOT))
 
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
-# NOTE: the views layer (``src.views``) is imported lazily, inside the tools that
-# need it -- see ``_views()`` below. Importing anything under ``src`` runs
-# ``src/__init__.py``, which eagerly loads the entire analyzer fleet (~360 ms,
-# dominated by src.prog_lang). None of that is needed to stand the server up, so
+# NOTE: the views layer (``file_analyzer.views``) is imported lazily, inside the tools that
+# need it -- see ``_views()`` below. Importing anything under ``file_analyzer`` runs
+# ``file_analyzer/__init__.py``, which eagerly loads the entire analyzer fleet (~360 ms,
+# dominated by file_analyzer.prog_lang). None of that is needed to stand the server up, so
 # deferring it keeps the stdio handshake fast; the cost is paid on first use.
 
 
 def _package_version() -> str:
     """Recover the file-analyzer version WITHOUT importing the analyzer fleet.
 
-    Kept fleet-import-free for the same reason the tools import ``src`` lazily:
-    ``import src`` runs ``src/__init__.py`` and pulls in the whole analyzer fleet,
+    Kept fleet-import-free for the same reason the tools import ``file_analyzer`` lazily:
+    ``import file_analyzer`` runs ``file_analyzer/__init__.py`` and pulls in the whole analyzer fleet,
     which would slow the stdio handshake this function feeds. So it prefers the
     installed distribution's metadata (``importlib.metadata``) and, when the
     package is not installed (e.g. running from a source checkout), falls back to
-    statically parsing ``src/_version.py`` -- the single source of truth, a bare
+    statically parsing ``file_analyzer/_version.py`` -- the single source of truth, a bare
     literal assignment -- rather than importing it. Never raises; returns a
     ``0+unknown`` sentinel only if every path fails.
     """
@@ -102,7 +102,9 @@ def _package_version() -> str:
     with contextlib.suppress(Exception):
         import re
 
-        text = (_READERS_ROOT / "src" / "_version.py").read_text(encoding="utf-8")
+        text = (_READERS_ROOT / "file_analyzer" / "_version.py").read_text(
+            encoding="utf-8"
+        )
         m = re.search(r"""__version__\s*=\s*["']([^"']+)["']""", text)
         if m:
             return m.group(1)
@@ -180,7 +182,7 @@ def _rows_as_dicts(cur: sqlite3.Cursor) -> List[Dict[str, Any]]:
 def _toolchains() -> Dict[str, bool]:
     """Report which native language toolchains are on PATH.
 
-    The analysis planes (``src.router``) and the view readers (``src.views``) both
+    The analysis planes (``file_analyzer.router``) and the view readers (``file_analyzer.views``) both
     speed up with Go and/or Java present and transparently fall back to concurrent
     Python when absent. Surfacing this lets an agent know whether it actually got
     the cross-language fast path.
@@ -199,7 +201,7 @@ def _views():
     Returns ``(VIEW_CATALOG, list_views)``. After the first call Python has the
     modules cached, so this is a cheap dict lookup on subsequent calls.
     """
-    from src.views import VIEW_CATALOG, list_views
+    from file_analyzer.views import VIEW_CATALOG, list_views
 
     return VIEW_CATALOG, list_views
 
@@ -254,7 +256,7 @@ def analyze_repository(
         plane_workers: Concurrency for the Go/Java analysis planes (default: CPU count).
         injection_workers: Concurrency for the DB injection stage (default: CPU count).
     """
-    from src.core.analysis_engine import AnalysisEngine
+    from file_analyzer.core.analysis_engine import AnalysisEngine
 
     source = Path(path).expanduser().resolve()
     if not source.is_dir():
@@ -359,7 +361,7 @@ def read_views(
     {error}}}``. ``engine`` reports what actually ran (e.g. "go+java", "go",
     "java", or "python").
     """
-    from src.views.native_reader import read_views_native, read_views_python
+    from file_analyzer.views.native_reader import read_views_native, read_views_python
 
     view_list: Optional[List[str]] = None
     if views:
@@ -457,8 +459,8 @@ def run_component(
         path: Directory to analyze.
         out_dir: Where to write the emitted JSON (default: ``<path>/.file-analyzer``).
     """
-    from src.main import build_parser
-    from src.main import run_component as _run_component
+    from file_analyzer.main import build_parser
+    from file_analyzer.main import run_component as _run_component
 
     source = Path(path).expanduser().resolve()
     if not source.is_dir():
@@ -488,7 +490,7 @@ def run_component(
 @mcp.tool()
 def list_components() -> Dict[str, Any]:
     """Enumerate the analyzer building blocks runnable via run_component."""
-    from src.main import list_components as _list_components
+    from file_analyzer.main import list_components as _list_components
 
     with _hushed():
         return _list_components()
@@ -555,7 +557,7 @@ def start_monitor(
         discover_agents: Resolve providers from desktop/CLI-configured MCP servers.
         agent_roster: Preferred provider name for the agent tier.
     """
-    from src.monitor.control import start_monitor as _start
+    from file_analyzer.monitor.control import start_monitor as _start
 
     source = Path(path).expanduser().resolve()
     if not source.is_dir():
@@ -591,7 +593,7 @@ def start_monitor(
 @mcp.tool()
 def stop_monitor(path: str) -> Dict[str, Any]:
     """Stop the background monitor watching ``path`` (if any)."""
-    from src.monitor.control import stop_monitor as _stop
+    from file_analyzer.monitor.control import stop_monitor as _stop
 
     source = Path(path).expanduser().resolve()
     with _hushed():
@@ -606,10 +608,10 @@ def monitor_status(
     """Report a monitor's status (running?, buffered changes, totals, last scan).
 
     Reads the diff database read-only, so it works whether the monitor runs in
-    this server or as a separate ``python -m src`` process. Give either ``path``
+    this server or as a separate ``python -m file_analyzer`` process. Give either ``path``
     (the watched repo) or ``diff_db`` (the database path directly).
     """
-    from src.monitor.control import read_status
+    from file_analyzer.monitor.control import read_status
 
     return read_status(root=path, diff_db_path=diff_db)
 
@@ -625,7 +627,7 @@ def recent_changes(
     re-analysis outcome. Reads the FIFO diff database read-only. Give either
     ``path`` (the watched repo) or ``diff_db`` (the database path directly).
     """
-    from src.monitor.control import read_recent_changes
+    from file_analyzer.monitor.control import read_recent_changes
 
     return read_recent_changes(root=path, diff_db_path=diff_db, limit=limit)
 
@@ -637,7 +639,7 @@ def scan_now(path: str) -> Dict[str, Any]:
     Useful right after making edits, instead of waiting for the next interval.
     Requires that ``start_monitor`` was called for ``path`` in this server.
     """
-    from src.monitor.control import get_monitor
+    from file_analyzer.monitor.control import get_monitor
 
     source = Path(path).expanduser().resolve()
     mon = get_monitor(source)
@@ -669,7 +671,7 @@ def change_history(
         rel_path: If given, restrict to the change history of that one file.
         change_log_url: Remote SQL URL or SQLite path (defaults to the local file).
     """
-    from src.monitor.control import read_change_log
+    from file_analyzer.monitor.control import read_change_log
 
     source = Path(path).expanduser().resolve()
     with _hushed():
@@ -708,7 +710,7 @@ def log_session(
         next_prompt: The user's next message, classified into a sentiment.
         summary_url: Remote SQL URL or SQLite path (defaults to the local file).
     """
-    from src.monitor.control import record_session
+    from file_analyzer.monitor.control import record_session
 
     source = Path(path).expanduser().resolve()
     with _hushed():
@@ -740,7 +742,7 @@ def assess_last_session(
     confused (or applies ``user_sentiment`` verbatim). Returns the updated row, or
     an empty result if there is no pending session.
     """
-    from src.monitor.control import assess_last_session as _assess
+    from file_analyzer.monitor.control import assess_last_session as _assess
 
     source = Path(path).expanduser().resolve()
     with _hushed():
@@ -764,7 +766,7 @@ def recent_sessions(
     (with confidence + rationale) and the improvements note. Reads the local
     SQLite summary dump by default, or a remote SQL server via ``summary_url``.
     """
-    from src.monitor.control import read_sessions
+    from file_analyzer.monitor.control import read_sessions
 
     source = Path(path).expanduser().resolve()
     with _hushed():
@@ -793,24 +795,24 @@ def views_catalog() -> str:
 # ---------------------------------------------------------------------------
 # Warm-up: pay the deferred fleet-load cost off the critical path
 # ---------------------------------------------------------------------------
-# Keeping the server outside the ``src`` package makes the stdio handshake fast,
+# Keeping the server outside the ``file_analyzer`` package makes the stdio handshake fast,
 # but it pushes the ~360 ms fleet-load onto whichever tool call fires first. This
-# warm-up does that work up front -- bytecode-compiling ``src/`` (so ``.pyc`` is
+# warm-up does that work up front -- bytecode-compiling ``file_analyzer/`` (so ``.pyc`` is
 # cached) and executing the heavy imports -- either in a background thread while
 # the agent is still handshaking/idle, or synchronously as a one-shot at install
-# / registration time. By the time the first analyze/query arrives, ``src`` is
+# / registration time. By the time the first analyze/query arrives, ``file_analyzer`` is
 # already resident in ``sys.modules`` and the call runs at full speed.
 _ENV_NO_WARM = "FILE_ANALYZER_MCP_NO_WARM"
 
 
 def warm_cache() -> None:
-    """Bytecode-compile ``src/`` and import the analyzer fleet (best-effort).
+    """Bytecode-compile ``file_analyzer/`` and import the analyzer fleet (best-effort).
 
     Safe to call more than once and from any thread: Python's import lock makes
     the heavy imports idempotent, and a concurrent first tool call simply blocks
     on that same lock instead of re-executing anything. Any failure (e.g. a
     read-only install dir that rejects ``.pyc`` writes) is swallowed -- the tools
-    still import ``src`` lazily on demand, so warm-up is a pure optimization.
+    still import ``file_analyzer`` lazily on demand, so warm-up is a pure optimization.
 
     stdout is routed to stderr throughout: the MCP stdio transport owns stdout for
     JSON-RPC, and neither ``compileall`` nor an import must be allowed to write to
@@ -820,11 +822,13 @@ def warm_cache() -> None:
         with _hushed():
             import compileall
 
-            compileall.compile_dir(str(_READERS_ROOT / "src"), quiet=1, optimize=0)
+            compileall.compile_dir(
+                str(_READERS_ROOT / "file_analyzer"), quiet=1, optimize=0
+            )
             # Execute the bodies so they land in sys.modules before any tool runs.
-            import src  # noqa: F401  (runs src/__init__.py -> the whole fleet)
-            import src.core.analysis_engine  # noqa: F401  (analyze_repository path)
-            import src.main  # noqa: F401  (run_component / list_components path)
+            import file_analyzer  # noqa: F401  (runs file_analyzer/__init__.py -> the whole fleet)
+            import file_analyzer.core.analysis_engine  # noqa: F401  (analyze_repository path)
+            import file_analyzer.main  # noqa: F401  (run_component / list_components path)
     except Exception:  # warm-up is best-effort; lazy imports remain the fallback
         pass
 
@@ -841,7 +845,7 @@ def _start_warm_cache() -> Optional[threading.Thread]:
 def main() -> None:
     argv = sys.argv[1:]
     # ``--version``: print the version and exit without standing up the server
-    # (mirrors the src.main / python -m src CLIs). No fleet import needed.
+    # (mirrors the file_analyzer.main / python -m file_analyzer CLIs). No fleet import needed.
     if "--version" in argv:
         print(f"file-analyzer {__version__}")
         return

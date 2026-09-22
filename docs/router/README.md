@@ -1,6 +1,6 @@
 # router — pure-Python file→analyzer routing and per-shard staging
 
-**Package:** `src/router` · **Import:** `from src.router import resolve_analyzer, build_mapping, group_into_shards, reconstruct_paths, ANALYZER_CLASSES, RouterPlanes, PlaneError` (this package is **not** re-exported from the `src` top level — it is internal, imported by `AnalysisEngine`/`RepositoryAnalyzer`) · CLI: none (routing has no `--component` mode — see below)
+**Package:** `file_analyzer/router` · **Import:** `from file_analyzer.router import resolve_analyzer, build_mapping, group_into_shards, reconstruct_paths, ANALYZER_CLASSES, RouterPlanes, PlaneError` (this package is **not** re-exported from the `file_analyzer` top level — it is internal, imported by `AnalysisEngine`/`RepositoryAnalyzer`) · CLI: none (routing has no `--component` mode — see below)
 
 ## What it does
 
@@ -28,7 +28,7 @@ decompress and re-route the extracted member on its own merits.
 
 ## Key APIs / functions (real names + signatures from source)
 
-From `src/router/routing.py`:
+From `file_analyzer/router/routing.py`:
 
 - `resolve_analyzer(name_or_path: Union[str, Path]) -> Optional[str]` — map a
   filename/path to its analyzer-class id, or `None` if no plane claims the
@@ -46,7 +46,7 @@ From `src/router/routing.py`:
 - `ANALYZER_CLASSES: Dict[str, str]` — logical class id → flat-façade class name
   the worker imports (e.g. `"code" -> "PolyglotCodeAnalyzer"`).
 
-From `src/router/planes.py`:
+From `file_analyzer/router/planes.py`:
 
 - `class RouterPlanes(readers_root, temp_dir, python_exe=None, workers_per_plane=None)`
   with `run(shards: List[Dict]) -> None`. Partitions shard ids across two
@@ -57,10 +57,10 @@ From `src/router/planes.py`:
   `PlaneError` (retaining `temp/`) otherwise.
 - `class PlaneError(RuntimeError)` — raised when one or more shards fail.
 
-From `src/router/worker.py`:
+From `file_analyzer/router/worker.py`:
 
 - `run_shard(readers_root, temp_dir, shard_id) -> Path` and a CLI `main()`
-  (`python -m src.router.worker --readers-root … --temp … --shard …`). For each
+  (`python -m file_analyzer.router.worker --readers-root … --temp … --shard …`). For each
   shard it loads `repo_tables.json` + `mapping.json`, runs the shard's engine
   over exactly that shard's files, calls `link_repository(...)` for every
   non-`code` plane (so local file_ids become repository file_ids and the
@@ -113,7 +113,7 @@ Routing has **no standalone component / CLI mode.** It is internal machinery
 invoked by `AnalysisEngine` (which constructs `RouterPlanes`) and by
 `RepositoryAnalyzer` (which calls `build_mapping` / `group_into_shards`).
 
-`python -m src.main --list-components` prints three groups — **special**
+`python -m file_analyzer.main --list-components` prints three groups — **special**
 (`census`, `linkage`, `dbgen`), **planes** (`code`, `schema`, `database`,
 `data`, `config`, `text`, `markup`, `document`, `misc`), and the
 **language_analyzers** — and *routing is not among them*. Census, linkage, and
@@ -121,14 +121,14 @@ dbgen are the special runnable components; routing itself only ever runs as part
 of the full pipeline (though `--component census --mapping` will emit the
 file→analyzer mapping and shards that routing produced).
 
-`src/router/worker.py` is executable as a subprocess (that is how the planes
+`file_analyzer/router/worker.py` is executable as a subprocess (that is how the planes
 invoke it), but it is a per-shard internal helper, not a user-facing command.
 
 ### Docker
 
 Routing has no standalone entry point in Docker either — it runs **automatically
 inside the `engine` container** during any full pipeline run (the engine stage's
-`ENTRYPOINT` is `["python", "-m", "src.main"]`, and `src.main` invokes routing
+`ENTRYPOINT` is `["python", "-m", "file_analyzer.main"]`, and `file_analyzer.main` invokes routing
 internally):
 
 ```bash
@@ -183,7 +183,7 @@ docker compose --profile engine run --build engine \
 
 ## See also
 
-- [../USAGE.md](../USAGE.md) — the `python -m src.main` entry point, full
+- [../USAGE.md](../USAGE.md) — the `python -m file_analyzer.main` entry point, full
   pipeline vs. component mode, and the component list.
 - repo [README.md](../../README.md) — project overview and package layout
-  (`src/router/` row).
+  (`file_analyzer/router/` row).

@@ -1,16 +1,16 @@
-# `src/script` — mainstream command-language / build-script dialects folded into `code`
+# `file_analyzer/script` — mainstream command-language / build-script dialects folded into `code`
 
-**Package:** `src/script` · **Import:** `from src import PowerShellAnalyzer` (and the other dialect classes) · **Component:** `code` / `polyglot` (script files are analyzed as part of the code plane) · `<ClassName>` for a single dialect
+**Package:** `file_analyzer/script` · **Import:** `from file_analyzer import PowerShellAnalyzer` (and the other dialect classes) · **Component:** `code` / `polyglot` (script files are analyzed as part of the code plane) · `<ClassName>` for a single dialect
 
 ## What it does
 
-`src/script` holds the residual `script`-kind extensions — the mainstream
+`file_analyzer/script` holds the residual `script`-kind extensions — the mainstream
 command-language and build-script dialects: bash/sh/zsh/ksh, fish, PowerShell,
 batch, CMake, Gradle, Bazel Starlark, F# script, and Perl. Like shell scripts,
 these are code (they define functions, variables and sourced/imported files), so
 every analyzer emits the **same `code`-domain relational tables** as every
 programming-language analyzer, and the whole package folds into the single `code`
-domain — exactly like `src/shell`.
+domain — exactly like `file_analyzer/shell`.
 
 There are nine analyzers, grouped into four modules:
 
@@ -29,12 +29,12 @@ get their own real hand-written parsers.
 
 ## Extensions / languages handled — `SCRIPT_EXT_MAP`
 
-`SCRIPT_EXT_MAP` (in `src/script/__init__.py`) is `ext → analyzer class`. As in
-`src/shell`, it is **built from each analyzer's own `EXTENSIONS` tuple** — the
+`SCRIPT_EXT_MAP` (in `file_analyzer/script/__init__.py`) is `ext → analyzer class`. As in
+`file_analyzer/shell`, it is **built from each analyzer's own `EXTENSIONS` tuple** — the
 `__init__` iterates a `_ANALYZERS` tuple of the nine classes and registers every
 lower-cased suffix each one owns, raising a `RuntimeError` on any collision. So the
 map can never drift out of sync with the analyzers. Read the live set with
-`from src import SCRIPT_EXT_MAP` (it is exported), or `sorted(SCRIPT_EXT_MAP)`.
+`from file_analyzer import SCRIPT_EXT_MAP` (it is exported), or `sorted(SCRIPT_EXT_MAP)`.
 It covers roughly fifteen suffixes across the nine dialects; the authoritative
 list is the union of the classes' `EXTENSIONS` tuples.
 
@@ -46,7 +46,7 @@ Script files are part of the `code` plane, so the pipeline analyzes them via
 `--component code`. There is no separate `script` plane component:
 
 ```bash
-python -m src.main . --component code --emit code.json
+python -m file_analyzer.main . --component code --emit code.json
 ```
 
 Each dialect class is also registered as a language component (it appears under
@@ -54,14 +54,14 @@ Each dialect class is also registered as a language component (it appears under
 `EXT_MAP`):
 
 ```bash
-python -m src.main . --component PowerShellAnalyzer --emit ps.json
-python -m src.main . --component CMakeAnalyzer      --emit cmake.json
-python -m src.main --list-components
+python -m file_analyzer.main . --component PowerShellAnalyzer --emit ps.json
+python -m file_analyzer.main . --component CMakeAnalyzer      --emit cmake.json
+python -m file_analyzer.main --list-components
 ```
 
 ### Docker (component mode in a container)
 
-The `engine` service (compose profile `engine`) runs `python -m src.main`, so pass
+The `engine` service (compose profile `engine`) runs `python -m file_analyzer.main`, so pass
 it the same args. The repo mounts at `/workspace` and artifacts at `/artifacts`, so
 emit into `/artifacts` for the JSON to land on the host:
 
@@ -88,7 +88,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`
 ### Python
 
 ```python
-from src import PowerShellAnalyzer
+from file_analyzer import PowerShellAnalyzer
 tables = PowerShellAnalyzer(
     file_paths=["build.ps1"],
     dump_file_type="memory",
@@ -101,7 +101,7 @@ script extensions merged into its `EXT_MAP`).
 
 ## Output tables
 
-Identical to the `code_tables` family produced by `src/prog_lang` — `kind_reference`,
+Identical to the `code_tables` family produced by `file_analyzer/prog_lang` — `kind_reference`,
 `symbol_index`, `imports_table`, `variables_table`, `functions_table`,
 `classes_table`, `args_table`, `outputs_table`, `tensor_members_table`,
 `introspection_metadata_table`, `temp_kind_details`. Script files add rows to the
@@ -110,7 +110,7 @@ same tables the `v_*` views already read (see
 
 ## How it fits the pipeline
 
-`src/prog_lang/polyglot.py`, at module bottom (just after the shell fold-in), does
+`file_analyzer/prog_lang/polyglot.py`, at module bottom (just after the shell fold-in), does
 `from ..script import SCRIPT_EXT_MAP` and merges every entry into
 `PolyglotCodeAnalyzer.EXT_MAP` (refusing to overwrite a different existing
 analyzer). Because the router derives its `code` extension universe lazily from
@@ -136,4 +136,4 @@ schema change.
 
 - [../USAGE.md](../USAGE.md) — the full CLI and component mode.
 - [../prog_lang/README.md](../prog_lang/README.md) — the code plane, `EXT_MAP`, and the `code_tables` reference.
-- [../shell/README.md](../shell/README.md) — the sibling `src/shell` fold-in.
+- [../shell/README.md](../shell/README.md) — the sibling `file_analyzer/shell` fold-in.

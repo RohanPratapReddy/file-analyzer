@@ -42,7 +42,7 @@ db_path)`, with `list_views` / `describe_schema` to discover what to query.
 ```bash
 # 1. Analyze (must be a git repo, else add --no-git). Prints a JSON summary
 #    whose "database" field is the .db to query.
-python -m src.main /path/to/repo --out ./artifacts --quiet
+python -m file_analyzer.main /path/to/repo --out ./artifacts --quiet
 #    (or, if pip-installed:  file-analyzer /path/to/repo --out ./artifacts --quiet)
 
 # 2. Ask questions over the v_* views:

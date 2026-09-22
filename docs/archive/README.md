@@ -1,6 +1,6 @@
 # ArchiveAnalyzer — the archive-traversal pipeline stage
 
-**Package:** `src/archive` · **Import:** `from src import ArchiveAnalyzer` (re-exported) · **Pipeline stage:** archive containers (step 4b in `AnalysisEngine.run()`; **no `--component`** — controlled by `--no-archives` / `--max-archive-depth`).
+**Package:** `file_analyzer/archive` · **Import:** `from file_analyzer import ArchiveAnalyzer` (re-exported) · **Pipeline stage:** archive containers (step 4b in `AnalysisEngine.run()`; **no `--component`** — controlled by `--no-archives` / `--max-archive-depth`).
 
 ## What it does
 
@@ -69,16 +69,16 @@ Controlling flags: **`--no-archives`** (skip the stage entirely) and
 
 There is **no standalone component mode** for this stage. It is **not** in
 `main.py`'s `_SPECIAL_COMPONENTS`, `_PLANE_COMPONENTS`, or
-`_lang_analyzer_registry()`, so `python -m src.main --component archive` is not a
+`_lang_analyzer_registry()`, so `python -m file_analyzer.main --component archive` is not a
 valid invocation and it does not appear in `--list-components`. It runs only
 inside the full pipeline:
 
 ```bash
 # archive traversal on (default), bounded to 4 nested levels
-python -m src.main <repo> --out ./artifacts --max-archive-depth 4
+python -m file_analyzer.main <repo> --out ./artifacts --max-archive-depth 4
 
 # skip archive extraction/recursion entirely
-python -m src.main <repo> --out ./artifacts --no-archives
+python -m file_analyzer.main <repo> --out ./artifacts --no-archives
 ```
 
 `AnalysisEngine` invokes it as: gather `mapping["mapping"]` rows whose
@@ -87,7 +87,7 @@ python -m src.main <repo> --out ./artifacts --no-archives
 ### Docker
 
 This stage runs as part of the full pipeline inside the `engine` service
-(compose profile `engine`, entrypoint `python -m src.main`); control it with the
+(compose profile `engine`, entrypoint `python -m file_analyzer.main`); control it with the
 same flags:
 
 ```bash
@@ -112,7 +112,7 @@ etc. off it) and the pre-selected archive rows — so direct use in isolation is
 awkward; normally you let `AnalysisEngine` drive it. The shape is:
 
 ```python
-from src import ArchiveAnalyzer
+from file_analyzer import ArchiveAnalyzer
 
 # `engine` is the owning AnalysisEngine; archive_files are router rows
 # [{"file_id": ..., "file_location": ...}, ...] for the `archive` class.
@@ -135,7 +135,7 @@ The stage returns the `archive_tables` family (the `--tables-json` /
   `modified`, `analyzer_class` (what the router *would* assign the member), and
   `file_id`.
 
-**No `v_*` views** read these tables — `src/views/catalog.py` defines no
+**No `v_*` views** read these tables — `file_analyzer/views/catalog.py` defines no
 `archive_*` views, so none are ever created. Query the base tables directly.
 
 ## Notes & gotchas

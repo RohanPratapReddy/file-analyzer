@@ -1,12 +1,12 @@
 # DocumentAnalyzer — the document plane
 
-**Package:** `src/document` · **Import:** `from src import DocumentAnalyzer` · **Component:** `document`
+**Package:** `file_analyzer/document` · **Import:** `from file_analyzer import DocumentAnalyzer` · **Component:** `document`
 
 ## What it does
 `DocumentAnalyzer` is the parent/super-class of the `document` analysis plane.
 Every extension of the eight residual *document* content kinds (`manifest`,
 `query`, `makefile`, `certificate_text`, `notebook`, `document`, `license`,
-`diff`) is dispatched to its own child parser class (in `src/document/parsers.py`,
+`diff`) is dispatched to its own child parser class (in `file_analyzer/document/parsers.py`,
 each a `DocumentTypeParser` subclass), and the resulting real, structure-aware
 profile is flattened into normalized `document_*` tables in the shape
 `document → sections → records → fields (+ file-level properties)`:
@@ -37,12 +37,12 @@ list. (Example: `.tsql` routes to the query parser — see gotchas.)
 ## Run it standalone
 ### CLI (component mode)
 ```bash
-python -m src.main . --component document --emit document.json
+python -m file_analyzer.main . --component document --emit document.json
 ```
 
 ### Docker (component mode in a container)
 
-The `engine` service runs `python -m src.main`, so pass it the same args (emit into `/artifacts` so the JSON lands on the host):
+The `engine` service runs `python -m file_analyzer.main`, so pass it the same args (emit into `/artifacts` so the JSON lands on the host):
 
 ```bash
 docker compose --profile engine run --build engine \
@@ -60,7 +60,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`.
 
 ### Python
 ```python
-from src import DocumentAnalyzer
+from file_analyzer import DocumentAnalyzer
 eng = DocumentAnalyzer(file_paths=[...], dump_file_type="memory")
 tables = eng.analyze()
 # non-code plane: also rewrite local ids -> repository ids and build the index
@@ -99,7 +99,7 @@ Together these are the `document_tables` family consumed by
 `RepositoryDatabaseGenerator` (`document_tables=` argument).
 
 ## How it fits the pipeline (routing id; link_repository step)
-Routing id is `document`. In `src/router/routing.py`, `resolve_analyzer` checks
+Routing id is `document`. In `file_analyzer/router/routing.py`, `resolve_analyzer` checks
 `document` after config / text / markup (and every higher-priority plane); the
 document suffix set already subtracts those planes, so only previously-residual
 document extensions route here. As a non-code plane it runs
@@ -119,7 +119,7 @@ build `document_file_index`; the final tables come from `get_tables()`.
   extensions it registers, not for the bare basename.
 - One bad file never aborts the batch — parse/emit failures are caught, warned,
   and skipped; a parser exception degrades to an honest forensic profile.
-- No `v_*` analysis views are defined for this plane; `src/views/catalog.py`
+- No `v_*` analysis views are defined for this plane; `file_analyzer/views/catalog.py`
   covers only the core/schema/data view families (no `v_document_*` view).
 
 ## See also — [../USAGE.md](../USAGE.md)

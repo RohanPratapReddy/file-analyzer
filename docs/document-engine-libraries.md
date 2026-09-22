@@ -28,7 +28,7 @@ interpreter with nothing installed:
 So the packages listed here are **OPTIONAL**. Install one to swap a stdlib
 implementation for a faster / richer / reference one, or to cross-check the
 built-in result against an independent library. The CI import gate
-(`python -m src.main --list-components` on bare `python:3.10`) proves the core
+(`python -m file_analyzer.main --list-components` on bare `python:3.10`) proves the core
 imports with none of them present.
 
 Install groups (see `pyproject.toml` extras and `requirements.txt`):
@@ -109,7 +109,7 @@ number against an independent, widely-cited implementation.
 ## Running the layers from the CLI
 
 The document-intelligence and agent-driven layers are **opt-in** and off by
-default; enable them on `python -m src.main` with the
+default; enable them on `python -m file_analyzer.main` with the
 `document intelligence & agents` argument group:
 
 | Flag | Effect |
@@ -133,10 +133,10 @@ case-insensitively; unknown names are ignored, so the filter never breaks a run.
 
 ```bash
 # enrichment only, restricted to Claude, everything else excluded
-python -m src.main ./src --enrich --agents-include claude
+python -m file_analyzer.main ./src --enrich --agents-include claude
 
 # full document stack, discovering desktop MCP servers but skipping grok
-python -m src.main ./src --dynamic --evaluate --enrich \
+python -m file_analyzer.main ./src --dynamic --evaluate --enrich \
     --discover-agents --agents-exclude grok --agent-roster claude
 ```
 
@@ -145,11 +145,11 @@ python -m src.main ./src --dynamic --evaluate --enrich \
 Part-C evaluation is materialized as **Database 4** inside DocumentParser
 (`document_eval.db` / `document_eval.sql`), alongside DB1 (concordance),
 DB2 (Part-A static metrics) and DB3 (Part-B dynamic agent/code layer). See
-`src/document/evaluation_engine.py` (engine), `evaluation_metrics.py` (metrics)
+`file_analyzer/document/evaluation_engine.py` (engine), `evaluation_metrics.py` (metrics)
 and `document_db.py` (`build_evaluation_database`).
 
 The **MCP content-aware enrichment layer** lands in **Database 5**
-(`mcp_enrichment.db` / `mcp_enrichment.sql`, see `src/core/mcp_enrichment.py`):
+(`mcp_enrichment.db` / `mcp_enrichment.sql`, see `file_analyzer/core/mcp_enrichment.py`):
 per-file deterministic metrics / quality / security / symbol-doc tables always,
 plus a soft agent tier that adds agent-derived rows only when a provider is
 reachable. All five per-source databases fold into the unified `.db`/`.sql`

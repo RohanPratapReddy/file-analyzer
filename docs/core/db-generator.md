@@ -1,6 +1,6 @@
 # RepositoryDatabaseGenerator — the normalized SQL dump + SQLite builder
 
-**Package:** `src/core` · **Import:** `from src import RepositoryDatabaseGenerator` · **Component:** `dbgen` / `db`
+**Package:** `file_analyzer/core` · **Import:** `from file_analyzer import RepositoryDatabaseGenerator` · **Component:** `dbgen` / `db`
 
 ## What it does
 
@@ -53,7 +53,7 @@ There is no `get_tables()` on this class — it *consumes* table families and
 
 ```bash
 # Build the .sql (+ .db) from a merged tables JSON
-python -m src.main --component dbgen --tables-json all_tables.json \
+python -m file_analyzer.main --component dbgen --tables-json all_tables.json \
     --build-db --db out.db --sql out.sql --dialect postgresql
 ```
 
@@ -64,7 +64,7 @@ concurrent SQLite build; `--injection-workers` sets the worker count. See the
 
 ### Docker (component mode in a container)
 
-The `engine` service runs `python -m src.main`, so pass it the same args. `dbgen` reads its inputs from `--tables-json` and writes `--sql`/`--db` — keep all of them under `/artifacts` so the input JSON is readable and the artifacts persist to the host:
+The `engine` service runs `python -m file_analyzer.main`, so pass it the same args. `dbgen` reads its inputs from `--tables-json` and writes `--sql`/`--db` — keep all of them under `/artifacts` so the input JSON is readable and the artifacts persist to the host:
 
 ```bash
 docker compose --profile engine run --build engine \
@@ -84,7 +84,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`; outpu
 ### Python
 
 ```python
-from src import RepositoryDatabaseGenerator
+from file_analyzer import RepositoryDatabaseGenerator
 
 generator = RepositoryDatabaseGenerator(
     folder_tables=(folders, extensions, files),
@@ -112,7 +112,7 @@ methods back to back.)
   sqlite regardless of `sql_dialect`).
 
 It consumes **all** `*_tables` families and folds them into one database; every
-`v_*` view (see `src/views/sql/catalog.json`) reads the base tables this class
+`v_*` view (see `file_analyzer/views/sql/catalog.json`) reads the base tables this class
 emits. (View DDL itself is installed separately by `AnalysisEngine`'s views
 stage, not by this class.)
 

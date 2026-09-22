@@ -1,10 +1,10 @@
 # =============================================================================
 # tabgen "readers" — Python analysis pipeline dependencies
 # =============================================================================
-# The reader package (src/) has a PURE-STDLIB CORE: RepositoryAnalyzer, the
+# The reader package (file_analyzer/) has a PURE-STDLIB CORE: RepositoryAnalyzer, the
 # router, all {Lang}Analyzers, SchemaAnalyzer, DatabaseAnalyzer, the archive and
 # machine-code/binary forensic layers, and the SQLite db-generator all run with
-# NOTHING installed but CPython. `from src import AnalysisEngine` and a full
+# NOTHING installed but CPython. `from file_analyzer import AnalysisEngine` and a full
 # repository -> SQLite run work on a bare interpreter.
 #
 # Every package below is therefore OPTIONAL. Each is imported lazily and guarded
@@ -71,7 +71,7 @@ tree-sitter              # precise CST parsing engine for {Lang}Analyzers
 tree-sitter-languages    # prebuilt grammars used by the tree-sitter path
 
 # =============================================================================
-# Background repository monitor (src/monitor/, `python -m src monitor <repo>`)
+# Background repository monitor (file_analyzer/monitor/, `python -m file_analyzer monitor <repo>`)
 # =============================================================================
 # The always-on monitoring + incremental-update layer is PURE STDLIB with NO new
 # hard dependency: change detection is an os.walk + hashlib snapshot/diff, the
@@ -80,12 +80,12 @@ tree-sitter-languages    # prebuilt grammars used by the tree-sitter path
 # (signals, PID file, atexit, daemon threads, child reaping) is all stdlib.
 # There is NOTHING to install for the monitor: it detects changes by polling
 # (os.walk + hashlib snapshot/diff on a fixed cadence), so there is no watcher
-# library to add. The Go worker pool (src/monitor/go/) is an optional speed-up
+# library to add. The Go worker pool (file_analyzer/monitor/go/) is an optional speed-up
 # for very large change sets, built on demand with the `go` toolchain (not a pip
 # package); without Go the pool transparently uses the concurrent.futures path.
 #
 # The monitor's two DURABLE dumps -- the continuous change log and the
-# session-summary dump (src/monitor/change_log.py + session_log.py) -- also
+# session-summary dump (file_analyzer/monitor/change_log.py + session_log.py) -- also
 # default to local SQLite (still nothing to install). They can instead live on a
 # REMOTE SQL server by passing a connection URL; only then do you need a driver,
 # imported lazily so the core stays stdlib-at-import:
@@ -95,7 +95,7 @@ tree-sitter-languages    # prebuilt grammars used by the tree-sitter path
 # =============================================================================
 # Document-intelligence engine (DocumentParser: Parts A / B / C)
 # =============================================================================
-# The document-analysis engine (src/document/) is ALSO pure-stdlib at its core:
+# The document-analysis engine (file_analyzer/document/) is ALSO pure-stdlib at its core:
 # Part A static metrics, the Part-B agent+code loop transport (agent_mcp.py) and
 # ALL Part-C evaluation metrics (evaluation_metrics.py -- CER/WER/BLEU/METEOR/
 # chrF/ROUGE/TEDS/mAP/REDS/ANLS/ECE/PSI, and a deterministic RAG judge) are

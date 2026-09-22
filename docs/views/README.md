@@ -1,13 +1,13 @@
 # views — the analysis views + concurrent readers layer
 
-**Package:** `src/views` · **Import:** `from src.views import VIEW_CATALOG, VIEW_PREFIX, ViewDef, catalog_by_name, views_ddl, install_views_sqlite, append_views_to_sql_dump, export_catalog_json, write_sql_artifacts, sqlite_present_tables, list_views, read_view, read_all_views` (this package is imported as `src.views`; it is **not** re-exported from the `src` top level) · CLI: `python -m src.views {install,dump,emit,artifacts,list,read}`
+**Package:** `file_analyzer/views` · **Import:** `from file_analyzer.views import VIEW_CATALOG, VIEW_PREFIX, ViewDef, catalog_by_name, views_ddl, install_views_sqlite, append_views_to_sql_dump, export_catalog_json, write_sql_artifacts, sqlite_present_tables, list_views, read_view, read_all_views` (this package is imported as `file_analyzer.views`; it is **not** re-exported from the `file_analyzer` top level) · CLI: `python -m file_analyzer.views {install,dump,emit,artifacts,list,read}`
 
 ## What it does
 
-`src/views` is the **single source of truth** for the ready-made analysis views
+`file_analyzer/views` is the **single source of truth** for the ready-made analysis views
 (`v_*`) that denormalize the engine's raw relational output into ready-to-read
 summaries. The views are defined once in Python
-([`catalog.py`](../../src/views/catalog.py)); the builder installs them into
+([`catalog.py`](../../file_analyzer/views/catalog.py)); the builder installs them into
 every `repository.db` the engine produces and mirrors them into the
 `repository_schema.sql` dump; the Python reader and the bundled Go + Java reader
 programs then simply **discover** the installed `VIEW` objects from the database
@@ -65,7 +65,7 @@ Per-dialect wrapping is the only difference: `sqlite` →
 
 ## CLI (views only)
 
-`python -m src.views <command>` ([`__main__.py`](../../src/views/__main__.py)):
+`python -m file_analyzer.views <command>` ([`__main__.py`](../../file_analyzer/views/__main__.py)):
 
 | command | args | what it does |
 |---------|------|--------------|
@@ -77,11 +77,11 @@ Per-dialect wrapping is the only difference: `sqlite` →
 | `read <db>` | `--view NAME`, `--limit N` | read installed view(s) and print them |
 
 ```bash
-python -m src.views install   repository.db
-python -m src.views dump      repository_schema.sql
-python -m src.views list      repository.db
-python -m src.views read      repository.db --view v_extension_distribution
-python -m src.views artifacts src/views/sql       # (re)generate sql/ artifacts
+python -m file_analyzer.views install   repository.db
+python -m file_analyzer.views dump      repository_schema.sql
+python -m file_analyzer.views list      repository.db
+python -m file_analyzer.views read      repository.db --view v_extension_distribution
+python -m file_analyzer.views artifacts file_analyzer/views/sql       # (re)generate sql/ artifacts
 ```
 
 ## The view catalog — 33 views (`v_` prefix)
@@ -114,13 +114,13 @@ Each is created as a DB object named `v_<name>` (e.g. the view
 `--no-views` is passed), so every artifact ships with its views. Consumers:
 
 - **Python** — `read_view` / `read_all_views`.
-- **Go reader** (`src/views/go/main.go`) — pure-Go SQLite driver
+- **Go reader** (`file_analyzer/views/go/main.go`) — pure-Go SQLite driver
   `modernc.org/sqlite` (no cgo / no gcc).
-- **Java reader** (`src/views/java/RepositoryReader.java`, JDK 17+) — bundled
+- **Java reader** (`file_analyzer/views/java/RepositoryReader.java`, JDK 17+) — bundled
   `sqlite-jdbc-3.45.3.0.jar` + `slf4j-api-2.0.13.jar` jars.
 - **Docker/Postgres backend** — `.sql` dumps already carry the appended
   `CREATE OR REPLACE VIEW` statements; for `.db` artifacts loaded via `pgloader`
-  (tables only), the loader then applies `src/views/sql/views.pgsql.sql`.
+  (tables only), the loader then applies `file_analyzer/views/sql/views.pgsql.sql`.
 
 Both the Go and Java readers are functionally equivalent: they **discover** the
 installed views from the catalog (`SELECT name FROM sqlite_master WHERE
@@ -138,7 +138,7 @@ ARTIFACTS_DIR=./artifacts docker compose up --build
 ```
 
 - For `.db` artifacts, `pgloader` copies **tables only**, so the loader's
-  `apply_views` step then applies `src/views/sql/views.pgsql.sql` (bind-mounted
+  `apply_views` step then applies `file_analyzer/views/sql/views.pgsql.sql` (bind-mounted
   in as `/loader/views.pgsql.sql`) after each load, running **without**
   `ON_ERROR_STOP` so views over base tables a given database lacks are skipped,
   not fatal — the same present-tables-only contract as the SQLite side.
@@ -148,20 +148,20 @@ ARTIFACTS_DIR=./artifacts docker compose up --build
   too, which is idempotent.
 
 Regenerate the bind-mounted `views.pgsql.sql` after editing `catalog.py` with
-`python -m src.views artifacts src/views/sql`.
+`python -m file_analyzer.views artifacts file_analyzer/views/sql`.
 
-**2. Running the `python -m src.views` CLI inside the engine image.** The engine
-image's stage `COPY`s the whole `src/` package (`COPY src/ ./src/`), so it
-already contains `src.views`. Its `ENTRYPOINT` is `python -m src.main`; override
+**2. Running the `python -m file_analyzer.views` CLI inside the engine image.** The engine
+image's stage `COPY`s the whole `file_analyzer/` package (`COPY file_analyzer/ ./file_analyzer/`), so it
+already contains `file_analyzer.views`. Its `ENTRYPOINT` is `python -m file_analyzer.main`; override
 it with `--entrypoint python` to invoke the views CLI against a mounted artifact:
 
 ```bash
 docker compose --profile engine run --build --entrypoint python engine \
-  -m src.views list /artifacts/repository.db
+  -m file_analyzer.views list /artifacts/repository.db
 
 # read a specific view
 docker compose --profile engine run --build --entrypoint python engine \
-  -m src.views read /artifacts/repository.db --view v_extension_distribution
+  -m file_analyzer.views read /artifacts/repository.db --view v_extension_distribution
 ```
 
 (`docker compose run --entrypoint` replaces the entrypoint for that one run; the
@@ -191,13 +191,13 @@ arguments after the service name become the new entrypoint's argv.)
   no DDL/DML; reserved-word columns (`"count"`, `"value"`) are double-quoted so
   both engines accept them.
 - **Regenerating artifacts.** After editing `catalog.py`, run
-  `python -m src.views artifacts src/views/sql` to refresh
+  `python -m file_analyzer.views artifacts file_analyzer/views/sql` to refresh
   `views.sqlite.sql`, `views.pgsql.sql`, and `catalog.json` (the Docker loader
   bind-mounts `views.pgsql.sql`).
 
 ## See also
 
-- [../USAGE.md](../USAGE.md) — the `python -m src.main` entry point and the
+- [../USAGE.md](../USAGE.md) — the `python -m file_analyzer.main` entry point and the
   `--no-views` gate.
 - repo [README.md](../../README.md) — the "views layer" and "concurrent readers
   (Go + Java)" sections (build/run instructions and Docker wiring).

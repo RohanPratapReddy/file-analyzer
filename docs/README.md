@@ -8,7 +8,7 @@ to run it, use it as a library, or understand a single module on its own is here
 
 Start here:
 
-- **[USAGE.md](USAGE.md)** — the `python -m src.main` CLI surface: every flag for
+- **[USAGE.md](USAGE.md)** — the `python -m file_analyzer.main` CLI surface: every flag for
   the full pipeline, plus **component mode** (`--component NAME`) for running one
   block standalone, the `--quiet` pure-JSON contract, and
   [Part 4 — AI agents (MCP)](USAGE.md#part-4--ai-agents-mcp). Read this first.
@@ -26,7 +26,7 @@ Beyond the one-shot static pipeline, the platform adds continuous and agent-driv
 layers:
 
 - **[monitor.md](monitor.md)** — the always-on **background monitor**
-  (`python -m src monitor`): watches a repository and re-analyzes changed files
+  (`python -m file_analyzer monitor`): watches a repository and re-analyzes changed files
   incrementally across a Go/Python worker pool, with a FIFO diff DB, a durable
   change log, and an optional soft MCP agent tier. MCP tools + a Docker profile.
 - **[document-engine-agents.md](document-engine-agents.md)** — the
@@ -44,11 +44,11 @@ layers:
 
 ## Per-module reference
 
-Below, one folder per `src/` subpackage. Each doc explains what that module does,
+Below, one folder per `file_analyzer/` subpackage. Each doc explains what that module does,
 how to use it on its own (component-mode CLI where one exists, plus the Python
 import), the tables it emits, and its gotchas.
 
-## Orchestration — `src/core`
+## Orchestration — `file_analyzer/core`
 
 The glue that ties every analyzer into one pipeline and writes the artifacts.
 
@@ -101,7 +101,7 @@ Post-plane stages driven by `AnalysisEngine` flags — no `--component` of their
 Every plane analyzer shares the same standalone shape:
 
 ```python
-from src import <Analyzer>
+from file_analyzer import <Analyzer>
 eng = <Analyzer>(file_paths=[...], dump_file_type="memory")
 tables = eng.analyze()
 # non-code planes then map local ids to repository ids:
@@ -112,12 +112,12 @@ tables = eng.get_tables()
 …or run any registered block from the CLI without writing code:
 
 ```bash
-python -m src.main . --component <name> --emit <name>.json
-python -m src.main --list-components   # every runnable block
+python -m file_analyzer.main . --component <name> --emit <name>.json
+python -m file_analyzer.main --list-components   # every runnable block
 ```
 
 …or run that same block **inside the Docker `engine` container** (entrypoint
-`python -m src.main`) — emit under `/artifacts` so output reaches the host:
+`python -m file_analyzer.main`) — emit under `/artifacts` so output reaches the host:
 
 ```bash
 docker compose --profile engine run --build engine \

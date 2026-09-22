@@ -225,16 +225,16 @@ __marimo__/
 # The Go SOURCE (plane.go, main.go, go.mod, go.sum) IS tracked; only the
 # compiled binaries are ignored.
 *.exe
-src/views/go/repo-reader
-src/router/go/analysis-plane
+file_analyzer/views/go/repo-reader
+file_analyzer/router/go/analysis-plane
 
 # Java compiled classes (regenerated via `javac`). The bundled JDBC/SLF4J
-# .jar dependencies under src/views/java/ ARE intentionally tracked (they are
+# .jar dependencies under file_analyzer/views/java/ ARE intentionally tracked (they are
 # runtime dependencies, not build outputs) -- do NOT add *.jar here.
 *.class
-src/views/java/out/
+file_analyzer/views/java/out/
 
-# AnalysisEngine output artifacts (produced by `python -m src.main`):
+# AnalysisEngine output artifacts (produced by `python -m file_analyzer.main`):
 # the emitted database, the .sql dump, and the default --out directory.
 /artifacts/
 # Default output dir for the MCP server's analyze_repository (mcp_server.py).

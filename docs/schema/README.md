@@ -1,6 +1,6 @@
 # SchemaAnalyzer — schema-definition parser (SQL DDL + IDL families)
 
-**Package:** `src/schema` · **Import:** `from src import SchemaAnalyzer` · **Component:** `schema`
+**Package:** `file_analyzer/schema` · **Import:** `from file_analyzer import SchemaAnalyzer` · **Component:** `schema`
 
 ## What it does
 
@@ -52,12 +52,12 @@ Verified against `SchemaAnalyzer` class constants and `_detect_engine`:
 ### CLI (component mode)
 
 ```bash
-python -m src.main . --component schema --emit schema.json
+python -m file_analyzer.main . --component schema --emit schema.json
 ```
 
 ### Docker (component mode in a container)
 
-The `engine` service runs `python -m src.main`, so pass it the same args (emit into `/artifacts` so the JSON lands on the host):
+The `engine` service runs `python -m file_analyzer.main`, so pass it the same args (emit into `/artifacts` so the JSON lands on the host):
 
 ```bash
 docker compose --profile engine run --build engine \
@@ -76,7 +76,7 @@ Set `SOURCE_DIR=/path/to/repo` to choose the repo mounted at `/workspace`.
 ### Python
 
 ```python
-from src import SchemaAnalyzer
+from file_analyzer import SchemaAnalyzer
 eng = SchemaAnalyzer(file_paths=[...], dump_file_type="memory")
 tables = eng.analyze()
 # non-code plane: rewrite local file ids -> repository file ids and populate
@@ -93,7 +93,7 @@ and fills `schema_file_index`. Constructor signature:
 ## Output tables (real names)
 
 `analyze()`/`get_tables()` emit exactly these ten (cross-checked against
-`src/views/catalog.py`):
+`file_analyzer/views/catalog.py`):
 
 | table | holds |
 |-------|-------|
@@ -108,7 +108,7 @@ and fills `schema_file_index`. Constructor signature:
 | `schema_indexes_table` | indexes (unique flag, method, column ids/expr) |
 | `schema_file_index` | `sfi_id, file_id, entity_kind, entity_id` — populated by `link_repository` |
 
-Analysis views in `src/views/catalog.py` that read these:
+Analysis views in `file_analyzer/views/catalog.py` that read these:
 `v_schema_databases_by_engine`, `v_schema_tables_by_engine`,
 `v_schema_tables_by_kind`, `v_schema_top_column_types`, `v_schema_keys_by_type`,
 `v_schema_foreign_key_edges`, `v_schema_constraints_by_type`,
@@ -119,7 +119,7 @@ tables are present.)
 
 ## How it fits the pipeline
 
-Routing id `schema` (see `resolve_analyzer` in `src/router/routing.py`). The
+Routing id `schema` (see `resolve_analyzer` in `file_analyzer/router/routing.py`). The
 router checks `code` first, then `schema`, then `database` — so an extension the
 code analyzers already claim is routed to code, not here. As a non-code plane,
 the `schema` component (and the real per-shard worker) runs

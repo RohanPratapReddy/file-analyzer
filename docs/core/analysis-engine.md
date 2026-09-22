@@ -1,6 +1,6 @@
 # AnalysisEngine — the end-to-end repository pipeline orchestrator
 
-**Package:** `src/core` · **Import:** `from src import AnalysisEngine` · **Component:** engine-only / N/A (it *is* the full pipeline; run it via `python -m src.main` with no `--component`)
+**Package:** `file_analyzer/core` · **Import:** `from file_analyzer import AnalysisEngine` · **Component:** engine-only / N/A (it *is* the full pipeline; run it via `python -m file_analyzer.main` with no `--component`)
 
 ## What it does
 
@@ -63,16 +63,16 @@ The summary dict contains: `repository_root`, `database`, `sql_dump`,
 ## Run it
 
 `AnalysisEngine` is the full pipeline, so there is no `--component` for it — the
-default `python -m src.main` invocation runs it.
+default `python -m file_analyzer.main` invocation runs it.
 
 ### CLI
 
 ```bash
 # Default: analyze the current repo into ./artifacts (sqlite artifacts + views)
-python -m src.main . --out ./artifacts
+python -m file_analyzer.main . --out ./artifacts
 
 # Postgres-loadable dump for the docker loader
-python -m src.main . --out ./artifacts --dialect postgresql
+python -m file_analyzer.main . --out ./artifacts --dialect postgresql
 ```
 
 See [../USAGE.md](../USAGE.md) for the complete flag surface.
@@ -80,7 +80,7 @@ See [../USAGE.md](../USAGE.md) for the complete flag surface.
 ### Docker
 
 The `engine` service (compose profile `engine`, Dockerfile `engine` stage) has
-ENTRYPOINT `["python","-m","src.main"]`, so it runs the full pipeline directly.
+ENTRYPOINT `["python","-m","file_analyzer.main"]`, so it runs the full pipeline directly.
 Point `--out` at `/artifacts` so the `.db`/`.sql` persist to the host:
 
 ```bash
@@ -112,7 +112,7 @@ See the Docker section of [`../../README.md`](../../README.md) for the full cont
 
 ```python
 from pathlib import Path
-from src import AnalysisEngine
+from file_analyzer import AnalysisEngine
 
 engine = AnalysisEngine(
     dir_path=Path("."),
@@ -138,7 +138,7 @@ and post-plane stages, then writes:
 - `<db_path>` — the binary SQLite database (all base tables + installed `v_*` views).
 - `<sql_path>` — the SQL text dump (same tables + appended `CREATE VIEW …`).
 
-All `v_*` views (see `src/views/sql/catalog.json`) are installed when
+All `v_*` views (see `file_analyzer/views/sql/catalog.json`) are installed when
 `enable_views` is on.
 
 ## How it fits the pipeline

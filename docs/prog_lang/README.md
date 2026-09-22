@@ -1,6 +1,6 @@
-# `src/prog_lang` — the polyglot code analyzer family
+# `file_analyzer/prog_lang` — the polyglot code analyzer family
 
-**Package:** `src/prog_lang` · **Import:** `from src import PolyglotCodeAnalyzer` (and any `{Lang}Analyzer`, e.g. `from src import RustAnalyzer`) · **Component:** `code` / `polyglot` (whole plane) · `<ClassName>` (a single language)
+**Package:** `file_analyzer/prog_lang` · **Import:** `from file_analyzer import PolyglotCodeAnalyzer` (and any `{Lang}Analyzer`, e.g. `from file_analyzer import RustAnalyzer`) · **Component:** `code` / `polyglot` (whole plane) · `<ClassName>` (a single language)
 
 ## What it does
 
@@ -34,8 +34,8 @@ The package has three layers:
    (`rust_analyzer.py` → `RustAnalyzer`, `go_analyzer.py` → `GoAnalyzer`, etc.).
    Each declares the extensions it owns via its `EXTENSIONS` tuple / its entry in
    `EXT_MAP`, and emits the identical `code_tables` shape. Every class exported
-   from the package is listed in `src/prog_lang/__init__.py` `__all__` and is
-   re-exported from `src` (so `from src import RustAnalyzer` works).
+   from the package is listed in `file_analyzer/prog_lang/__init__.py` `__all__` and is
+   re-exported from `file_analyzer` (so `from file_analyzer import RustAnalyzer` works).
 
 3. **`PolyglotCodeAnalyzer`** (`polyglot.py`) — the dispatcher. It routes each
    input file to the right `{Lang}Analyzer` via `EXT_MAP`, runs each, and merges
@@ -70,19 +70,19 @@ some entries are pure aliases onto an existing analyzer of the same syntax famil
 Two other packages **extend the same table** at import time (see *How it fits the
 pipeline*):
 
-- `src/shell` merges its `SHELL_EXT_MAP` into `EXT_MAP` (shell / command-language
+- `file_analyzer/shell` merges its `SHELL_EXT_MAP` into `EXT_MAP` (shell / command-language
   / automation-script families).
-- `src/script` merges its `SCRIPT_EXT_MAP` into `EXT_MAP` (bash/sh/zsh/ksh, fish,
+- `file_analyzer/script` merges its `SCRIPT_EXT_MAP` into `EXT_MAP` (bash/sh/zsh/ksh, fish,
   PowerShell, batch, CMake, Gradle, Bazel Starlark, F# script, Perl).
 
 Both merges refuse to overwrite an existing, different analyzer (they raise a
 `RuntimeError` on collision), so `EXT_MAP` stays the single, conflict-free
 universe of code extensions. The exact count is best read from source
 (`len(PolyglotCodeAnalyzer.EXT_MAP)` after import, or
-`python -m src.main --list-components`) — it spans well over 250 suffixes and the
+`python -m file_analyzer.main --list-components`) — it spans well over 250 suffixes and the
 full `language_analyzers` class list is what `--list-components` prints.
 
-**Routing vs. selection.** The router (`src/router/routing.py`) derives its `code`
+**Routing vs. selection.** The router (`file_analyzer/router/routing.py`) derives its `code`
 extension universe *lazily* from `EXT_MAP` (`_code_exts()`), and `resolve_analyzer`
 returns `"code"` for any suffix in that set — checked **first**, before every
 other plane. So merging an extension into `EXT_MAP` (and nowhere else) is all it
@@ -94,14 +94,14 @@ takes to route that extension to the `code` plane.
 
 ```bash
 # the whole code plane (every code file routing assigns to `code`)
-python -m src.main . --component code --emit code.json
+python -m file_analyzer.main . --component code --emit code.json
 
 # a single language analyzer over ONLY the files whose extensions it claims
-python -m src.main . --component RustAnalyzer   --emit rust.json
-python -m src.main . --component PythonAnalyzer --emit py.json      # alias of PythonCodeAnalyzer
+python -m file_analyzer.main . --component RustAnalyzer   --emit rust.json
+python -m file_analyzer.main . --component PythonAnalyzer --emit py.json      # alias of PythonCodeAnalyzer
 
 # discover every valid name (planes + language_analyzers)
-python -m src.main --list-components
+python -m file_analyzer.main --list-components
 ```
 
 Component names are case-insensitive; `PythonAnalyzer` is accepted as an alias for
@@ -112,7 +112,7 @@ matches, the component emits empty tables and warns.
 
 ### Docker (component mode in a container)
 
-The `engine` service (compose profile `engine`) runs `python -m src.main`, so pass
+The `engine` service (compose profile `engine`) runs `python -m file_analyzer.main`, so pass
 it the same args. The repo mounts at `/workspace` and artifacts at `/artifacts`, so
 emit into `/artifacts` for the JSON to land on the host:
 
@@ -142,7 +142,7 @@ The public constructor mirrors what component mode calls
 (`engine_cls(file_paths=[...], dump_file_type="memory")` then `.analyze()`):
 
 ```python
-from src import PolyglotCodeAnalyzer
+from file_analyzer import PolyglotCodeAnalyzer
 
 eng = PolyglotCodeAnalyzer(
     file_paths=["a.py", "b.rs", "c.go"],   # list[str | Path]
@@ -151,7 +151,7 @@ eng = PolyglotCodeAnalyzer(
 tables = eng.analyze()                      # -> the code_tables dict
 
 # A single language analyzer has the same call shape:
-from src import RustAnalyzer
+from file_analyzer import RustAnalyzer
 rust_tables = RustAnalyzer(file_paths=["lib.rs"], dump_file_type="memory").analyze()
 ```
 
@@ -178,7 +178,7 @@ This is the `code_tables` family referenced throughout `main.py` / `USAGE.md`:
 | `introspection_metadata_table` | per-entity introspection (`metadata_id`, `entity_id`, `entity_type`, `language`, `inspection_source`, bytecode/AST dump, structural props). |
 | `temp_kind_details` | denormalized per-kind detail rows (+ Mermaid flowcharts), rebuilt once over the merged tables. |
 
-**Derived downstream, not produced here:** the views in `src/views/catalog.py`
+**Derived downstream, not produced here:** the views in `file_analyzer/views/catalog.py`
 also read `junction_class_methods` and `import_linkage_table`. Those are **not**
 emitted by the analyzers — `RepositoryDatabaseGenerator` builds
 `junction_class_methods` from `classes_table.method_ids`, and
@@ -221,5 +221,5 @@ tables the analyzer output feeds directly into views are `classes_table`,
 ## See also
 
 - [../USAGE.md](../USAGE.md) — the full CLI, component mode, and the `--tables-json` contract.
-- [../shell/README.md](../shell/README.md) — the `src/shell` fold-in.
-- [../script/README.md](../script/README.md) — the `src/script` fold-in.
+- [../shell/README.md](../shell/README.md) — the `file_analyzer/shell` fold-in.
+- [../script/README.md](../script/README.md) — the `file_analyzer/script` fold-in.

@@ -1,5 +1,5 @@
 {
-  "$comment": "Function-calling tool definitions for file-analyzer. Drop these into a `tools` array for Grok / DeepSeek / OpenAI-style APIs. They mirror the MCP server (mcp_server.py); dispatch each call to `python -m src.main ...` (use --quiet for pure-JSON stdout) or to the MCP tool of the same name. Intended loop: analyze_repository once, then query the returned `database` with SQL over the v_* views.",
+  "$comment": "Function-calling tool definitions for file-analyzer. Drop these into a `tools` array for Grok / DeepSeek / OpenAI-style APIs. They mirror the MCP server (mcp_server.py); dispatch each call to `python -m file_analyzer.main ...` (use --quiet for pure-JSON stdout) or to the MCP tool of the same name. Intended loop: analyze_repository once, then query the returned `database` with SQL over the v_* views.",
   "tools": [
     {
       "type": "function",
