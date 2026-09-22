@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 # ---------------------------------------------------------------------------
@@ -25,13 +25,13 @@ dynamic = ["version", "dependencies"]
 description = "Meta-package for the file-analyzer platform: installs the analysis profile (client foundation + analyzer engine). The database-hosting server ships separately as file-analyzer-server."
 readme = "README.md"
 requires-python = ">=3.9"
-license = { file = "LICENSE" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [{ name = "Rohan Pratap Reddy Ravula" }]
 keywords = ["static-analysis", "code-intelligence", "repository", "sqlite", "mcp", "ai-agent", "repository-monitor", "incremental-analysis", "document-intelligence"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Topic :: Software Development :: Libraries",
     "Topic :: Software Development :: Quality Assurance",
