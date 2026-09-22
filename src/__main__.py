@@ -50,6 +50,15 @@ def build_parser() -> argparse.ArgumentParser:
         prog="python -m src",
         description="Background repository monitor + incremental re-analysis.",
     )
+    from ._version import __version__
+
+    # Prints and exits during parsing (like --help) -- before the containment guard.
+    ap.add_argument(
+        "--version",
+        action="version",
+        version=f"file-analyzer {__version__}",
+        help="print the file-analyzer version and exit.",
+    )
     sub = ap.add_subparsers(dest="command")
 
     mon = sub.add_parser(
@@ -217,7 +226,9 @@ def _make_monitor(args: argparse.Namespace):
 def main(argv: Optional[List[str]] = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     # Allow the subcommand to be omitted: "python -m src /repo" == "... monitor /repo".
-    if argv and argv[0] not in ("monitor", "-h", "--help"):
+    # Top-level flags (--version/--help) must reach the top-level parser, so they
+    # are NOT rewritten into the monitor subcommand.
+    if argv and argv[0] not in ("monitor", "-h", "--help", "--version"):
         argv = ["monitor", *argv]
 
     args = build_parser().parse_args(argv)

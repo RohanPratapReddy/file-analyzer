@@ -4,7 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "file-analyzer"
-version = "0.1.0"
+# Version is the single source of truth in src/_version.py, read statically by
+# setuptools (see [tool.setuptools.dynamic] below). Bump it there for a release.
+dynamic = ["version"]
 description = "Repository intelligence platform: turns a source tree into a queryable SQLite/PostgreSQL database of code, schemas, data, archives, binaries and docs -- without executing it -- plus a live background monitor, an MCP agent-enrichment tier, and a document-intelligence engine."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -134,6 +136,12 @@ file-analyzer-monitor = "src.__main__:main"
 # no __init__.py (they are not importable Python), so they are not picked up as
 # packages here -- they travel as package-data instead (see below) so the
 # build-on-demand `go build` / `javac` fast paths work from an installed wheel.
+# Read the version from src/_version.py at build time. The module holds only a
+# literal assignment, so setuptools extracts it by AST parsing WITHOUT importing
+# the `src` package (no analyzer-fleet import during the build).
+[tool.setuptools.dynamic]
+version = { attr = "src._version.__version__" }
+
 [tool.setuptools.packages.find]
 include = ["src*"]
 

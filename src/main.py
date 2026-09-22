@@ -206,6 +206,16 @@ def build_parser() -> argparse.ArgumentParser:
         description="Run the tabgen AnalysisEngine over a repository and emit "
         "the .db + .sql artifacts (with analysis views installed).",
     )
+    from src._version import __version__
+
+    # Prints and exits during argument parsing (like --help), so it works on any
+    # host -- before the containment guard.
+    p.add_argument(
+        "--version",
+        action="version",
+        version=f"file-analyzer {__version__}",
+        help="print the file-analyzer version and exit.",
+    )
     p.add_argument(
         "source",
         nargs="?",

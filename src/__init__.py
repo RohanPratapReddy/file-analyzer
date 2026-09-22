@@ -11,6 +11,7 @@ the orchestration glue that ties them together:
                 + AnalysisEngine (orchestration glue)
 """
 
+from ._version import __version__  # noqa: F401  (SDK version; single source of truth)
 from .archive import ArchiveAnalyzer
 from .binary import BinaryForensicsAnalyzer, BinaryFormatParser, MachineCodeAnalyzer
 from .config import ConfigAnalyzer  # noqa: F401  (configuration-file analyzer plane)
@@ -41,6 +42,7 @@ from .shell import __all__ as _shell_all
 from .text import TextualAnalyzer  # noqa: F401  (text-record analyzer plane)
 
 __all__ = [
+    "__version__",
     "RepositoryAnalyzer",
     "ImportLinkageAnalyzer",
     "RepositoryDatabaseGenerator",

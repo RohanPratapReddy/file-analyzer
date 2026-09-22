@@ -78,18 +78,62 @@ from mcp.server.fastmcp import FastMCP  # noqa: E402
 # dominated by src.prog_lang). None of that is needed to stand the server up, so
 # deferring it keeps the stdio handshake fast; the cost is paid on first use.
 
+
+def _package_version() -> str:
+    """Recover the file-analyzer version WITHOUT importing the analyzer fleet.
+
+    Kept fleet-import-free for the same reason the tools import ``src`` lazily:
+    ``import src`` runs ``src/__init__.py`` and pulls in the whole analyzer fleet,
+    which would slow the stdio handshake this function feeds. So it prefers the
+    installed distribution's metadata (``importlib.metadata``) and, when the
+    package is not installed (e.g. running from a source checkout), falls back to
+    statically parsing ``src/_version.py`` -- the single source of truth, a bare
+    literal assignment -- rather than importing it. Never raises; returns a
+    ``0+unknown`` sentinel only if every path fails.
+    """
+    with contextlib.suppress(Exception):
+        from importlib.metadata import PackageNotFoundError
+        from importlib.metadata import version as _dist_version
+
+        try:
+            return _dist_version("file-analyzer")
+        except PackageNotFoundError:
+            pass
+    with contextlib.suppress(Exception):
+        import re
+
+        text = (_READERS_ROOT / "src" / "_version.py").read_text(encoding="utf-8")
+        m = re.search(r"""__version__\s*=\s*["']([^"']+)["']""", text)
+        if m:
+            return m.group(1)
+    return "0+unknown"
+
+
+__version__ = _package_version()
+
 mcp = FastMCP(
     "file-analyzer",
     instructions=(
-        "Static, read-only code-intelligence for a repository. First call "
-        "analyze_repository(path) to build a SQLite database of the repo (files, "
-        "symbols, imports, DB schemas, data profiles). It returns a 'database' "
-        "path. Then explore with list_views/describe_schema and answer questions "
-        "with query(sql, db_path) -- prefer the ready-made v_* views (e.g. "
-        "'SELECT * FROM v_extension_distribution'). The database is read-only; "
-        "only SELECT/WITH queries are accepted."
+        "Repository-intelligence platform. It never executes the analyzed code: "
+        "it parses a source tree into a queryable SQLite database (files, symbols, "
+        "imports, DB schemas, data profiles) and can also watch the repo live and "
+        "enrich files via an agent tier. First call analyze_repository(path) to "
+        "build the database -- it returns a 'database' path. Then explore with "
+        "list_views/describe_schema and answer questions with query(sql, db_path) "
+        "-- prefer the ready-made v_* views (e.g. 'SELECT * FROM "
+        "v_extension_distribution'). The query interface opens the database "
+        "read-only and accepts only SELECT/WITH statements. Call server_info() to "
+        "see this server's version and available native toolchains."
     ),
 )
+
+# Advertise the package version on the MCP handshake: FastMCP has no ``version``
+# constructor argument, but the low-level server it wraps carries a ``version``
+# that surfaces in the initialize response's ``serverInfo.version`` -- so a
+# connecting agent sees exactly which file-analyzer build is answering. Guarded
+# because the private attribute is not part of FastMCP's public API.
+with contextlib.suppress(Exception):
+    mcp._mcp_server.version = __version__
 
 
 # ---------------------------------------------------------------------------
@@ -163,6 +207,22 @@ def _views():
 # ---------------------------------------------------------------------------
 # Tools
 # ---------------------------------------------------------------------------
+@mcp.tool()
+def server_info() -> Dict[str, Any]:
+    """Identify this server: its file-analyzer version and native toolchains.
+
+    Handy right after connecting to confirm which build is answering (the same
+    version advertised on the MCP handshake as ``serverInfo.version``) and whether
+    the Go/Java cross-language fast paths are available on this host (they fall
+    back to concurrent Python when absent).
+    """
+    return {
+        "name": "file-analyzer",
+        "version": __version__,
+        "toolchains": _toolchains(),
+    }
+
+
 @mcp.tool()
 def analyze_repository(
     path: str,
@@ -779,11 +839,17 @@ def _start_warm_cache() -> Optional[threading.Thread]:
 
 
 def main() -> None:
+    argv = sys.argv[1:]
+    # ``--version``: print the version and exit without standing up the server
+    # (mirrors the src.main / python -m src CLIs). No fleet import needed.
+    if "--version" in argv:
+        print(f"file-analyzer {__version__}")
+        return
     # ``python -m mcp_server --precompile`` / ``file-analyzer-mcp --precompile``:
     # do the warm-up synchronously and exit, without starting the server. Run this
     # once at install or MCP-registration time (Dockerfile, postinstall, CI) so the
     # first real server the agent launches is already warm.
-    if "--precompile" in sys.argv[1:]:
+    if "--precompile" in argv:
         warm_cache()
         return
     _start_warm_cache()
