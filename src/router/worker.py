@@ -52,6 +52,7 @@ def run_shard(readers_root: str, temp_dir: str, shard_id: str) -> Path:
         DataAnalyzer,
         DatabaseAnalyzer,
         DocumentAnalyzer,
+        DocumentParser,
         MarkupAnalyzer,
         MiscAnalyzer,
         PolyglotCodeAnalyzer,
@@ -68,6 +69,7 @@ def run_shard(readers_root: str, temp_dir: str, shard_id: str) -> Path:
         "text": TextualAnalyzer,
         "markup": MarkupAnalyzer,
         "document": DocumentAnalyzer,
+        "document_parser": DocumentParser,
         "misc": MiscAnalyzer,
     }
 
@@ -89,6 +91,7 @@ def run_shard(readers_root: str, temp_dir: str, shard_id: str) -> Path:
         "text",
         "markup",
         "document",
+        "document_parser",
         "misc",
     ):
         # Rewrite local file_ids -> repository file_ids and build the file index.

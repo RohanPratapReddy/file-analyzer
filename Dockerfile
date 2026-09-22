@@ -173,3 +173,41 @@ ENV PYTHONPATH=/app \
 # the args in compose (or on the CLI), e.g. add `--dialect postgresql`.
 ENTRYPOINT ["python", "-m", "src.main"]
 CMD ["/workspace", "--out", "/artifacts"]
+
+# =============================================================================
+# Optional: the always-on background MONITOR (incremental re-analysis daemon)
+# =============================================================================
+# Runs `python -m src monitor /workspace` as a long-lived process: it watches the
+# repo mounted at /workspace, records the last 16 changes into the FIFO diff
+# database and re-analyzes changed files across the Go worker pool as they appear.
+#
+# Zombie prevention is layered:
+#   * `tini` is PID 1 and reaps any orphaned grandchildren (the compose service
+#     also sets `init: true` as a second line of defense);
+#   * the monitor installs SIGINT/SIGTERM handlers, writes a PID file and stops
+#     its daemon threads + waits on every worker child on shutdown (SIGTERM from
+#     `docker stop` therefore drains cleanly within stop_grace_period).
+#
+# The Go worker pool is real here: the Go 1.22 toolchain is copied in so the pool
+# builds `src/monitor/go` on first use (GOCACHE/GOPATH point at writable /tmp).
+# Without Go it would transparently fall back to the concurrent.futures pool.
+# Gated behind the compose `monitor` profile. Requires the whole src/ package in
+# the build context (see .dockerignore).
+FROM python:3.12-slim-bookworm AS monitor
+COPY --from=golang:1.22-bookworm /usr/local/go /usr/local/go
+ENV PATH="/usr/local/go/bin:${PATH}" \
+    GOCACHE=/tmp/gocache \
+    GOPATH=/tmp/gopath \
+    GOFLAGS=-mod=mod
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends git ca-certificates tini \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY src/ ./src/
+ENV PYTHONPATH=/app \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+# tini (PID 1) forwards signals and reaps zombies; the monitor itself handles
+# SIGTERM/SIGINT for a clean drain. Watch /workspace; keep state under /artifacts.
+ENTRYPOINT ["tini", "--", "python", "-m", "src", "monitor"]
+CMD ["/workspace", "--out", "/artifacts", "--interval", "2"]

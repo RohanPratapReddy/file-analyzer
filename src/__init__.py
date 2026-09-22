@@ -25,6 +25,10 @@ from .core.repository_analyzer import RepositoryAnalyzer
 from .data import DataAnalyzer
 from .database import DatabaseAnalyzer
 from .document import DocumentAnalyzer  # noqa: F401  (document analyzer plane)
+from .document import DocumentParser  # noqa: F401  (document-format analyzer plane)
+from .document import (  # noqa: F401  (DocumentParser's two-database generator)
+    DocumentParserDatabaseGenerator,
+)
 from .markup import MarkupAnalyzer  # noqa: F401  (markup analyzer plane)
 from .misc import MiscAnalyzer  # noqa: F401  (terminal misc analyzer plane)
 from .prog_lang import *  # noqa: F401,F403  (all {Lang}Analyzers + bases + polyglot)
@@ -54,6 +58,8 @@ __all__ = [
     "TextualAnalyzer",
     "MarkupAnalyzer",
     "DocumentAnalyzer",
+    "DocumentParser",
+    "DocumentParserDatabaseGenerator",
     "MiscAnalyzer",
     "SHELL_EXT_MAP",
     *_prog_all,

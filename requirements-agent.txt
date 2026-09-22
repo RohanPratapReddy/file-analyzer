@@ -10,3 +10,35 @@
 # Pinned to the 1.x line: mcp_server.py is built on the v1 FastMCP API, which
 # 2.x renamed to MCPServer (mcp.server.mcpserver) with a changed surface.
 mcp[cli]>=1.2,<2         # Model Context Protocol SDK (FastMCP, stdio transport)
+
+# =============================================================================
+# Multi-agent connectors (DocumentParser Parts B & C -- dynamic agent+code loop
+# and the Part-C LLM-as-judge RAG metrics)
+# =============================================================================
+# src/document/agent_mcp.py speaks to external coding agents / LLM providers
+# (Claude Code, Claude/Gemini agents, Gemini CLI, Antigravity desktop, Grok,
+# opencode, DeepSeek, Moonshot Kimi, ...) over TWO transports that need NOTHING
+# beyond the stdlib:
+#   * MCP stdio  -- spawns the agent's own `mcp` server as a subprocess; the
+#                   `mcp[cli]` pin above is the only requirement.
+#   * HTTP JSON  -- OpenAI-compatible /chat/completions via urllib (stdlib).
+# So the agent + judge layer runs with just `mcp[cli]`. The packages below are
+# OPTIONAL: install the vendor SDK only if you prefer its native client over the
+# generic HTTP transport (agent_mcp.py auto-detects and falls back to HTTP).
+#
+#   pip install -r requirements-agent.txt          # stdio + HTTP, no SDKs
+#   pip install -r requirements-agent.txt anthropic openai google-genai
+#
+# anthropic              # native Claude client (Claude Code / Claude agents)
+# openai                 # OpenAI-compatible client (Grok, DeepSeek, Kimi, ...)
+# google-genai           # native Gemini client (Gemini CLI / agents)
+#
+# Provider endpoints, models and API keys are configuration, NOT dependencies:
+# set them via the provider spec / environment (see docs/document-engine-agents.md).
+
+# =============================================================================
+# Background monitor tools exposed over MCP
+# =============================================================================
+# mcp_server.py also exposes the repository monitor (start_monitor / stop_monitor
+# / monitor_status / recent_changes / scan_now). That layer (src/monitor/) is
+# pure stdlib -- it adds NO dependency here beyond the `mcp[cli]` pin above.

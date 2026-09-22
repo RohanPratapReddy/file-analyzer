@@ -151,6 +151,40 @@ services:
       - ${ARTIFACTS_DIR:-./artifacts}:/artifacts:ro
     networks: [tabgen]
 
+  # ----------------------------------------------------------- monitor (opt) -
+  # The always-on background MONITOR: `python -m src monitor /workspace`. Watches
+  # the mounted repo, records the last 16 changes into the FIFO diff database
+  # (under /artifacts/.file-analyzer/monitor/changes.db) and re-analyzes changed
+  # files across the Go worker pool as agents / users / tools touch them. Opt-in:
+  #   SOURCE_DIR=/path/to/repo ARTIFACTS_DIR=./artifacts \
+  #     docker compose --profile monitor up --build monitor
+  # Inspect it live from the host with the read-only diff DB, or over MCP.
+  #
+  # Zombie prevention: `init: true` runs Docker's tini as PID 1 to reap orphans
+  # (the image ALSO bakes in tini as a second line), and `stop_grace_period`
+  # gives the monitor's SIGTERM handler time to drain daemon threads and wait on
+  # every worker child before the container is killed.
+  #
+  # Tune via MONITOR_ARGS (shell-split, replaces `command`), e.g.:
+  #   MONITOR_ARGS="/workspace --out /artifacts --interval 1 --max-workers 200 \
+  #     --min-workers 20" docker compose --profile monitor up --build monitor
+  monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: monitor
+    profiles: ["monitor"]
+    init: true                     # tini as PID 1: forwards signals, reaps zombies
+    stop_grace_period: 30s         # let the SIGTERM handler drain before SIGKILL
+    restart: unless-stopped
+    command: ${MONITOR_ARGS:-/workspace --out /artifacts --interval 2}
+    volumes:
+      # Repo to watch. Read-only: the monitor only reads source to re-analyze it;
+      # all state (diff DB, per-file analysis) is written under /artifacts.
+      - ${SOURCE_DIR:-./workspace}:/workspace:ro
+      - ${ARTIFACTS_DIR:-./artifacts}:/artifacts
+    networks: [tabgen]
+
   # ---------------------------------------------------------------- frontend -
   # pgAdmin is used here; to swap in another frontend, replace this service with
   # e.g. Mathesar (mathesar/mathesar) or Adminer (adminer) -- all connect to the

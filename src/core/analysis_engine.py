@@ -33,7 +33,7 @@ import os
 import shutil
 import stat
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
 
 from ..router import RouterPlanes
 from .db_generator import RepositoryDatabaseGenerator
@@ -74,6 +74,51 @@ class AnalysisEngine:
         enable_conversion_analysis: bool = True,
         conversions_dir: Optional[Union[str, Path]] = None,
         enable_views: bool = True,
+        # --- DocumentParser databases (Database 1 + Database 2) -------------
+        enable_document_databases: bool = True,
+        enable_char_index: bool = True,
+        concordance_max_bytes: int = 25_000_000,
+        document_index_db_path: Optional[Union[str, Path]] = None,
+        document_index_sql_path: Optional[Union[str, Path]] = None,
+        document_metrics_db_path: Optional[Union[str, Path]] = None,
+        document_metrics_sql_path: Optional[Union[str, Path]] = None,
+        # Database 3 (Part-B dynamic agent+code layer): opt-in, non-load-bearing.
+        enable_dynamic_database: bool = False,
+        document_dynamic_db_path: Optional[Union[str, Path]] = None,
+        document_dynamic_sql_path: Optional[Union[str, Path]] = None,
+        dynamic_agent_registry: Optional[Any] = None,
+        dynamic_roster: Optional[Any] = None,
+        # Database 4 (Part-C evaluation layer): opt-in, non-load-bearing.
+        enable_evaluation_database: bool = False,
+        document_eval_db_path: Optional[Union[str, Path]] = None,
+        document_eval_sql_path: Optional[Union[str, Path]] = None,
+        evaluation_cases: Optional[Sequence[Any]] = None,
+        evaluation_agent_registry: Optional[Any] = None,
+        evaluation_judge: str = "",
+        # Database 5 (MCP content-aware enrichment layer): opt-in, soft.
+        enable_mcp_enrichment: bool = False,
+        mcp_enrichment_db_path: Optional[Union[str, Path]] = None,
+        mcp_enrichment_sql_path: Optional[Union[str, Path]] = None,
+        mcp_agent_registry: Optional[Any] = None,
+        mcp_roster: Optional[str] = None,
+        mcp_max_agent_files: int = 40,
+        mcp_max_file_bytes: int = 2_000_000,
+        # Agent selection: applied to EVERY agent-driven layer -- the DB3
+        # dynamic parser layer, the DB4 evaluation parser layer, and the DB5
+        # enrichment analyzers. ``agents_include`` (when non-empty) is an
+        # allow-list; ``agents_exclude`` is a deny-list. Names match provider
+        # names case-insensitively and unknown names are ignored, so the filter
+        # is soft. ``discover_agents`` lets the parser layers resolve a registry
+        # from the desktop/CLI-configured MCP servers so the filter has
+        # providers to act on (enrichment already discovers on its own).
+        agents_include: Optional[Iterable[str]] = None,
+        agents_exclude: Optional[Iterable[str]] = None,
+        discover_agents: bool = False,
+        # Unified database: fold repository.db + the four DocumentParser
+        # databases into one .db (+ .sql) with every object source-qualified.
+        enable_unified_database: bool = True,
+        unified_db_path: Optional[Union[str, Path]] = None,
+        unified_sql_path: Optional[Union[str, Path]] = None,
         # --- RepositoryDatabaseGenerator (DDL/dump) knobs -------------------
         schema_name: str = "code_intelligence",
         drop_existing: bool = True,
@@ -144,6 +189,114 @@ class AnalysisEngine:
         )
         self._archive_depth = _archive_depth
 
+        # DocumentParser owns two databases kept separate from the single
+        # repository database: Database 1 (the token/character concordance
+        # hash-table registry, built from every file) and Database 2 (the Part-A
+        # static document-metric database). Both are dumped as their own .db+.sql
+        # beside the repository database unless explicit paths are given.
+        self.enable_document_databases = enable_document_databases
+        self.enable_char_index = enable_char_index
+        self.concordance_max_bytes = concordance_max_bytes
+        db_parent = self.db_path.resolve().parent
+        self.document_index_db_path = Path(
+            document_index_db_path
+            if document_index_db_path is not None
+            else db_parent / "document_index.db"
+        )
+        self.document_index_sql_path = Path(
+            document_index_sql_path
+            if document_index_sql_path is not None
+            else db_parent / "document_index.sql"
+        )
+        self.document_metrics_db_path = Path(
+            document_metrics_db_path
+            if document_metrics_db_path is not None
+            else db_parent / "document_metrics.db"
+        )
+        self.document_metrics_sql_path = Path(
+            document_metrics_sql_path
+            if document_metrics_sql_path is not None
+            else db_parent / "document_metrics.sql"
+        )
+        # Database 3 (Part-B dynamic layer): the agent+code loop over the
+        # analyzed documents. Off by default (needs opt-in because it can drive
+        # external agents); when on but no provider is reachable it still emits
+        # real rows via the deterministic HeuristicRunner fallback.
+        self.enable_dynamic_database = enable_dynamic_database
+        self.dynamic_agent_registry = dynamic_agent_registry
+        self.dynamic_roster = dynamic_roster
+        self.document_dynamic_db_path = Path(
+            document_dynamic_db_path
+            if document_dynamic_db_path is not None
+            else db_parent / "document_dynamic.db"
+        )
+        self.document_dynamic_sql_path = Path(
+            document_dynamic_sql_path
+            if document_dynamic_sql_path is not None
+            else db_parent / "document_dynamic.sql"
+        )
+        # Database 4 (Part-C evaluation layer): metric + LLM-judge scoring over
+        # the analyzed documents. Off by default (the RAG family can drive an
+        # external judge agent); when on but no judge is reachable it still emits
+        # real rows via the deterministic HeuristicJudge fallback, and derives
+        # calibration/KPI cases from the Part-B run when it is present.
+        self.enable_evaluation_database = enable_evaluation_database
+        self.evaluation_cases = evaluation_cases
+        self.evaluation_agent_registry = evaluation_agent_registry
+        self.evaluation_judge = evaluation_judge
+        self.document_eval_db_path = Path(
+            document_eval_db_path
+            if document_eval_db_path is not None
+            else db_parent / "document_eval.db"
+        )
+        self.document_eval_sql_path = Path(
+            document_eval_sql_path
+            if document_eval_sql_path is not None
+            else db_parent / "document_eval.sql"
+        )
+        # Database 5 (MCP content-aware enrichment layer): opt-in,
+        # non-load-bearing. Content-type-aware "more information" for every
+        # censused file -- deterministic metrics/quality/security/symbol-doc
+        # tables always, plus soft agent-derived rows only when a provider is
+        # reachable (silently skipped, never terminating, when undetected).
+        self.enable_mcp_enrichment = enable_mcp_enrichment
+        self.mcp_agent_registry = mcp_agent_registry
+        self.mcp_roster = mcp_roster
+        self.mcp_max_agent_files = mcp_max_agent_files
+        self.mcp_max_file_bytes = mcp_max_file_bytes
+        self.mcp_enrichment_db_path = Path(
+            mcp_enrichment_db_path
+            if mcp_enrichment_db_path is not None
+            else db_parent / "mcp_enrichment.db"
+        )
+        self.mcp_enrichment_sql_path = Path(
+            mcp_enrichment_sql_path
+            if mcp_enrichment_sql_path is not None
+            else db_parent / "mcp_enrichment.sql"
+        )
+
+        # Agent allow/deny-list applied to every agent-driven layer.
+        self.agents_include = list(agents_include) if agents_include else None
+        self.agents_exclude = list(agents_exclude) if agents_exclude else None
+        self.discover_agents = discover_agents
+
+        # Unified database: a single SQLite file (+ portable .sql dump) that
+        # folds the repository database and whichever DocumentParser databases
+        # were built into one file, each object source-qualified by a name
+        # prefix (repo__ / docindex__ / docmetrics__ / docdynamic__ / doceval__)
+        # so nothing collides and provenance is preserved. Built after every
+        # source .db is materialized; non-load-bearing (a merge failure never
+        # breaks the per-database build). Written beside the repository DB.
+        self.enable_unified_database = enable_unified_database
+        self.unified_db_path = Path(
+            unified_db_path if unified_db_path is not None else db_parent / "unified.db"
+        )
+        self.unified_sql_path = Path(
+            unified_sql_path
+            if unified_sql_path is not None
+            else db_parent / "unified.sql"
+        )
+
         # The 'readers' directory is the parent of the 'src' package, and is the
         # sys.path root that makes 'from src import ...' resolve inside workers.
         # This module lives at src/core/analysis_engine.py, so readers/ is 2 up.
@@ -189,6 +342,17 @@ class AnalysisEngine:
             by_class[payload["analyzer_class"]] = payload["tables"]
         return by_class
 
+    def _collect_concordance_files(self) -> List[Dict[str, Any]]:
+        """Flatten every shard's temp/concordance/*.json into one file list."""
+        conc_dir = self.temp_dir / "concordance"
+        out: List[Dict[str, Any]] = []
+        if not conc_dir.exists():
+            return out
+        for shard_file in sorted(conc_dir.glob("*.json")):
+            payload = json.loads(shard_file.read_text(encoding="utf-8"))
+            out.extend(payload.get("files", []))
+        return out
+
     def _shard_file_paths(self, analyzer_class: str) -> List[str]:
         mapping = json.loads(
             (self.temp_dir / "mapping.json").read_text(encoding="utf-8")
@@ -211,6 +375,32 @@ class AnalysisEngine:
 
         if path.exists():
             shutil.rmtree(path, onerror=_onerror)
+
+    # ------------------------------------------------------------------
+    def _resolve_agent_registry(self, base: Optional[Any]) -> Optional[Any]:
+        """Resolve an agent registry and apply the global include/exclude list.
+
+        ``base`` wins when supplied; otherwise, when ``discover_agents`` is set,
+        the desktop/CLI-configured MCP servers are discovered. The resulting
+        registry (if any) is then narrowed by ``agents_include`` /
+        ``agents_exclude``. Any failure degrades softly to ``base`` so an
+        agent-driven layer never terminates on selection problems.
+        """
+        registry = base
+        try:
+            if registry is None and self.discover_agents:
+                from ..document.agent_mcp import AgentRegistry
+
+                registry = AgentRegistry.from_desktop(project_dir=str(self.dir_path))
+            if (
+                (self.agents_include or self.agents_exclude)
+                and registry is not None
+                and hasattr(registry, "select")
+            ):
+                registry = registry.select(self.agents_include, self.agents_exclude)
+        except Exception:
+            return base
+        return registry
 
     # ------------------------------------------------------------------
     def run(self) -> Dict[str, Any]:
@@ -263,6 +453,7 @@ class AnalysisEngine:
         text_tables = by_class.get("text") or None
         markup_tables = by_class.get("markup") or None
         document_tables = by_class.get("document") or None
+        document_parser_tables = by_class.get("document_parser") or None
         misc_tables = by_class.get("misc") or None
 
         # 4. Cross-file import linkage over the code tables.
@@ -442,6 +633,201 @@ class AnalysisEngine:
             except Exception as exc:  # views are a convenience layer, not load-bearing
                 views_error = str(exc)
 
+        # 5c. DocumentParser databases. Database 1 (token/character concordance
+        #     registry over *every* file) is produced by fanning out the
+        #     concordance routing worker per shard; Database 2 (Part-A static
+        #     metrics over document files) comes from the document_parser analysis
+        #     plane. Both are dumped as their own .db+.sql beside repository.db,
+        #     with a schema deliberately distinct from RepositoryDatabaseGenerator.
+        #     Non-load-bearing: a failure here never breaks the repository build.
+        document_db_summary: Dict[str, Any] = {}
+        if self.enable_document_databases:
+            try:
+                from ..document.document_db import DocumentParserDatabaseGenerator
+
+                planes.run_concordance(
+                    shards,
+                    index_chars=self.enable_char_index,
+                    max_bytes=self.concordance_max_bytes,
+                )
+                concordance_files = self._collect_concordance_files()
+
+                # Database 3 (Part-B dynamic layer): opt-in. The routed metric
+                # tables carry no extracted text (they were produced in worker
+                # processes), so run a local DocumentParser over the document
+                # shard's files to drive the agent+code loop with real source.
+                dynamic_tables: Optional[Dict[str, List[Dict[str, Any]]]] = None
+                doc_parser: Optional[Any] = None
+                if self.enable_dynamic_database or self.enable_evaluation_database:
+                    try:
+                        from ..document.document_parser import DocumentParser
+
+                        doc_paths = self._shard_file_paths("document_parser")
+                        if doc_paths:
+                            doc_parser = DocumentParser(
+                                doc_paths,
+                                enable_grep=False,
+                                enable_lang_scan=False,
+                            )
+                            doc_parser.analyze()
+                            if self.enable_dynamic_database:
+                                dynamic_tables = doc_parser.dynamic_analyze(
+                                    registry=self.dynamic_agent_registry,
+                                    roster=self.dynamic_roster,
+                                    agents_include=self.agents_include,
+                                    agents_exclude=self.agents_exclude,
+                                    discover_desktop=self.discover_agents,
+                                    project_dir=str(self.dir_path),
+                                )
+                    except Exception as exc:  # dynamic layer is additive
+                        dynamic_tables = {
+                            "dynamic_loop_events_table": [
+                                {
+                                    "event_id": 1,
+                                    "document_id": 0,
+                                    "iteration": 0,
+                                    "action": "error",
+                                    "target_field": "",
+                                    "method": "engine",
+                                    "detail": f"{type(exc).__name__}: {exc}",
+                                    "outcome": "error",
+                                }
+                            ]
+                        }
+
+                # Database 4 (Part-C evaluation): opt-in. Scores any supplied
+                # evaluation cases and derives calibration/KPI cases from the
+                # Part-B run (when present), judging the C3 RAG family over the
+                # evaluation registry (heuristic fallback when unreachable).
+                evaluation_tables: Optional[Dict[str, List[Dict[str, Any]]]] = None
+                if self.enable_evaluation_database:
+                    try:
+                        from ..document.evaluation_engine import EvaluationEngine
+
+                        cases = list(self.evaluation_cases or [])
+                        if doc_parser is not None and doc_parser.dynamic_tables:
+                            cases.extend(
+                                EvaluationEngine.from_dynamic_tables(
+                                    doc_parser.dynamic_tables
+                                )
+                            )
+                        evaluation_tables = EvaluationEngine(
+                            registry=self._resolve_agent_registry(
+                                self.evaluation_agent_registry
+                            ),
+                            judge=self.evaluation_judge,
+                        ).run(cases)
+                    except Exception:  # evaluation layer is additive
+                        evaluation_tables = None
+
+                doc_gen = DocumentParserDatabaseGenerator(
+                    concordance_files=concordance_files,
+                    document_tables=document_parser_tables,
+                    repository_files=files,
+                    index_db_path=str(self.document_index_db_path),
+                    index_sql_path=str(self.document_index_sql_path),
+                    metrics_db_path=str(self.document_metrics_db_path),
+                    metrics_sql_path=str(self.document_metrics_sql_path),
+                    dynamic_db_path=str(self.document_dynamic_db_path),
+                    dynamic_sql_path=str(self.document_dynamic_sql_path),
+                    dynamic_tables=dynamic_tables,
+                    eval_db_path=str(self.document_eval_db_path),
+                    eval_sql_path=str(self.document_eval_sql_path),
+                    evaluation_tables=evaluation_tables,
+                    schema_name="document_intelligence",
+                )
+                document_db_summary = doc_gen.generate()
+                document_db_summary["concordance_files_indexed"] = len(
+                    concordance_files
+                )
+            except Exception as exc:  # document DBs are additive, not load-bearing
+                document_db_summary = {"document_databases_error": str(exc)}
+
+        # 5c-bis. MCP content-aware enrichment (Database 5). For every censused
+        #     file, classify a content family (code/markup/data/config/document/
+        #     text/schema/binary/media/archive/database/misc) and emit additional
+        #     tables of "more information": generic + family-specific metrics,
+        #     quality & smells findings, redacting security/PII flags, symbol-doc
+        #     coverage joined out of the code tables, and an extractive summary.
+        #     A soft agent tier (same agent_mcp transport, discover=True) adds
+        #     agent-derived rows *only* when a provider is reachable -- when none
+        #     is detected the agent tables stay empty and the deterministic tables
+        #     still fully populate. Non-load-bearing: any failure is recorded and
+        #     never breaks the run. Runs centrally here (not in the shard workers)
+        #     so a live provider is probed once, not once per shard.
+        mcp_enrichment_summary: Dict[str, Any] = {}
+        if self.enable_mcp_enrichment:
+            try:
+                from .mcp_enrichment import (
+                    McpEnrichmentDatabaseGenerator,
+                    McpEnrichmentEngine,
+                )
+
+                enrich = McpEnrichmentEngine(
+                    mapping["mapping"],
+                    repository_files=files,
+                    code_tables=code_tables,
+                    registry=self.mcp_agent_registry,
+                    roster=self.mcp_roster,
+                    agents_include=self.agents_include,
+                    agents_exclude=self.agents_exclude,
+                    project_dir=str(self.dir_path),
+                    max_file_bytes=self.mcp_max_file_bytes,
+                    max_agent_files=self.mcp_max_agent_files,
+                ).analyze()
+                mcp_enrichment_summary = McpEnrichmentDatabaseGenerator(
+                    enrich.get_tables(),
+                    db_path=str(self.mcp_enrichment_db_path),
+                    sql_path=str(self.mcp_enrichment_sql_path),
+                    schema_name="mcp_enrichment",
+                ).generate()
+            except Exception as exc:  # enrichment layer is additive, not load-bearing
+                mcp_enrichment_summary = {"mcp_enrichment_error": str(exc)}
+
+        # 5d. Unified database. Fold the repository database and whichever of the
+        #     four DocumentParser databases were materialized (opt-in DB3/DB4 are
+        #     skipped automatically when absent) into a single .db + .sql, every
+        #     object source-qualified by a name prefix so the five schemas -- which
+        #     share the v_* view namespace -- merge without collision and keep
+        #     their provenance. The build verifies itself (integrity_check + every
+        #     merged view must resolve) before it is accepted. Non-load-bearing:
+        #     a merge failure is recorded but never breaks the per-database build.
+        unified_summary: Dict[str, Any] = {}
+        if self.enable_unified_database:
+            try:
+                from .unified_db import UnifiedDatabaseBuilder
+
+                unified_summary = UnifiedDatabaseBuilder(
+                    sources=[
+                        ("repository", "repo", str(self.db_path)),
+                        (
+                            "document_index",
+                            "docindex",
+                            str(self.document_index_db_path),
+                        ),
+                        (
+                            "document_metrics",
+                            "docmetrics",
+                            str(self.document_metrics_db_path),
+                        ),
+                        (
+                            "document_dynamic",
+                            "docdynamic",
+                            str(self.document_dynamic_db_path),
+                        ),
+                        ("document_eval", "doceval", str(self.document_eval_db_path)),
+                        (
+                            "mcp_enrichment",
+                            "mcpenrich",
+                            str(self.mcp_enrichment_db_path),
+                        ),
+                    ],
+                    unified_db_path=str(self.unified_db_path),
+                    unified_sql_path=str(self.unified_sql_path),
+                ).build()
+            except Exception as exc:  # unified merge is additive, not load-bearing
+                unified_summary = {"unified_database_error": str(exc)}
+
         summary = {
             "repository_root": str(self.dir_path),
             "database": str(self.db_path),
@@ -459,6 +845,12 @@ class AnalysisEngine:
         if views_error is not None:
             summary["views_error"] = views_error
         summary.update(conversions_summary)
+        if document_db_summary:
+            summary["document_databases"] = document_db_summary
+        if mcp_enrichment_summary:
+            summary["mcp_enrichment"] = mcp_enrichment_summary
+        if unified_summary:
+            summary["unified_database"] = unified_summary
 
         # 6. Success cleanup: remove temp/ (unless retained by request).
         if not self.keep_temp_on_success:

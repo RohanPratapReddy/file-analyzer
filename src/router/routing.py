@@ -23,7 +23,10 @@ extension tables):
     * ``"data"``    -> DataAnalyzer            (tabular / tensor / structured data)
     * ``None``      -> unrouted (no engine claims the suffix)
 
-Priority is ``code > schema > archive > binary > data``. Content-sniffed, extension-ambiguous
+Priority is ``code > schema > document_parser > archive > binary > data``
+(``document_parser`` is a dedicated high-priority plane for true document formats
+-- ``.pdf`` / ``.doc*`` / ``.odt`` / ``.rtf`` / ``.epub`` / ... -- see
+``DocumentParser``). Content-sniffed, extension-ambiguous
 formats (``.json`` / ``.md``: SchemaAnalyzer only claims them when their *content*
 is a Mongo/Avro/JSON-schema or a Redis-keyspace table) are deliberately routed to
 DataAnalyzer, which is their overwhelmingly common case and which degrades to a
@@ -47,6 +50,7 @@ ANALYZER_CLASSES: Dict[str, str] = {
     "text": "TextualAnalyzer",
     "markup": "MarkupAnalyzer",
     "document": "DocumentAnalyzer",
+    "document_parser": "DocumentParser",
     "misc": "MiscAnalyzer",
 }
 
@@ -268,6 +272,7 @@ _CONFIG_EXTS: Optional[frozenset] = None
 _TEXT_EXTS: Optional[frozenset] = None
 _MARKUP_EXTS: Optional[frozenset] = None
 _DOCUMENT_EXTS: Optional[frozenset] = None
+_DOCUMENT_PARSER_EXTS: Optional[frozenset] = None
 _MISC_EXTS: Optional[frozenset] = None
 
 
@@ -318,6 +323,7 @@ def _binary_format_exts() -> frozenset:
         owned = (
             set(_code_exts())
             | set(_SCHEMA_EXTS)
+            | set(_document_parser_exts())
             | set(_database_exts())
             | set(_ARCHIVE_EXTS)
             | set(_BINARY_EXTS)
@@ -332,6 +338,32 @@ def _binary_format_exts() -> frozenset:
         _BINARY_FMT_EXCLUDE = frozenset({".md5", ".ora"})
         _BINARY_FMT_EXTS = frozenset(cand - owned - _BINARY_FMT_EXCLUDE)
     return _BINARY_FMT_EXTS
+
+
+def _document_parser_exts() -> frozenset:
+    """Last-component suffixes owned by DocumentParser's document-format universe.
+
+    The ``document`` ``extension_type`` universe from the canonical catalogue --
+    word-processor documents, e-books, page-description / fixed-layout formats,
+    notation and other rich documents (``.pdf`` / ``.doc`` / ``.docx`` / ``.odt``
+    / ``.rtf`` / ``.epub`` / ``.mobi`` / ``.azw*`` / ``.pages`` / ``.keynote`` /
+    ``.djvu`` / ...). This is a HIGH-priority plane (checked right after ``code``
+    and ``schema``), so it deliberately *reclaims* these document suffixes from the
+    lower-priority generic planes (data / binary-format / archive / text / the
+    residual ``document`` plane) that previously absorbed them by tail. Only the
+    two structured planes above it keep their suffixes: genuinely dual-use tails
+    that are a *program* or a *schema* far more often than a document -- ``.gp`` /
+    ``.ws`` / ``.ily`` (source code) and ``.msg`` (ROS message IDL) -- are
+    subtracted here so those routing decisions do not change.
+    """
+    global _DOCUMENT_PARSER_EXTS
+    if _DOCUMENT_PARSER_EXTS is None:
+        from ..document.document_parser import DocumentParser
+
+        cand = set(DocumentParser.routing_suffixes())
+        owned = set(_code_exts()) | set(_SCHEMA_EXTS)
+        _DOCUMENT_PARSER_EXTS = frozenset(cand - owned)
+    return _DOCUMENT_PARSER_EXTS
 
 
 def _config_exts() -> frozenset:
@@ -357,6 +389,7 @@ def _config_exts() -> frozenset:
             | set(_ARCHIVE_EXTS)
             | set(_BINARY_EXTS)
             | set(_data_exts())
+            | set(_document_parser_exts())
             | set(_binary_format_exts())
         )
         _CONFIG_EXTS = frozenset(cand - owned)
@@ -385,6 +418,7 @@ def _text_exts() -> frozenset:
             | set(_BINARY_EXTS)
             | set(_data_exts())
             | set(_binary_format_exts())
+            | set(_document_parser_exts())
             | set(_config_exts())
         )
         _TEXT_EXTS = frozenset(cand - owned)
@@ -415,6 +449,7 @@ def _markup_exts() -> frozenset:
             | set(_data_exts())
             | set(_binary_format_exts())
             | set(_config_exts())
+            | set(_document_parser_exts())
             | set(_text_exts())
         )
         _MARKUP_EXTS = frozenset(cand - owned)
@@ -448,6 +483,7 @@ def _document_exts() -> frozenset:
             | set(_binary_format_exts())
             | set(_config_exts())
             | set(_text_exts())
+            | set(_document_parser_exts())
             | set(_markup_exts())
         )
         _DOCUMENT_EXTS = frozenset(cand - owned)
@@ -480,6 +516,7 @@ def _misc_exts() -> frozenset:
             | set(_config_exts())
             | set(_text_exts())
             | set(_markup_exts())
+            | set(_document_parser_exts())
             | set(_document_exts())
         )
         _MISC_EXTS = frozenset(cand - owned)
@@ -500,6 +537,14 @@ def resolve_analyzer(name_or_path: Union[str, Path]) -> Optional[str]:
         return "code"
     if ext in _SCHEMA_EXTS:
         return "schema"
+    # Document-format files (word-processor / e-book / page-description / notation
+    # documents). A HIGH-priority plane: it reclaims these ``document``-type
+    # suffixes from the lower-priority generic planes (data / binary-format /
+    # archive / text / ...) that previously absorbed them by tail. Only ``code``
+    # and ``schema`` above keep their dual-use tails (``.gp`` / ``.ws`` / ``.ily`` /
+    # ``.msg``); those are already subtracted from this set.
+    if ext in _document_parser_exts():
+        return "document_parser"
     if ext in _database_exts():
         return "database"
     if ext in _ARCHIVE_EXTS:
@@ -640,6 +685,7 @@ def group_into_shards(mapping: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         "text",
         "markup",
         "document",
+        "document_parser",
         "misc",
     ):
         b = buckets.get(cls)

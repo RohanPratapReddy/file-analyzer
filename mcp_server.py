@@ -435,6 +435,283 @@ def list_components() -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Repository monitor (background incremental-update layer)
+# ---------------------------------------------------------------------------
+# These expose the always-on monitor: it watches a repository and keeps a rolling
+# 16-deep FIFO of what changed (created/modified/deleted), re-analyzing each
+# changed file with the correct analyzer as it happens. An agent can start a
+# monitor for the repo it is working in and then ask "what changed?" at any time.
+#
+# In-server safety: a monitor started here forces ALL re-analysis through the
+# subprocess worker pool (inline_threshold=0), whose child stdout is captured, so
+# analyzer chatter never corrupts the MCP JSON-RPC stream on stdout.
+
+
+@mcp.tool()
+def start_monitor(
+    path: str,
+    interval: float = 2.0,
+    capacity: int = 16,
+    out_dir: Optional[str] = None,
+    max_workers: int = 128,
+    min_workers: int = 16,
+    reanalyze: bool = True,
+    change_log: bool = True,
+    change_log_url: Optional[str] = None,
+    enable_agents: bool = False,
+    agents_include: Optional[List[str]] = None,
+    agents_exclude: Optional[List[str]] = None,
+    discover_agents: bool = True,
+    agent_roster: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Start a background monitor that tracks and re-analyzes changes to a repo.
+
+    Watches ``path`` on a daemon thread; every ``interval`` seconds it detects
+    files created/modified/deleted (by you, the user, or any tool) and records the
+    last ``capacity`` (default 16) changes into a FIFO diff database, re-analyzing
+    changed files across the Go/Python worker pool. Idempotent: calling it again
+    for the same path returns the already-running monitor. Read what changed with
+    ``recent_changes`` / ``monitor_status``.
+
+    Args:
+        path: Repository directory to watch.
+        interval: Seconds between scan cycles.
+        capacity: FIFO depth -- how many consecutive changes are retained.
+        out_dir: Artifact dir (default: ``<path>/.file-analyzer``).
+        max_workers: Worker-pool ceiling for large change sets (~100-200).
+        min_workers: Worker-pool floor for large change sets (~10-20).
+        reanalyze: Re-run analyzers on changed files (else record changes only).
+        change_log: Keep the durable append-only change log (default True). Set
+            False for a FIFO-ring-only monitor with no durable archive.
+        change_log_url: Optional remote SQL URL (postgresql://... / mysql://...) or
+            SQLite path for the durable append-only change log (a superset of the
+            FIFO ring that never deletes evicted changes). Defaults to a local
+            SQLite file under ``<out_dir>/monitor/changes_log.db``.
+        enable_agents: Run the soft MCP agent tier on every re-analyzed file
+            (summary, quality/security findings, symbol docs). Off by default; a
+            no-op unless an MCP provider is reachable.
+        agents_include: Allow-list of provider names (only these are eligible).
+        agents_exclude: Deny-list of provider names (applied after the allow-list).
+        discover_agents: Resolve providers from desktop/CLI-configured MCP servers.
+        agent_roster: Preferred provider name for the agent tier.
+    """
+    from src.monitor.control import start_monitor as _start
+
+    source = Path(path).expanduser().resolve()
+    if not source.is_dir():
+        raise NotADirectoryError(f"source is not a directory: {source}")
+    with _hushed():
+        mon = _start(
+            source,
+            interval=interval,
+            capacity=capacity,
+            out_dir=out_dir,
+            max_workers=max_workers,
+            min_workers=min_workers,
+            reanalyze=reanalyze,
+            inline_threshold=0,  # never analyze inline in the server thread
+            enable_change_log=change_log,
+            change_log_url=change_log_url,
+            enable_agents=enable_agents,
+            agents_include=agents_include,
+            agents_exclude=agents_exclude,
+            discover_agents=discover_agents,
+            agent_roster=agent_roster,
+        )
+        summary = mon.summary()
+    summary["diff_database"] = str(mon.diff_db_path)
+    summary["change_log"] = getattr(mon, "change_log_url", None) or str(
+        mon.change_log_path
+    )
+    summary["agents"] = mon.enable_agents
+    summary["started"] = True
+    return summary
+
+
+@mcp.tool()
+def stop_monitor(path: str) -> Dict[str, Any]:
+    """Stop the background monitor watching ``path`` (if any)."""
+    from src.monitor.control import stop_monitor as _stop
+
+    source = Path(path).expanduser().resolve()
+    with _hushed():
+        stopped = _stop(source)
+    return {"path": str(source), "stopped": stopped}
+
+
+@mcp.tool()
+def monitor_status(
+    path: Optional[str] = None, diff_db: Optional[str] = None
+) -> Dict[str, Any]:
+    """Report a monitor's status (running?, buffered changes, totals, last scan).
+
+    Reads the diff database read-only, so it works whether the monitor runs in
+    this server or as a separate ``python -m src`` process. Give either ``path``
+    (the watched repo) or ``diff_db`` (the database path directly).
+    """
+    from src.monitor.control import read_status
+
+    return read_status(root=path, diff_db_path=diff_db)
+
+
+@mcp.tool()
+def recent_changes(
+    path: Optional[str] = None, diff_db: Optional[str] = None, limit: int = 16
+) -> Dict[str, Any]:
+    """Return the most recent changes the monitor recorded (newest first).
+
+    Each entry is a created/modified/deleted event with the analyzer that claimed
+    the file, byte/line deltas, a bounded unified-diff snippet (text files) and the
+    re-analysis outcome. Reads the FIFO diff database read-only. Give either
+    ``path`` (the watched repo) or ``diff_db`` (the database path directly).
+    """
+    from src.monitor.control import read_recent_changes
+
+    return read_recent_changes(root=path, diff_db_path=diff_db, limit=limit)
+
+
+@mcp.tool()
+def scan_now(path: str) -> Dict[str, Any]:
+    """Force one immediate scan cycle for a monitor already watching ``path``.
+
+    Useful right after making edits, instead of waiting for the next interval.
+    Requires that ``start_monitor`` was called for ``path`` in this server.
+    """
+    from src.monitor.control import get_monitor
+
+    source = Path(path).expanduser().resolve()
+    mon = get_monitor(source)
+    if mon is None:
+        raise RuntimeError(
+            f"no monitor is running for {source}; call start_monitor first"
+        )
+    with _hushed():
+        return mon.scan_once()
+
+
+@mcp.tool()
+def change_history(
+    path: str,
+    limit: int = 50,
+    rel_path: Optional[str] = None,
+    change_log_url: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Read the durable, continuous change log for a repo (newest first).
+
+    Unlike ``recent_changes`` (the 16-deep FIFO ring), this is the permanent
+    archive: every change ever recorded, so changes evicted from the ring still
+    appear here. Backed by a local SQLite file by default, or a remote SQL server
+    when ``change_log_url`` (postgresql://... / mysql://...) is given.
+
+    Args:
+        path: The watched repository directory.
+        limit: Max rows to return.
+        rel_path: If given, restrict to the change history of that one file.
+        change_log_url: Remote SQL URL or SQLite path (defaults to the local file).
+    """
+    from src.monitor.control import read_change_log
+
+    source = Path(path).expanduser().resolve()
+    with _hushed():
+        return read_change_log(
+            source, url=change_log_url, limit=limit, rel_path=rel_path
+        )
+
+
+@mcp.tool()
+def log_session(
+    path: str,
+    task_given: str,
+    work_done: str,
+    files_changed: Optional[List[str]] = None,
+    improvements: str = "",
+    user_sentiment: Optional[str] = None,
+    next_prompt: Optional[str] = None,
+    summary_url: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Record one session summary for a repo (task, files, work, sentiment, fixes).
+
+    Stores a durable row an agent can refer back to at any time: the task the user
+    gave, the files changed, what was done, the user's inferred sentiment
+    (satisfied/dissatisfied/annoyed/neutral/confused -- from ``next_prompt`` if
+    given, or ``user_sentiment`` to set it explicitly), and a short 3-5 sentence
+    ``improvements`` note. Local SQLite by default; ``summary_url``
+    (postgresql://... / mysql://...) redirects it to a remote SQL server.
+
+    Args:
+        path: The repository this session worked on.
+        task_given: What the user asked for.
+        work_done: What was actually done.
+        files_changed: Paths the session touched.
+        improvements: Short (3-5 sentence) note on what to do better next time.
+        user_sentiment: Explicit sentiment override (skips the heuristic).
+        next_prompt: The user's next message, classified into a sentiment.
+        summary_url: Remote SQL URL or SQLite path (defaults to the local file).
+    """
+    from src.monitor.control import record_session
+
+    source = Path(path).expanduser().resolve()
+    with _hushed():
+        return record_session(
+            source,
+            task_given=task_given,
+            work_done=work_done,
+            files_changed=files_changed,
+            improvements=improvements,
+            user_sentiment=user_sentiment,
+            next_prompt=next_prompt,
+            url=summary_url,
+        )
+
+
+@mcp.tool()
+def assess_last_session(
+    path: str,
+    next_prompt: str,
+    user_sentiment: Optional[str] = None,
+    improvements: Optional[str] = None,
+    summary_url: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Attach a sentiment to the most recent still-unassessed session for a repo.
+
+    The user's reaction to a session is whatever they say next, so call this at the
+    start of a new turn with the user's ``next_prompt``: it finds the latest pending
+    session and classifies the prompt into satisfied/dissatisfied/annoyed/neutral/
+    confused (or applies ``user_sentiment`` verbatim). Returns the updated row, or
+    an empty result if there is no pending session.
+    """
+    from src.monitor.control import assess_last_session as _assess
+
+    source = Path(path).expanduser().resolve()
+    with _hushed():
+        row = _assess(
+            source,
+            next_prompt=next_prompt,
+            user_sentiment=user_sentiment,
+            improvements=improvements,
+            url=summary_url,
+        )
+    return row or {"assessed": False, "reason": "no pending session"}
+
+
+@mcp.tool()
+def recent_sessions(
+    path: str, limit: int = 20, summary_url: Optional[str] = None
+) -> Dict[str, Any]:
+    """Return recent session summaries for a repo (newest first).
+
+    Each row carries the task, files changed, work done, inferred user sentiment
+    (with confidence + rationale) and the improvements note. Reads the local
+    SQLite summary dump by default, or a remote SQL server via ``summary_url``.
+    """
+    from src.monitor.control import read_sessions
+
+    source = Path(path).expanduser().resolve()
+    with _hushed():
+        return read_sessions(source, url=summary_url, limit=limit)
+
+
+# ---------------------------------------------------------------------------
 # Resources
 # ---------------------------------------------------------------------------
 @mcp.resource("file-analyzer://views")

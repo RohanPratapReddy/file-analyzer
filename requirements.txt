@@ -69,3 +69,72 @@ transformers             # model-config / tokenizer metadata (media_metrics)
 # --- Source-code parsing (prog_lang, optional accelerator) -------------------
 tree-sitter              # precise CST parsing engine for {Lang}Analyzers
 tree-sitter-languages    # prebuilt grammars used by the tree-sitter path
+
+# =============================================================================
+# Background repository monitor (src/monitor/, `python -m src monitor <repo>`)
+# =============================================================================
+# The always-on monitoring + incremental-update layer is PURE STDLIB with NO new
+# hard dependency: change detection is an os.walk + hashlib snapshot/diff, the
+# 16-deep FIFO diff record is plain SQLite (WAL), the concurrent re-analysis
+# worker pool has a stdlib `concurrent.futures` fallback, and process management
+# (signals, PID file, atexit, daemon threads, child reaping) is all stdlib.
+# There is NOTHING to install for the monitor: it detects changes by polling
+# (os.walk + hashlib snapshot/diff on a fixed cadence), so there is no watcher
+# library to add. The Go worker pool (src/monitor/go/) is an optional speed-up
+# for very large change sets, built on demand with the `go` toolchain (not a pip
+# package); without Go the pool transparently uses the concurrent.futures path.
+#
+# The monitor's two DURABLE dumps -- the continuous change log and the
+# session-summary dump (src/monitor/change_log.py + session_log.py) -- also
+# default to local SQLite (still nothing to install). They can instead live on a
+# REMOTE SQL server by passing a connection URL; only then do you need a driver,
+# imported lazily so the core stays stdlib-at-import:
+#   PostgreSQL:  pip install "psycopg[binary]>=3.1"   (or:  .[monitor-postgres])
+#   MySQL/Maria: pip install "PyMySQL>=1.1"           (or:  .[monitor-mysql])
+
+# =============================================================================
+# Document-intelligence engine (DocumentParser: Parts A / B / C)
+# =============================================================================
+# The document-analysis engine (src/document/) is ALSO pure-stdlib at its core:
+# Part A static metrics, the Part-B agent+code loop transport (agent_mcp.py) and
+# ALL Part-C evaluation metrics (evaluation_metrics.py -- CER/WER/BLEU/METEOR/
+# chrF/ROUGE/TEDS/mAP/REDS/ANLS/ECE/PSI, and a deterministic RAG judge) are
+# implemented with the standard library alone. The packages below are OPTIONAL
+# accelerators / cross-validators / reference backends for the spec's tooling
+# table (docs/document-engine-libraries.md, spec §6). The engine runs and emits
+# real rows WITHOUT any of them; install a package to upgrade a layer from the
+# stdlib implementation to a richer / faster / reference one. Several A-layer
+# tools are system binaries, not pip packages (Tesseract, qpdf, exiftool,
+# veraPDF) -- see the docs file for those.
+
+# --- A1-A5  PDF / office structure + text-layer extraction -------------------
+pdfplumber               # A4-A5 text + table geometry (words/lines/rects)
+pdfminer.six             # A4    low-level PDF text extraction fallback
+pikepdf                  # A3/A10 qpdf-backed structure/repair, XMP, signatures
+python-docx              # A3    .docx structure (paragraphs, styles, tables)
+oletools                 # A1-A2 OLE/VBA-macro + OOXML threat surface triage
+
+# --- A6-A8  OCR / vision / layout (install the OCR engine you prefer) --------
+scikit-image             # A6    image quality: skew, blur, contrast metrics
+pytesseract              # A7    Tesseract OCR bindings (needs system tesseract)
+
+# --- A11-A12  PII + linguistics ----------------------------------------------
+phonenumbers             # A11   phone-number detection/validation
+python-stdnum            # A11   IBAN/VAT/SSN-style structured-number checks
+presidio-analyzer        # A11   Microsoft Presidio PII detection (spaCy-backed)
+spacy                    # A12   NER + linguistic features (Presidio dependency)
+textstat                 # A12   readability indices cross-check
+
+# --- A13-A15  validation + tokenization --------------------------------------
+jsonschema               # A13   JSON-Schema validation of extracted records
+tiktoken                 # A15   token accounting for chunking / cost KPIs
+
+# --- C  evaluation: reference metric backends (cross-check the stdlib impl) ---
+jiwer                    # C1    reference CER / WER
+sacrebleu                # C1    reference BLEU / chrF
+nltk                     # C1    reference METEOR (WordNet synonymy stage)
+lxml                     # C2    robust HTML-table parsing for TEDS
+zss                      # C2    reference Zhang-Shasha tree edit distance
+scikit-learn             # C5    calibration curves / Brier score cross-check
+ragas                    # C3    LLM-judge RAG metrics (faithfulness, ...)
+deepeval                 # C3    alternative LLM-judge evaluation harness

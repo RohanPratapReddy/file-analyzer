@@ -158,6 +158,56 @@ class RouterPlanes:
                     failures += 1
         return 1 if failures else 0
 
+    def run_concordance(
+        self,
+        shards: List[Dict[str, Any]],
+        index_chars: bool = True,
+        max_bytes: int = 25_000_000,
+    ) -> None:
+        """Fan out the per-shard concordance worker (Database 1) over every shard.
+
+        Uses the same one-process-per-shard model as the analysis planes, driving
+        ``concordance_worker.py`` concurrently. Raises :class:`PlaneError` (leaving
+        temp/ intact) if any shard failed to produce its ``.ok`` marker.
+        """
+        shard_ids = [s["shard_id"] for s in shards]
+        if not shard_ids:
+            return
+        worker = self.router_dir / "concordance_worker.py"
+
+        def _one(shard_id: str) -> int:
+            cmd = [
+                self.python_exe,
+                str(worker),
+                "--readers-root",
+                str(self.readers_root),
+                "--temp",
+                str(self.temp_dir),
+                "--shard",
+                shard_id,
+                "--max-bytes",
+                str(max_bytes),
+            ]
+            if not index_chars:
+                cmd.append("--no-index-chars")
+            return self._stream_subprocess(cmd, self.router_dir)
+
+        failures = 0
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=self.workers_per_plane
+        ) as ex:
+            for rc in ex.map(_one, shard_ids):
+                if rc != 0:
+                    failures += 1
+
+        status_dir = self.temp_dir / "concordance_status"
+        failed = [sid for sid in shard_ids if not (status_dir / f"{sid}.ok").exists()]
+        if failed or failures:
+            raise PlaneError(
+                f"concordance workers reported failures; shards without OK marker: "
+                f"{failed}. temp/ retained at {self.temp_dir} for debugging."
+            )
+
     def _stream_subprocess(self, cmd: List[str], cwd: Path) -> int:
         try:
             proc = subprocess.Popen(

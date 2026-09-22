@@ -63,6 +63,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -119,13 +120,25 @@ _PLANE_COMPONENTS = {
     "markupanalyzer": ("MarkupAnalyzer", "markup"),
     "document": ("DocumentAnalyzer", "document"),
     "documentanalyzer": ("DocumentAnalyzer", "document"),
+    "document_parser": ("DocumentParser", "document_parser"),
+    "documentparser": ("DocumentParser", "document_parser"),
     "misc": ("MiscAnalyzer", "misc"),
     "miscanalyzer": ("MiscAnalyzer", "misc"),
 }
 
 # The routing class-ids treated as "non-code" (they get link_repository()).
 _NONCODE_PLANE_IDS = frozenset(
-    {"schema", "database", "data", "config", "text", "markup", "document", "misc"}
+    {
+        "schema",
+        "database",
+        "data",
+        "config",
+        "text",
+        "markup",
+        "document",
+        "document_parser",
+        "misc",
+    }
 )
 
 
@@ -173,6 +186,7 @@ def list_components() -> dict:
             "text",
             "markup",
             "document",
+            "document_parser",
             "misc",
         ],
         "language_analyzers": lang_names,
@@ -385,6 +399,76 @@ def build_parser() -> argparse.ArgumentParser:
         help="do not prepend DROP TABLE IF EXISTS statements to the dump.",
     )
 
+    # -- document intelligence & agent-driven layers -----------------------
+    docai = p.add_argument_group(
+        "document intelligence & agents",
+        "opt-in DocumentParser databases (DB1-DB4) and the MCP content-aware "
+        "enrichment layer (DB5), plus the agent allow/deny-list applied to "
+        "every agent-driven layer.",
+    )
+    docai.add_argument(
+        "--document-databases",
+        action="store_true",
+        help="build the DocumentParser databases (DB1 concordance + DB2 "
+        "Part-A metrics); prerequisite for --dynamic and --evaluate.",
+    )
+    docai.add_argument(
+        "--dynamic",
+        action="store_true",
+        help="build the Part-B dynamic agent+code layer (DB3). Implies "
+        "--document-databases.",
+    )
+    docai.add_argument(
+        "--evaluate",
+        action="store_true",
+        help="build the Part-C evaluation layer (DB4). Implies "
+        "--document-databases.",
+    )
+    docai.add_argument(
+        "--enrich",
+        action="store_true",
+        help="build the DB5 MCP content-aware enrichment layer (deterministic "
+        "metrics/quality/security/symbol-doc tables always; soft agent rows "
+        "only when a provider is reachable).",
+    )
+    docai.add_argument(
+        "--no-unified",
+        action="store_true",
+        help="do not fold the per-source databases into one unified .db/.sql "
+        "(the unified database is built by default).",
+    )
+    docai.add_argument(
+        "--agents-include",
+        default=None,
+        metavar="NAMES",
+        help="comma-separated allow-list of agent/provider names to use across "
+        "the DB3 dynamic, DB4 evaluation, and DB5 enrichment layers "
+        "(case-insensitive; unknown names ignored). When set, only these "
+        "providers are eligible.",
+    )
+    docai.add_argument(
+        "--agents-exclude",
+        default=None,
+        metavar="NAMES",
+        help="comma-separated deny-list of agent/provider names to drop from "
+        "every agent-driven layer (applied after --agents-include).",
+    )
+    docai.add_argument(
+        "--discover-agents",
+        action="store_true",
+        help="let the DB3/DB4 parser layers resolve providers from the "
+        "desktop/CLI-configured MCP servers so the include/exclude filter has "
+        "providers to act on (DB5 enrichment discovers on its own).",
+    )
+    docai.add_argument(
+        "--agent-roster",
+        default=None,
+        metavar="NAME",
+        help="preferred provider name for the DB3 dynamic layer and DB5 "
+        "enrichment agent tier (used when reachable, else the first available "
+        "provider).",
+    )
+
     p.add_argument(
         "--keep-temp",
         action="store_true",
@@ -451,6 +535,19 @@ def build_parser() -> argparse.ArgumentParser:
         "mapping and per-class shards.",
     )
     return p
+
+
+def _split_names(value):
+    """Parse a comma/whitespace-separated provider list into a clean list.
+
+    Returns ``None`` for an empty/unset value so callers can pass it straight
+    through to the engine's ``agents_include`` / ``agents_exclude`` (which treat
+    ``None`` as "no filter").
+    """
+    if not value:
+        return None
+    names = [n.strip() for n in re.split(r"[,\s]+", value) if n.strip()]
+    return names or None
 
 
 def _maybe_quiet(args):
@@ -716,6 +813,14 @@ def _run_dbgen_component(args, out_dir: Path) -> int:
 def run(argv=None) -> int:
     args = build_parser().parse_args(argv)
 
+    # Containment guard: this tool is only permitted inside a container or a
+    # virtual machine, never directly on bare-metal host hardware. Refuses (exit
+    # code 3) unless a container/VM is detected or FILE_ANALYZER_ALLOW_BARE_METAL
+    # is set. Runs after argparse so --help still works anywhere.
+    from .core.runtime_guard import require_virtualized
+
+    require_virtualized(context="src.main")
+
     # --list-components short-circuits before any source validation.
     if args.list_components:
         print(json.dumps(list_components(), indent=2, default=str))
@@ -776,6 +881,19 @@ def run(argv=None) -> int:
         schema_name=args.schema_name,
         drop_existing=not args.no_drop,
         keep_temp_on_success=args.keep_temp,
+        # document intelligence (DB1-DB4) + enrichment (DB5) + agents
+        enable_document_databases=(
+            args.document_databases or args.dynamic or args.evaluate
+        ),
+        enable_dynamic_database=args.dynamic,
+        dynamic_roster=args.agent_roster,
+        enable_evaluation_database=args.evaluate,
+        enable_mcp_enrichment=args.enrich,
+        mcp_roster=args.agent_roster,
+        enable_unified_database=not args.no_unified,
+        agents_include=_split_names(args.agents_include),
+        agents_exclude=_split_names(args.agents_exclude),
+        discover_agents=args.discover_agents,
     )
 
     try:

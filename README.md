@@ -16,6 +16,14 @@ It never executes the code it analyzes, never stores raw file payloads, and degr
 honestly — when a format can only be partially understood, it records what it could
 determine and marks the rest, rather than fabricating results.
 
+> **⚠️ Runs in a container or VM only.** The CLI entrypoints (`file-analyzer` /
+> `python -m src.main` and the monitor `file-analyzer-monitor` / `python -m src`)
+> **refuse to run directly on bare-metal host hardware** — they start only inside a
+> container (Docker/Podman/containerd/LXC/Kubernetes) or a virtual machine, exiting
+> with code **3** otherwise. Use the Docker workflow below (recommended), or set
+> `FILE_ANALYZER_ALLOW_BARE_METAL=1` to opt out on an already-isolated box. The MCP
+> server is unaffected. Full details: **[docs/runtime-containment.md](docs/runtime-containment.md)**.
+
 ## What it produces
 
 Running the engine over a repository yields two artifacts (both carry the `v_*`
@@ -26,6 +34,10 @@ views):
 
 ## Quick start
 
+The engine must run inside a container or VM (see the note above). The one-line
+Docker recipe below satisfies that automatically. To run the Python CLI directly,
+do it inside a VM/container, or export `FILE_ANALYZER_ALLOW_BARE_METAL=1` first:
+
 ```bash
 pip install -r requirements.txt
 
@@ -35,7 +47,7 @@ python -m src.main /path/to/repo --out ./artifacts
 # Postgres-loadable dump instead of SQLite:
 python -m src.main /path/to/repo --out ./artifacts --dialect postgresql
 
-# All flags:
+# All flags (works on any host — --help is exempt from the containment guard):
 python -m src.main --help
 ```
 

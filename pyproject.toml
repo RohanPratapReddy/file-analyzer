@@ -27,8 +27,70 @@ dependencies = []
 [project.optional-dependencies]
 # AI-agent integration: the MCP server (python -m mcp_server). Pinned to mcp 1.x
 # -- the server uses the v1 FastMCP API, which 2.x renamed/changed (FastMCP ->
-# MCPServer in mcp.server.mcpserver).
+# MCPServer in mcp.server.mcpserver). This same pin also powers the DocumentParser
+# Part-B/C multi-agent connectors (src/document/agent_mcp.py) over MCP stdio; the
+# HTTP transport and native vendor SDKs are documented in requirements-agent.txt.
 agent = ["mcp[cli]>=1.2,<2"]
+
+# Remote database backends for the monitor's durable dumps (the continuous change
+# log + the session-summary dump, src/monitor/change_log.py + session_log.py).
+# OPTIONAL and remote-only: both dumps default to a local SQLite file (pure
+# stdlib, nothing to install). Install one of these ONLY to point a dump at a
+# remote server via a connection URL (postgresql://... / mysql://...). The
+# drivers are imported lazily inside src/monitor/store.py, so the core stays
+# stdlib-at-import even with these uninstalled.
+monitor-postgres = ["psycopg[binary]>=3.1"]
+monitor-mysql = ["PyMySQL>=1.1"]
+
+# ---------------------------------------------------------------------------
+# DocumentParser document-intelligence engine (Parts A / B / C).
+# Every layer has a pure-stdlib implementation -- Part-A static metrics, the
+# Part-B agent+code loop transport, and ALL Part-C evaluation metrics
+# (evaluation_metrics.py: CER/WER/BLEU/METEOR/chrF/ROUGE/TEDS/mAP/REDS/ANLS/
+# ECE/PSI + a deterministic RAG judge) run WITHOUT anything below. These extras
+# are OPTIONAL accelerators / reference backends; see requirements.txt and
+# docs/document-engine-libraries.md (spec section 6) for the full mapping and
+# the system binaries (Tesseract, qpdf, exiftool, veraPDF) that are not pip pkgs.
+# ---------------------------------------------------------------------------
+# Parts A1-A5: PDF / office structure + text-layer extraction.
+parse = [
+    "pdfplumber",
+    "pdfminer.six",
+    "pikepdf",
+    "python-docx",
+    "oletools",
+]
+# Parts A6-A8: OCR / image-quality (pytesseract needs the system tesseract).
+ocr = [
+    "scikit-image",
+    "pytesseract",
+]
+# Parts A11-A12: PII detection + linguistic features.
+pii = [
+    "phonenumbers",
+    "python-stdnum",
+    "presidio-analyzer",
+    "spacy",
+    "textstat",
+]
+# Part C: reference metric backends that cross-check the stdlib evaluators, plus
+# the LLM-judge RAG harnesses (which drive the same agent connectors as `agent`).
+eval = [
+    "jiwer",
+    "sacrebleu",
+    "nltk",
+    "lxml",
+    "zss",
+    "scikit-learn",
+    "jsonschema",
+    "tiktoken",
+    "ragas",
+    "deepeval",
+]
+# Everything for the document engine at once.
+document = [
+    "file-analyzer[parse,ocr,pii,eval]",
+]
 
 [project.urls]
 Homepage = "https://github.com/RohanPratapReddy/file-analyzer"
@@ -55,6 +117,17 @@ line_length = 88
 file-analyzer = "src.main:run"
 #     file-analyzer-mcp        # start the MCP server over stdio
 file-analyzer-mcp = "mcp_server:main"
+#     file-analyzer-monitor /path/to/repo --interval 2   # background monitor
+file-analyzer-monitor = "src.__main__:main"
+#
+# Runtime containment: the two CLI entrypoints above (`file-analyzer` / `src.main`
+# and `file-analyzer-monitor` / `python -m src`) REFUSE to run on bare-metal host
+# hardware -- they only start inside a container (Docker/Podman/containerd/LXC/
+# Kubernetes) or a virtual machine. The check is real, stdlib-only, and lives in
+# src/core/runtime_guard.py; it runs after argument parsing (so `--help` still
+# works anywhere) and exits with code 3 on refusal. Deliberate opt-out for an
+# already-isolated bare-metal box: set FILE_ANALYZER_ALLOW_BARE_METAL=1. The MCP
+# server (`file-analyzer-mcp`) is unaffected. See docs/runtime-containment.md.
 
 # The package is literally named `src` (the existing public API is `from src
 # import ...`); ship it and its subpackages. The Go/Java reader/plane trees have
@@ -90,4 +163,11 @@ py-modules = ["mcp_server"]
     "go/*.go",
     "go/go.mod",
     "java/*.java",
+]
+# The background monitor ships its own Go worker-pool source so the same
+# build-on-demand `go build` fast path works from an installed wheel; the
+# Python fallback pool needs nothing extra.
+"src.monitor" = [
+    "go/*.go",
+    "go/go.mod",
 ]

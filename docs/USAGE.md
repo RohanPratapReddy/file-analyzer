@@ -23,6 +23,15 @@ Run it as a module (`python -m src.main …`, from the repo root so `src` import
 or by path (`python src/main.py …`; `main.py` bootstraps its own package root, so
 it works from any cwd or inside the container).
 
+> **⚠️ Containment: container or VM only.** `python -m src.main` (and the monitor,
+> `python -m src`) **refuse to run on bare-metal host hardware** — they start only
+> inside a container (Docker/Podman/containerd/LXC/Kubernetes) or a virtual machine,
+> and otherwise exit with code **3** and a refusal banner on stderr. `--help` is
+> exempt (the check runs after argument parsing), so you can always inspect the flag
+> surface. Deliberate opt-out on an already-isolated box: `FILE_ANALYZER_ALLOW_BARE_METAL=1`.
+> The [Docker workflow](#part-3--running-any-of-this-in-docker) satisfies this
+> automatically. Full detail: [runtime-containment.md](runtime-containment.md).
+
 The source must be a **git repository** — the census walks git-tracked files.
 Pass `--no-git` to census every file on disk instead. On success a JSON summary is
 printed to stdout. On failure the engine keeps its `temp/` staging dir for
@@ -399,6 +408,7 @@ JSON-RPC stream.
 | `0` | success — JSON summary printed to stdout. |
 | `1` | a stage failed (census / analyzer / linkage / dbgen / engine). The engine keeps `temp/` for debugging. |
 | `2` | bad invocation — source is not a directory, unknown component, or a table-driven component was run without `--tables-json`. |
+| `3` | **containment refusal** — running on bare-metal host hardware (no container/VM detected and `FILE_ANALYZER_ALLOW_BARE_METAL` not set). See [runtime-containment.md](runtime-containment.md). |
 
 ## See also
 
@@ -411,3 +421,9 @@ JSON-RPC stream.
   existing database.
 - `docker compose --profile engine run --build engine --help` — the same
   `main.py` argument surface, containerized (pass args via `ENGINE_ARGS`).
+- [`runtime-containment.md`](runtime-containment.md) — why the CLI refuses to run
+  on bare metal, what counts as a container/VM, and the `FILE_ANALYZER_ALLOW_BARE_METAL`
+  override.
+- [`monitor.md`](monitor.md) — the always-on background monitor
+  (`python -m src monitor`): incremental re-analysis, durable change log, worker
+  pool, and the soft MCP agent tier.
