@@ -5,7 +5,10 @@
 #      owner=RohanPratapReddy, repo=file-analyzer,
 #      workflow=python-publish.yml, environment=pypi
 #   2. Create a GitHub environment named "pypi" (Settings → Environments).
-#   3. Bump [project].version in pyproject.toml before each release.
+#   3. Bump __version__ in src/_version.py before each release (the single
+#      source of truth; pyproject reads it via setuptools `dynamic = ["version"]`,
+#      and the SDK / CLIs / MCP handshake all follow it). Then publish a GitHub
+#      Release whose tag matches (e.g. v0.1.0) to trigger this workflow.
 name: Upload Python Package
 
 on:
