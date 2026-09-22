@@ -1,7 +1,10 @@
 # file-analyzer — documentation
 
-Everything you need to run `file-analyzer`, use it as a library, or understand a
-single module on its own.
+`file-analyzer` is a **repository intelligence platform**: a static core that turns
+a source tree into a queryable SQLite/PostgreSQL database **without executing it**,
+wrapped in live/agentic layers — a background monitor (incremental re-analysis), an
+MCP agent-enrichment tier, and a document-intelligence engine. Everything you need
+to run it, use it as a library, or understand a single module on its own is here.
 
 Start here:
 
@@ -16,6 +19,30 @@ Start here:
   ([`mcp_server.py`](../mcp_server.py)), the `--quiet` CLI, and
   [`../tools.json`](../tools.json) function-calling definitions. A Claude Code skill
   lives at [`../.claude/skills/file-analyzer/SKILL.md`](../.claude/skills/file-analyzer/SKILL.md).
+
+## Live & agentic layers
+
+Beyond the one-shot static pipeline, the platform adds continuous and agent-driven
+layers:
+
+- **[monitor.md](monitor.md)** — the always-on **background monitor**
+  (`python -m src monitor`): watches a repository and re-analyzes changed files
+  incrementally across a Go/Python worker pool, with a FIFO diff DB, a durable
+  change log, and an optional soft MCP agent tier. MCP tools + a Docker profile.
+- **[document-engine-agents.md](document-engine-agents.md)** — the
+  **DocumentParser** document-intelligence engine: static Part-A metrics + a
+  dynamic **agent/code loop** (Part B) + a full **evaluation** stack (Part C).
+- **[document-engine-libraries.md](document-engine-libraries.md)** — the optional
+  library/system-binary backends behind each document-engine layer, and the
+  pure-stdlib fallbacks.
+
+## Runtime & operations
+
+- **[runtime-containment.md](runtime-containment.md)** — the CLI entrypoints refuse
+  to run on bare-metal host hardware; they start only inside a container or VM
+  (fail-closed, exit code 3, `FILE_ANALYZER_ALLOW_BARE_METAL` override).
+
+## Per-module reference
 
 Below, one folder per `src/` subpackage. Each doc explains what that module does,
 how to use it on its own (component-mode CLI where one exists, plus the Python
