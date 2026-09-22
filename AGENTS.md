@@ -1,11 +1,13 @@
 # AGENTS.md — driving file-analyzer from an AI agent
 
 This file tells an AI coding agent (Claude, opencode, Cursor, Cline, Windsurf,
-Antigravity, Grok, DeepSeek, …) how to use `file-analyzer`. It is a static,
-read-only engine that turns a repository into a **queryable SQLite database** of
+Antigravity, Grok, DeepSeek, …) how to use `file-analyzer`. It is a repository
+intelligence platform that turns a repository into a **queryable SQLite database** of
 everything in it — files, per-language symbols and imports, DB schemas, data-file
-profiles, archives, binaries, configs, docs. It never executes the analyzed code
-and never stores raw file payloads.
+profiles, archives, binaries, configs, docs — and adds live/agentic layers on top (a
+background monitor with incremental re-analysis, an MCP agent-enrichment tier, and a
+document-intelligence engine). It never executes the analyzed code, never modifies
+the source tree, and never stores raw file payloads.
 
 **The intended loop for an agent is: analyze once → then ask questions with SQL.**
 The database ships denormalized `v_*` analysis views, so you answer questions with

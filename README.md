@@ -2,19 +2,33 @@
 
 **Point it at a repository, get back a queryable database of everything in it.**
 
-`file-analyzer` is a static, read-only analysis engine that walks a source tree —
-code, schemas, data files, archives, binaries, configs, docs — and emits a single
-**SQLite** (or **PostgreSQL**) database describing what it found: files and folders,
-per-language symbols (classes, functions, imports and the links between them),
-database schemas (tables, columns, keys, constraints, triggers), data-artifact
-profiles (datasets, columns, tensors, correlations), and more. A layer of ready-made
-**analysis views** (`v_*`) sits on top so you can answer questions with plain
-`SELECT`s, and two independent **concurrent readers** (Go and Java) demonstrate
-strictly read-only access to those views.
+`file-analyzer` is a **repository intelligence platform**. Its core walks a source
+tree — code, schemas, data files, archives, binaries, configs, docs — **without ever
+executing it**, and emits a single **SQLite** (or **PostgreSQL**) database describing
+what it found: files and folders, per-language symbols (classes, functions, imports
+and the links between them), database schemas (tables, columns, keys, constraints,
+triggers), data-artifact profiles (datasets, columns, tensors, correlations), and
+more. A layer of ready-made **analysis views** (`v_*`) sits on top so you can answer
+questions with plain `SELECT`s, and two independent **concurrent readers** (Go and
+Java) demonstrate strictly read-only access to those views.
 
-It never executes the code it analyzes, never stores raw file payloads, and degrades
-honestly — when a format can only be partially understood, it records what it could
-determine and marks the rest, rather than fabricating results.
+On top of that static core it adds **live and agentic layers**:
+
+- a **background monitor** that watches a repository and re-analyzes changed files
+  incrementally across a Go/Python worker pool, with a FIFO diff DB and a durable
+  change log ([docs/monitor.md](docs/monitor.md));
+- an optional **MCP agent tier** that enriches each file (summaries, quality /
+  security findings, symbol docs) alongside the deterministic metrics;
+- a **document-intelligence engine** (DocumentParser) combining static metrics with
+  a dynamic agent/code loop and a full evaluation stack
+  ([docs/document-engine-agents.md](docs/document-engine-agents.md));
+- a **unified database** that merges every per-source layer into one queryable `.db`
+  + `.sql`.
+
+It never executes the code it analyzes, never modifies the source tree, never stores
+raw file payloads, and degrades honestly — when a format can only be partially
+understood, it records what it could determine and marks the rest, rather than
+fabricating results.
 
 > **⚠️ Runs in a container or VM only.** The CLI entrypoints (`file-analyzer` /
 > `python -m src.main` and the monitor `file-analyzer-monitor` / `python -m src`)
