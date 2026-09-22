@@ -42,7 +42,10 @@ jobs:
 
       - name: Build release distributions (3 wheels + meta)
         run: |
-          python -m pip install --upgrade build
+          # setuptools + wheel must be installed because we build with
+          # `--no-isolation`: the build frontend validates the current env
+          # against each package's build-system.requires (which lists "wheel").
+          python -m pip install --upgrade build setuptools wheel
           rm -rf dist && mkdir -p dist
           # Build the client FIRST: the server/engine/meta setup.py shims
           # single-source the version by AST-reading
