@@ -56,6 +56,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from ..core.guardrails import scrub
 from . import config_formats
 
 # maximum tree nodes emitted per file (guards pathological/huge configs)
@@ -456,7 +457,7 @@ class ConfigAnalyzer:
                 "property_id": self._next("property"),
                 "config_file_id": cfg_id,
                 "property_name": str(name)[:256],
-                "property_value": pv[:2048],
+                "property_value": scrub(pv, max_len=2048),
                 "value_type": vtype,
                 "group_name": str(group_name)[:128],
                 "file_id": local_fid,
@@ -511,6 +512,9 @@ class ConfigAnalyzer:
 
     @staticmethod
     def _scalar_text(node: Any) -> Optional[str]:
+        # Leaf config values are the prime place secrets live (``password: ...``,
+        # ``api_key = ...``, connection strings). Scrub every scalar of
+        # secrets/PII before it is stored, then length-cap.
         if node is None:
             return None
         if isinstance(node, bool):
@@ -519,7 +523,7 @@ class ConfigAnalyzer:
             return node[:64].hex()
         s = node if isinstance(node, str) else str(node)
         s = s.replace("\x00", "")  # NUL padding is not content
-        return s[:2048]
+        return scrub(s, max_len=2048)
 
     # ------------------------------------------------------------------
     # coercion helpers (mirror DatabaseAnalyzer)
@@ -538,9 +542,8 @@ class ConfigAnalyzer:
     def _as_text(v: Any) -> Optional[str]:
         if v is None:
             return None
-        if isinstance(v, str):
-            return v.replace("\x00", "")[:2048]
-        return str(v)[:2048]
+        s = v if isinstance(v, str) else str(v)
+        return scrub(s.replace("\x00", ""), max_len=2048)
 
     @staticmethod
     def _json(v: Any) -> Optional[str]:
@@ -550,7 +553,9 @@ class ConfigAnalyzer:
         except TypeError:
             pass
         try:
-            return json.dumps(v, ensure_ascii=False, default=str)[:8192]
+            # Serialized nested config can carry secret values in its leaves;
+            # scrub the rendered JSON before storing it.
+            return scrub(json.dumps(v, ensure_ascii=False, default=str), max_len=8192)
         except (TypeError, ValueError):
             return None
 

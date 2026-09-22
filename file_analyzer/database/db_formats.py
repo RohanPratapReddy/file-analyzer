@@ -183,9 +183,10 @@ def _forensic(
         "shannon_entropy": ent,
         "printable_ratio": pr,
     }
-    strings = _ascii_strings(head)
-    if strings:
-        props["sample_strings"] = strings[:16]
+    # Count printable strings in the header for a text/binary signal, but never
+    # store the strings themselves: a verbatim dump of an opaque store's header
+    # could leak copyrighted content, embedded secrets or PII.
+    props["header_printable_string_count"] = len(_ascii_strings(head))
     return _profile(
         engine,
         family,

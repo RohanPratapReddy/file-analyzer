@@ -24,9 +24,10 @@ When a file carries no fixed magic (many serialization and proprietary project
 formats are structurally magicless), the per-extension ``REGISTRY`` selects the
 most specific real parser or, for genuinely undocumented/proprietary payloads,
 records an honest ``forensic`` disposition -- the format-agnostic forensic
-profile (size / sha256 / entropy / byte distribution / strings), which is the
-real, non-fabricated analysis such payloads admit. Nothing here invents fields
-it did not read, and raw payload is never stored.
+profile (size / sha256 / entropy / byte distribution / string counts), which is
+the real, non-fabricated analysis such payloads admit. Nothing here invents fields
+it did not read, raw payload is never stored, and the free-text header fields it
+does surface are redacted of secrets/PII and length-capped at a single choke point.
 
 The public surface consumed by ``MachineCodeAnalyzer``:
 
@@ -42,6 +43,8 @@ The public surface consumed by ``MachineCodeAnalyzer``:
 import struct
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+from ..core.guardrails import scrub
 
 # Bounded header read: enough for every documented header/superblock/box we parse
 # without loading multi-gigabyte media into memory.
@@ -2601,10 +2604,16 @@ class BinaryFormatParser:
         return p.suffix.lower()
 
     def _prop(self, out, group, name, value):
-        # Strip embedded NUL bytes from decoded text: they are padding, never
-        # real content, and would be rejected by SQLite text ingestion.
-        if isinstance(value, str) and "\x00" in value:
-            value = value.replace("\x00", "").strip()
+        # Single choke point for every free-text header field we surface. Strip
+        # embedded NUL padding, then run the value through the guardrail scrubber
+        # so any secret / credential / PII that happened to live in a header
+        # string (e.g. a font's embedded license URL, a disk image's backing
+        # path, a MATLAB description) is redacted and length-capped before it can
+        # be indexed. Non-string values pass through untouched.
+        if isinstance(value, str):
+            if "\x00" in value:
+                value = value.replace("\x00", "").strip()
+            value = scrub(value, max_len=512)
         out["properties"].append((group, name, value))
 
     @staticmethod

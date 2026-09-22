@@ -6,6 +6,8 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from ..core.guardrails import scrub
+
 
 class DataAnalyzer:
     """
@@ -1443,13 +1445,16 @@ class DataAnalyzer:
         return "unknown"
 
     def _sample_values(self, series) -> List[str]:
+        # Sample distinct column values to illustrate a column's shape. These are
+        # real cell contents, so each is scrubbed of secrets/PII (a column may
+        # hold emails, card numbers or tokens) and length-capped before storage.
         out: List[str] = []
         try:
             seen = series.dropna().unique()
         except Exception:
             return out
         for v in seen[: self.MAX_SAMPLE_VALUES]:
-            out.append(str(v)[: self.SAMPLE_VALUE_CHARS])
+            out.append(scrub(str(v), max_len=self.SAMPLE_VALUE_CHARS))
         return out
 
     def _emit_correlations(self, df, dataset_id: int, local_fid: int) -> None:

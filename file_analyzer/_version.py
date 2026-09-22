@@ -15,4 +15,4 @@ This module is deliberately tiny and import-free so that:
 Bump this one string for a release; every other surface follows.
 """
 
-__version__ = "0.2.0"
+__version__ = "1.0.0"

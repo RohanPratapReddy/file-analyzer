@@ -41,6 +41,7 @@ import struct
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from ..core.guardrails import scrub
 from .binary_forensics import BinaryForensicsAnalyzer
 from .format_parsers import BinaryFormatParser
 
@@ -1392,6 +1393,10 @@ class MachineCodeAnalyzer:
     # Helpers
     # ==================================================================
     def _prop(self, properties, bid, group, name, value):
+        # Single choke point for the free-text property bag. Route every value
+        # through the guardrail scrubber so a secret/credential/PII that lived in
+        # a format-specific field (rpath, interpreter string, load-command path,
+        # manifest text) is redacted and length-capped before it is indexed.
         self._prop_id += 1
         properties.append(
             {
@@ -1399,7 +1404,7 @@ class MachineCodeAnalyzer:
                 "binary_id": bid,
                 "prop_group": group,
                 "prop_name": name,
-                "prop_value": str(value),
+                "prop_value": scrub(str(value), max_len=512),
             }
         )
 

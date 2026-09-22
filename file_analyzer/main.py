@@ -218,6 +218,25 @@ def build_parser() -> argparse.ArgumentParser:
         version=f"file-analyzer {__version__}",
         help="print the file-analyzer version and exit.",
     )
+
+    # Prints the acceptable-use / IP-safety policy and exits (like --version),
+    # before any analysis or the containment guard runs.
+    class _AcceptableUseAction(argparse.Action):
+        def __init__(self, option_strings, dest, **kwargs):
+            kwargs.setdefault("nargs", 0)
+            super().__init__(option_strings, dest, **kwargs)
+
+        def __call__(self, parser, namespace, values, option_string=None):
+            from file_analyzer.core.guardrails import acceptable_use_banner
+
+            print(acceptable_use_banner())
+            parser.exit()
+
+    p.add_argument(
+        "--acceptable-use",
+        action=_AcceptableUseAction,
+        help="print the acceptable-use / IP-safety policy and exit.",
+    )
     p.add_argument(
         "source",
         nargs="?",

@@ -21,6 +21,12 @@ from .convert import (  # noqa: F401  (opaque/legacy -> renderable transcoder + 
 )
 from .core.analysis_engine import AnalysisEngine
 from .core.db_generator import RepositoryDatabaseGenerator
+from .core.guardrails import (  # noqa: F401  (IP-safety / secret-PII redaction / acceptable-use)
+    ACCEPTABLE_USE,
+    PROHIBITED_USES,
+    acceptable_use_banner,
+    scrub,
+)
 from .core.import_linkage import ImportLinkageAnalyzer
 from .core.repository_analyzer import RepositoryAnalyzer
 from .data import DataAnalyzer
@@ -64,6 +70,10 @@ __all__ = [
     "DocumentParserDatabaseGenerator",
     "MiscAnalyzer",
     "SHELL_EXT_MAP",
+    "ACCEPTABLE_USE",
+    "PROHIBITED_USES",
+    "acceptable_use_banner",
+    "scrub",
     *_prog_all,
     *_shell_all,
 ]

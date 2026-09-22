@@ -13,8 +13,9 @@ the Go/Java per-shard workers. Three cooperating classes:
   firmware containers: ELF, PE/COFF, Mach-O, Java `.class`, Python `.pyc`,
   WebAssembly, Android DEX, `ar` static libraries, LLVM bitcode, UF2, OLE/MSI.
 - **`BinaryForensicsAnalyzer`** — the format-agnostic layer (size / sha256 /
-  magic / detected-format / entropy / byte distribution / string extraction) plus
-  the `binaries.json` taxonomy. Composed by `MachineCodeAnalyzer` so every
+  magic / detected-format / entropy / byte distribution / **printable-string
+  statistics — counts and longest length only, never the strings themselves**)
+  plus the `binaries.json` taxonomy. Composed by `MachineCodeAnalyzer` so every
   `binary_index` row carries honest forensic metrics even when the deep parser
   only partially understands a format. Usable standalone.
 - **`BinaryFormatParser`** (`format_parsers.py`) — deep, **magic-driven**
@@ -28,6 +29,27 @@ Everything is **metadata only** — section/segment *contents* are never stored;
 most a bounded byte window (`_SECTION_ENTROPY_CAP = 1 MiB`) is read to measure
 per-section entropy. Any single malformed file is caught, recorded with a
 `notes`/`error` marker, and never sinks the batch.
+
+### IP-safety & redaction (guardrails)
+
+The binary plane is deliberately built so it **cannot be turned into a
+copyright-lifting or secret-harvesting tool**:
+
+- **No verbatim strings dump.** Earlier builds stored a `sample_strings` column —
+  a classic `strings`-style dump of the first N extracted strings. That column has
+  been **removed** everywhere (`BinaryForensicsAnalyzer`, the database and catalog
+  forensic profilers). A raw strings dump of an arbitrary binary can reproduce
+  copyrighted text, hardcoded secrets (API keys, private keys, passwords), license
+  keys and PII, so only **non-expressive counts** (`ascii_string_count`,
+  `utf16_string_count`, `max_string_len`, `header_printable_string_count`) are
+  kept — facts about the payload, not the payload.
+- **Every free-text header field is scrubbed.** The short structural strings the
+  parsers *do* surface (font license URLs, disk-image backing paths, load-command
+  paths, MATLAB descriptions, …) pass through a single choke point
+  (`_prop`) that routes them through `file_analyzer.core.guardrails.scrub`,
+  redacting secrets and PII (`[REDACTED:…]`) and length-capping before storage.
+- See [`../../ACCEPTABLE_USE.md`](../../ACCEPTABLE_USE.md) for the package-wide
+  acceptable-use policy and the full list of redaction boundaries.
 
 ## Formats handled (from source)
 

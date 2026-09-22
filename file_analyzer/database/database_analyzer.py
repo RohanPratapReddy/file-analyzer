@@ -58,6 +58,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from ..core.guardrails import scrub
 from . import db_formats
 
 
@@ -398,13 +399,14 @@ class DatabaseAnalyzer:
 
     @staticmethod
     def _as_text(v: Any) -> Optional[str]:
+        # Column min/max/default and other cell-derived text can carry real data;
+        # scrub secrets/PII before storage. (Numbers pass through scrub untouched.)
         if v is None:
             return None
-        if isinstance(v, str):
-            return v[:2048]
         if isinstance(v, (int, float, bool)):
             return str(v)
-        return str(v)[:2048]
+        s = v if isinstance(v, str) else str(v)
+        return scrub(s, max_len=2048)
 
     @staticmethod
     def _json(v: Any) -> Optional[str]:
@@ -414,7 +416,9 @@ class DatabaseAnalyzer:
         except TypeError:
             pass
         try:
-            return json.dumps(v, ensure_ascii=False, default=str)[:8192]
+            # Sample values serialized here are real cell contents; scrub the
+            # rendered JSON of secrets/PII before storing.
+            return scrub(json.dumps(v, ensure_ascii=False, default=str), max_len=8192)
         except (TypeError, ValueError):
             return None
 

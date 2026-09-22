@@ -26,6 +26,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from ..core.guardrails import scrub
+
 # Directories never worth watching (VCS internals, caches, virtualenvs, build
 # output). Matched by exact directory name at any depth.
 DEFAULT_IGNORE_DIRS = frozenset(
@@ -210,7 +212,9 @@ class Scanner:
             elif line.startswith("-") and not line.startswith("---"):
                 removed += 1
             pieces.append(line if line.endswith("\n") else line + "\n")
-        snippet = "".join(pieces)
+        # Redact secrets/PII before persisting: a diff may add a hardcoded key,
+        # password or email, and the change log is a durable, shareable artifact.
+        snippet = scrub("".join(pieces), max_len=None)
         if len(snippet) > self.diff_snippet_chars:
             snippet = snippet[: self.diff_snippet_chars] + "\n... (diff truncated)\n"
         return added, removed, (snippet or None)

@@ -14,8 +14,10 @@ of measurements that are meaningful no matter what the payload is:
     * Shannon entropy (bits/byte) over a bounded sample, with a coarse class
       (low / medium / high) -- high entropy flags compressed or encrypted regions;
     * a compact byte-distribution profile (printable ratio, NUL ratio, whitespace
-      ratio, a 16-bucket histogram) and extracted printable strings (ASCII and
-      UTF-16LE: count, longest, and a small capped sample).
+      ratio, a 16-bucket histogram) and printable-string *statistics* (ASCII and
+      UTF-16LE counts and the longest length -- **counts only, never the string
+      contents**: the strings themselves are never stored, so no copyrighted text,
+      embedded secret, license key or PII from a scanned payload can be indexed).
 
 It is deliberately NOT wired as an exclusive router class: doing so would hijack
 images / audio / video / tensors / tabular data away from ``DataAnalyzer``'s rich
@@ -38,9 +40,7 @@ from typing import Any, Dict, List, Optional, Tuple
 # multi-gigabyte binary cannot blow up memory or time.
 _SCAN_CAP = 16 * 1024 * 1024  # 16 MiB sampled for stats
 _HASH_CHUNK = 1 << 20
-_MIN_STRING = 4  # minimum run length for a "string"
-_MAX_STRING_SAMPLE = 40  # capped sample of extracted strings
-_MAX_STRING_LEN_KEEP = 200  # truncate any single sampled string
+_MIN_STRING = 4  # minimum run length for a "string" (used for counts only)
 
 
 class BinaryForensicsAnalyzer:
@@ -223,7 +223,6 @@ class BinaryForensicsAnalyzer:
             "ascii_string_count": None,
             "utf16_string_count": None,
             "max_string_len": None,
-            "sample_strings": None,
             "is_probably_text": None,
             "looks_compressed_or_encrypted": None,
             "error": None,
@@ -285,17 +284,17 @@ class BinaryForensicsAnalyzer:
         buckets = [sum(counts[i * 16 : (i + 1) * 16]) for i in range(16)]
         out["histogram16"] = json.dumps(buckets)
 
-        # String extraction.
+        # Printable-string STATISTICS only. We count ASCII / UTF-16LE strings and
+        # measure the longest, but deliberately never persist the strings
+        # themselves: a verbatim strings dump of an arbitrary binary could
+        # reproduce copyrighted text, hardcoded secrets, license keys or PII, so
+        # only the non-expressive counts leave this function.
         ascii_strings = self._ascii_strings(sample)
         utf16_strings = self._utf16le_strings(sample)
         all_strings = ascii_strings + utf16_strings
         out["ascii_string_count"] = len(ascii_strings)
         out["utf16_string_count"] = len(utf16_strings)
         out["max_string_len"] = max((len(s) for s in all_strings), default=0)
-        sample_strs = [
-            s[:_MAX_STRING_LEN_KEEP] for s in all_strings[:_MAX_STRING_SAMPLE]
-        ]
-        out["sample_strings"] = json.dumps(sample_strs, ensure_ascii=False)
 
         out["is_probably_text"] = bool(
             out["printable_ratio"] >= 0.95 and out["null_ratio"] < 0.01

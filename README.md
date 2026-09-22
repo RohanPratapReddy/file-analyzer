@@ -30,6 +30,14 @@ raw file payloads, and degrades honestly — when a format can only be partially
 understood, it records what it could determine and marks the rest, rather than
 fabricating results.
 
+> **🔒 IP-safe by design.** It stores **metadata, structure and statistics — never
+> file payloads**, and never dumps verbatim strings out of binaries. The little
+> free text it does keep (header fields, config/DB values, sample cells, document
+> previews, monitor diffs) is scrubbed of **secrets and PII** at a single choke
+> point (`file_analyzer.core.guardrails`) before storage. It is a defensive tool,
+> not a secret-harvesting or copyright-lifting one. See the acceptable-use policy:
+> **[ACCEPTABLE_USE.md](ACCEPTABLE_USE.md)** (`python -m file_analyzer.main --acceptable-use`).
+
 > **⚠️ Runs in a container or VM only.** The CLI entrypoints (`file-analyzer` /
 > `python -m file_analyzer.main` and the monitor `file-analyzer-monitor` / `python -m file_analyzer`)
 > **refuse to run directly on bare-metal host hardware** — they start only inside a

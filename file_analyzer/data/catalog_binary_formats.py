@@ -120,9 +120,10 @@ def forensic_profile(path: Path, note: Optional[str] = None) -> Dict[str, Any]:
         "printable_ratio": pr,
         "likely_encrypted_or_compressed": ent >= 7.5,
     }
-    strings = _ascii_strings(head)
-    if strings:
-        props["sample_strings"] = strings[:_STR_CAP]
+    # Count printable header strings for a text/binary signal, but never persist
+    # the strings themselves: a verbatim dump of an arbitrary binary's header
+    # could reproduce copyrighted content, embedded secrets or PII.
+    props["header_printable_string_count"] = len(_ascii_strings(head))
     if note:
         props["parse_note"] = note
     return props

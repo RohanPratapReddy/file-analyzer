@@ -55,6 +55,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from ..core.guardrails import scrub
 from . import document_formats
 
 
@@ -330,11 +331,14 @@ class DocumentAnalyzer:
 
     @staticmethod
     def _as_text(v: Any) -> Optional[str]:
+        # Single choke point for every free-text field we persist from a document
+        # (text_preview, record_label, notes, ...). Scrub secrets/PII so a
+        # password, key or email that appears in the document body cannot be
+        # indexed in the clear, then cap length.
         if v is None:
             return None
-        if isinstance(v, str):
-            return v.replace("\x00", "")[:2048]
-        return str(v)[:2048]
+        s = v if isinstance(v, str) else str(v)
+        return scrub(s.replace("\x00", ""), max_len=2048)
 
     @staticmethod
     def _json(v: Any) -> Optional[str]:
