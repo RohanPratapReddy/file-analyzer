@@ -26,6 +26,12 @@ name: Upload Python Package
 on:
   release:
     types: [published]
+  # Manual re-publish without cutting a new release: rebuilds the wheels from the
+  # current _version.py and uploads them, skipping any already on PyPI (see
+  # `skip-existing` below). Trusted Publishing still authenticates -- the OIDC
+  # identity is keyed to this workflow file + the `pypi` environment, not the
+  # trigger -- so a workflow_dispatch run publishes exactly like a release run.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -86,3 +92,9 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
+          # This release ships FOUR projects from one dist/; twine uploads them
+          # in one pass and aborts on the first hard error. skip-existing makes a
+          # re-run idempotent: any wheel already on PyPI (e.g. after a partial
+          # failure, or a workflow_dispatch re-publish of an unchanged version) is
+          # skipped instead of failing the whole upload.
+          skip-existing: true
