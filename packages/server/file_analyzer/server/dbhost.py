@@ -22,12 +22,14 @@ can enumerate what is hosted and where.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import os
 import shutil
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, ContextManager, Dict, List, Optional
 
 from ..naming import sqlite_db_path, storage_key
 from ..store import SqlStore, resolve_dialect
@@ -36,6 +38,9 @@ from .catalog import SessionCatalog
 
 #: Default per-chunk size for the remote (bytea) backend: 8 MiB.
 DEFAULT_CHUNK_BYTES = 8 * 1024 * 1024
+#: Minimum seconds between two recorded read accesses of the same database, so
+#: a busy query loop does not turn every read into a catalog write.
+TOUCH_THROTTLE_SECONDS = 60.0
 
 
 def _sha256_file(path: PathLike) -> str:
@@ -109,6 +114,16 @@ class DatabaseHost:
         self.dialect = resolve_dialect(backend) if backend != "sqlite" else "sqlite"
         self.chunk_bytes = max(64 * 1024, int(chunk_bytes))
         self._schema_ready = False
+        self._touched: Dict[str, float] = {}
+        # Optional ``key -> context manager`` that serializes content changes of
+        # one storage key with backups/heals of it (the server wires the
+        # BackupManager's per-key lock in here).
+        self.key_lock_factory: Optional[Callable[[str], ContextManager[Any]]] = None
+
+    def _key_lock(self, key: str) -> ContextManager[Any]:
+        if self.key_lock_factory is None:
+            return contextlib.nullcontext()
+        return self.key_lock_factory(key)
 
     @property
     def is_remote(self) -> bool:
@@ -155,12 +170,6 @@ class DatabaseHost:
 
         if not self.is_remote:
             dest = sqlite_db_path(self.data_dir, self.root, self.token, db_name)
-            if source.resolve() != dest.resolve():
-                # Copy to a sibling temp then atomically replace, so a reader
-                # never sees a partial file.
-                tmp = dest.with_name(f".{dest.name}.incoming")
-                shutil.copyfile(source, tmp)
-                tmp.replace(dest)
             record = {
                 "storage_key": key,
                 "fingerprint": None,
@@ -174,7 +183,6 @@ class DatabaseHost:
                 "updated_at": now,
             }
         else:
-            n_chunks = self._write_chunks(key, source, db_name, size, sha, now)
             record = {
                 "storage_key": key,
                 "fingerprint": None,
@@ -184,15 +192,111 @@ class DatabaseHost:
                 "location": f"{self.backend}#{key}",
                 "size_bytes": size,
                 "sha256": sha,
-                "n_chunks": n_chunks,
+                "n_chunks": None,
                 "updated_at": now,
             }
         # Fill the fingerprint from the catalog's identity helper.
         from ..tokens import project_fingerprint
 
         record["fingerprint"] = project_fingerprint(self.root)
-        self.catalog.register_database(record)
+        # Content swap + catalog update happen under the key lock, so a
+        # concurrent backup/heal of the same key never sees a half-updated pair.
+        with self._key_lock(key):
+            if not self.is_remote:
+                dest = Path(record["location"])
+                if source.resolve() != dest.resolve():
+                    # Copy to a sibling temp then atomically replace, so a
+                    # reader never sees a partial file.
+                    tmp = dest.with_name(f".{dest.name}.incoming")
+                    shutil.copyfile(source, tmp)
+                    # Stale WAL/SHM sidecars belong to the previous content.
+                    for side in ("-wal", "-shm"):
+                        try:
+                            dest.with_name(dest.name + side).unlink()
+                        except FileNotFoundError:
+                            pass
+                    tmp.replace(dest)
+            else:
+                record["n_chunks"] = self._write_chunks(
+                    key, source, db_name, size, sha, now
+                )
+            self.catalog.register_database(record)
         return HostedDatabase(record)
+
+    def reinstall(self, storage_key_: str, source: PathLike) -> Dict[str, Any]:
+        """Replace a hosted database's content with ``source`` *in place*.
+
+        Used by the autopilot to install a verified restore over a damaged copy:
+        the catalog row keeps its identity and ``updated_at`` (it is the same
+        logical database, repaired, not a re-host) while ``size_bytes`` and
+        ``sha256`` are updated to the installed content. For SQLite the file is
+        moved into place atomically (a ``source`` in the data directory is
+        consumed); for a remote backend the chunks are rewritten. Call under
+        the key lock.
+        """
+        rec = self.catalog.get_database(storage_key_)
+        if rec is None:
+            raise KeyError(f"no hosted database with key {storage_key_!r}")
+        source = Path(source)
+        size = source.stat().st_size
+        sha = _sha256_file(source)
+        record = dict(rec)
+        record["size_bytes"] = size
+        record["sha256"] = sha
+        if rec.get("dialect") == "sqlite":
+            dest = Path(rec.get("location") or "")
+            if dest.name != f"{storage_key_}.db":
+                raise ValueError(f"refusing to reinstall over unexpected path {dest}")
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if source.parent.resolve() != dest.parent.resolve():
+                tmp = dest.with_name(f".{dest.name}.incoming")
+                shutil.copyfile(source, tmp)
+                source = tmp
+            for side in ("-wal", "-shm"):
+                try:
+                    dest.with_name(dest.name + side).unlink()
+                except FileNotFoundError:
+                    pass
+            os.replace(source, dest)
+        else:
+            updated = float(rec.get("updated_at") or time.time())
+            record["n_chunks"] = self._write_chunks(
+                storage_key_, source, rec["db_name"], size, sha, updated
+            )
+        self.catalog.register_database(record)
+        return record
+
+    def chunk_stats(self, storage_key_: str) -> Dict[str, Any]:
+        """Cheap structural facts about a remote-hosted database's chunks.
+
+        Returns ``n_chunks`` (rows present), ``min_seq``/``max_seq``,
+        ``total_bytes`` (sum of chunk lengths) and the content table's own
+        ``declared`` row (``size_bytes``/``sha256``/``n_chunks``) or ``None``.
+        """
+        store = self._store()
+        try:
+            self._ensure_remote_schema(store)
+            rows = store.query(
+                "SELECT COUNT(*) AS n, MIN(seq) AS lo, MAX(seq) AS hi, "
+                "SUM(LENGTH(data)) AS total FROM hosted_chunks "
+                "WHERE storage_key = ?",
+                (storage_key_,),
+            )
+            declared = store.query(
+                "SELECT size_bytes, sha256, n_chunks FROM hosted_databases "
+                "WHERE storage_key = ?",
+                (storage_key_,),
+            )
+        finally:
+            store.close()
+        row = rows[0] if rows else {}
+        return {
+            "n_chunks": int(row.get("n") or 0),
+            "min_seq": row.get("lo"),
+            "max_seq": row.get("hi"),
+            "total_bytes": int(row.get("total") or 0),
+            "declared": dict(declared[0]) if declared else None,
+        }
 
     def _write_chunks(
         self,
@@ -277,6 +381,7 @@ class DatabaseHost:
         rec = self.catalog.get_database(storage_key_)
         if rec is None:
             raise KeyError(f"no hosted database with key {storage_key_!r}")
+        self.touch(storage_key_)
         if rec.get("dialect") == "sqlite":
             return Path(rec["location"]).read_bytes()
         fd, tmp = tempfile.mkstemp(suffix=".db", prefix="hosted-")
@@ -332,6 +437,7 @@ class DatabaseHost:
         rec = self.catalog.get_database(storage_key_)
         if rec is None:
             raise KeyError(f"no hosted database with key {storage_key_!r}")
+        self.touch(storage_key_)
         if rec.get("dialect") == "sqlite":
             return run_readonly_query(rec["location"], sql, params, limit)
         tmp = self.materialize(storage_key_)
@@ -342,3 +448,117 @@ class DatabaseHost:
                 Path(tmp).unlink()
             except OSError:
                 pass
+
+    # -- access tracking -------------------------------------------------
+    def touch(self, storage_key_: str) -> None:
+        """Record a read access (throttled), so retention sees the db as in use.
+
+        Backups deliberately do *not* call this -- a database that is only ever
+        backed up is still idle.
+        """
+        now = time.time()
+        if now - self._touched.get(storage_key_, 0.0) < TOUCH_THROTTLE_SECONDS:
+            return
+        self._touched[storage_key_] = now
+        try:
+            self.catalog.touch_database(storage_key_, now)
+        except Exception:
+            # Access tracking is advisory; never fail a read over it.
+            pass
+
+    # -- size / removal (retention) ---------------------------------------
+    @staticmethod
+    def _sqlite_files(location: PathLike) -> List[Path]:
+        """The live file plus its WAL/SHM sidecars and any half-copied upload."""
+        loc = Path(location)
+        return [
+            loc,
+            loc.with_name(loc.name + "-wal"),
+            loc.with_name(loc.name + "-shm"),
+            loc.with_name(f".{loc.name}.incoming"),
+        ]
+
+    def stored_bytes(self, record: Dict[str, Any]) -> int:
+        """Bytes a hosted database occupies in its backend right now."""
+        if record.get("dialect") == "sqlite":
+            total = 0
+            for p in self._sqlite_files(record["location"]):
+                try:
+                    total += p.stat().st_size
+                except OSError:
+                    pass
+            return total
+        return int(record.get("size_bytes") or 0)
+
+    def remove(self, storage_key_: str) -> int:
+        """Delete a hosted database's content and catalog row; return bytes freed.
+
+        For the SQLite backend only a file named exactly ``<storage_key>.db`` (and
+        its sidecars) is ever unlinked, so a corrupted catalog row can never point
+        this at an unrelated file.
+        """
+        rec = self.catalog.get_database(storage_key_)
+        if rec is None:
+            return 0
+        freed = 0
+        if rec.get("dialect") == "sqlite":
+            loc = Path(rec.get("location") or "")
+            if loc.name == f"{storage_key_}.db":
+                for p in self._sqlite_files(loc):
+                    try:
+                        size = p.stat().st_size
+                        p.unlink()
+                        freed += size
+                    except FileNotFoundError:
+                        pass
+        else:
+            store = self._store()
+            try:
+                self._ensure_remote_schema(store)
+                store.execute(
+                    "DELETE FROM hosted_chunks WHERE storage_key = ?", (storage_key_,)
+                )
+                store.execute(
+                    "DELETE FROM hosted_databases WHERE storage_key = ?",
+                    (storage_key_,),
+                )
+            finally:
+                store.close()
+            freed = int(rec.get("size_bytes") or 0)
+        self.catalog.remove_database(storage_key_)
+        self._touched.pop(storage_key_, None)
+        return freed
+
+    def reclaim(self) -> Dict[str, Any]:
+        """Best-effort space reclaim on the remote content store after deletions.
+
+        Postgres gets a plain ``VACUUM`` (non-blocking; makes the freed chunk
+        space reusable), MySQL/MariaDB an ``OPTIMIZE TABLE`` (rebuilds the table
+        and returns space to the OS). The SQLite backend stores one file per
+        database, so deleting the file already returned the space.
+        """
+        if not self.is_remote:
+            return {"action": "none", "reason": "sqlite backend frees space on delete"}
+        store = self._store()
+        try:
+            self._ensure_remote_schema(store)
+            conn = store._require()
+            if store.dialect == "postgresql":
+                # VACUUM cannot run inside a transaction block.
+                previous = getattr(conn, "autocommit", False)
+                conn.autocommit = True
+                try:
+                    cur = conn.cursor()
+                    try:
+                        cur.execute("VACUUM hosted_chunks")
+                    finally:
+                        cur.close()
+                finally:
+                    conn.autocommit = previous
+                return {"action": "VACUUM hosted_chunks"}
+            store.execute("OPTIMIZE TABLE hosted_chunks")
+            return {"action": "OPTIMIZE TABLE hosted_chunks"}
+        except Exception as exc:
+            return {"action": "failed", "error": str(exc)}
+        finally:
+            store.close()

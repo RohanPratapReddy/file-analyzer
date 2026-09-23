@@ -14,7 +14,19 @@ this class *hosts* them and hands clients a way to reach them. It:
   (``http.server.ThreadingHTTPServer`` -- standard library, so the bare-interpreter
   import contract holds) that is the **entrypoint** a client connects to;
 * runs **periodic, chunked, rotating backups** in the background
-  (:class:`~file_analyzer.server.backup.BackupManager`);
+  (:class:`~file_analyzer.server.backup.BackupManager`), optionally
+  **Reed-Solomon erasure coded** into ``k`` data + ``m`` parity shards spread
+  across several shard directories, with a periodic **scrub** that verifies
+  every block and rebuilds lost or corrupt shards
+  (:mod:`~file_analyzer.server.sharding`);
+* runs a periodic **retention janitor** that evicts idle databases and old
+  backups and holds the session to a total size budget
+  (:class:`~file_analyzer.server.retention.RetentionManager`);
+* runs the **autopilot** (:class:`~file_analyzer.server.autopilot.Autopilot`):
+  scheduled health checks of every hosted database and of the catalog,
+  automatic healing from verified backups (with quarantine of the damaged
+  copy), backup-set scrub/repair, retention, backup freshness and debris /
+  orphan sweeps -- so the server maintains and repairs itself;
 * can surface the backend **Postgres logs**
   (:class:`~file_analyzer.server.pglog.PostgresLogTailer`);
 * **persists detached with a PID** once started on a VPS, and is stopped by PID.
@@ -38,7 +50,9 @@ from urllib.parse import parse_qs, urlparse
 from .._version import __version__
 from ..naming import storage_key
 from ..tokens import PathLike, new_server_id, project_fingerprint
-from .backup import BackupManager
+from .autopilot import TASKS as AUTOPILOT_TASKS
+from .autopilot import Autopilot, AutopilotPolicy
+from .backup import DEFAULT_SCRUB_INTERVAL, BackupManager
 from .catalog import SessionCatalog, default_catalog_dir
 from .daemon import (
     pid_alive,
@@ -50,12 +64,21 @@ from .daemon import (
     write_pid_file,
 )
 from .dbhost import DEFAULT_CHUNK_BYTES, DatabaseHost
-from .locking import atomic_write_text
+from .locking import FileLock, atomic_write_text
 from .pglog import PostgresLogTailer
 from .readonly import is_readonly_select
+from .retention import (
+    DEFAULT_BACKUP_MAX_AGE,
+    DEFAULT_MAX_AGE,
+    DEFAULT_RETENTION_INTERVAL,
+    RetentionManager,
+    RetentionPolicy,
+)
+from .sharding import DEFAULT_BLOCK_BYTES, ErasureConfig
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_BACKUP_INTERVAL = 900.0  # 15 minutes
+DEFAULT_AUTOPILOT_INTERVAL = 300.0  # 5 minutes between maintenance ticks
 HEARTBEAT_INTERVAL = 15.0
 
 
@@ -87,6 +110,26 @@ class DatabaseServer:
         backup_interval: float = DEFAULT_BACKUP_INTERVAL,
         backup_part_bytes: Optional[int] = None,
         backup_keep: int = 5,
+        retention_interval: float = DEFAULT_RETENTION_INTERVAL,
+        retention_max_age: Optional[float] = DEFAULT_MAX_AGE,
+        backup_max_age: Optional[float] = DEFAULT_BACKUP_MAX_AGE,
+        retention_max_bytes: Optional[int] = None,
+        rs_data_shards: int = 0,
+        rs_parity_shards: int = 2,
+        rs_block_bytes: int = DEFAULT_BLOCK_BYTES,
+        shard_dirs: Optional[List[PathLike]] = None,
+        scrub_interval: float = DEFAULT_SCRUB_INTERVAL,
+        autopilot_interval: float = DEFAULT_AUTOPILOT_INTERVAL,
+        check_interval: Optional[float] = None,
+        deep_check_interval: Optional[float] = None,
+        autopilot_startup_delay: Optional[float] = None,
+        auto_heal: bool = True,
+        allow_rollback: bool = True,
+        auto_backup: bool = True,
+        drift_action: str = "restore",
+        autopilot_workers: Optional[int] = None,
+        autopilot_use_go: bool = True,
+        autopilot_policy: Optional[AutopilotPolicy] = None,
     ) -> None:
         self.root = str(Path(root).resolve())
         self.backend = backend
@@ -96,6 +139,23 @@ class DatabaseServer:
         self.backup_interval = float(backup_interval)
         self.backup_keep = int(backup_keep)
         self.chunk_bytes = int(chunk_bytes)
+        self.retention_interval = float(retention_interval)
+        self.scrub_interval = float(scrub_interval)
+        # Reed-Solomon backups: off (plain chunked sets) unless data shards > 0.
+        self.erasure: Optional[ErasureConfig] = None
+        if int(rs_data_shards) > 0:
+            self.erasure = ErasureConfig(
+                data_shards=rs_data_shards,
+                parity_shards=rs_parity_shards,
+                block_bytes=rs_block_bytes,
+                shard_dirs=[str(d) for d in (shard_dirs or [])],
+            )
+            for d in self.erasure.shard_dirs:
+                Path(d).mkdir(parents=True, exist_ok=True)
+        elif shard_dirs:
+            raise ValueError(
+                "shard_dirs need erasure coding: set rs_data_shards (e.g. 4)"
+            )
 
         self.catalog = SessionCatalog(catalog_dir, target=catalog_target)
         self.fingerprint = project_fingerprint(self.root)
@@ -128,7 +188,70 @@ class DatabaseServer:
             backup_dir=self.backup_dir,
             part_bytes=part_bytes,
             keep=self.backup_keep,
+            erasure=self.erasure,
         )
+        self.retention = RetentionManager(
+            self.dbhost,
+            self.backups,
+            RetentionPolicy(
+                max_age=retention_max_age,
+                backup_max_age=backup_max_age,
+                max_total_bytes=retention_max_bytes,
+            ),
+        )
+        # Content swaps of a key (re-host, heal) serialize with its backups.
+        self.dbhost.key_lock_factory = lambda k: FileLock(
+            self.backups._key_lock_path(k), timeout=600.0
+        )
+        # Damaged databases flagged by the autopilot are never backed up (by
+        # this process, a parallel instance or a Go-pool backup worker).
+        self.backups.suspect_file = self.run_dir / "suspect.json"
+
+        self.autopilot_interval = float(autopilot_interval or 0.0)
+        if autopilot_policy is None:
+            defaults = AutopilotPolicy()
+            autopilot_policy = AutopilotPolicy(
+                interval=self.autopilot_interval or defaults.interval,
+                startup_delay=(
+                    defaults.startup_delay
+                    if autopilot_startup_delay is None
+                    else autopilot_startup_delay
+                ),
+                check_interval=(
+                    defaults.check_interval
+                    if check_interval is None
+                    else check_interval
+                ),
+                deep_check_interval=(
+                    defaults.deep_check_interval
+                    if deep_check_interval is None
+                    else deep_check_interval
+                ),
+                # The autopilot takes over the retention + scrub schedules.
+                retention_interval=self.retention_interval,
+                scrub_interval=self.scrub_interval,
+                heal=auto_heal,
+                allow_rollback=allow_rollback,
+                drift_action=drift_action,
+                ensure_backups=auto_backup,
+                workers=autopilot_workers,
+                use_go=autopilot_use_go,
+                backup_max_age=(
+                    2 * self.backup_interval + 60 if self.backup_interval > 0 else None
+                ),
+            )
+        self.autopilot = Autopilot(
+            self.dbhost,
+            self.backups,
+            self.retention,
+            run_dir=self.run_dir,
+            policy=autopilot_policy,
+            quarantine_dir=base / self.fingerprint / "quarantine",
+            own_server_id=self.server_id,
+            backend=self.backend,
+            on_catalog_restored=self._reregister,
+        )
+        self._serving = False
 
         self._httpd: Optional[ThreadingHTTPServer] = None
         self._stop = threading.Event()
@@ -187,12 +310,26 @@ class DatabaseServer:
         self._write_endpoint()
         write_pid_file(self.pid_file)
         self._register()
+        self._serving = True
         self._start_heartbeat()
         if self.backup_interval > 0:
             self.backups.start_periodic(
                 self.backup_interval,
                 database_url=self.backend if self.dbhost.is_remote else None,
             )
+        if self.autopilot_interval > 0:
+            # The autopilot schedules retention and the backup scrub itself,
+            # between its checks and heals, so they never race each other.
+            self.autopilot.start()
+        else:
+            if self.retention_interval > 0:
+                self.retention.start_periodic(self.retention_interval)
+            if self.erasure is not None and self.scrub_interval > 0:
+                self.backups.start_scrub(
+                    self.scrub_interval,
+                    workers=self.autopilot.policy.workers,
+                    use_go=self.autopilot.policy.use_go,
+                )
 
         self._install_signals(httpd)
         print(
@@ -259,6 +396,11 @@ class DatabaseServer:
             }
         )
 
+    def _reregister(self) -> None:
+        """Re-add this server's row after the autopilot rebuilt the catalog."""
+        if self._serving:
+            self._register()
+
     def _start_heartbeat(self) -> None:
         def _beat() -> None:
             while not self._stop.wait(HEARTBEAT_INTERVAL):
@@ -274,6 +416,15 @@ class DatabaseServer:
 
     def _teardown(self, httpd: ThreadingHTTPServer) -> None:
         self._stop.set()
+        self._serving = False
+        try:
+            self.autopilot.stop()
+        except Exception:
+            pass
+        try:
+            self.retention.stop()
+        except Exception:
+            pass
         try:
             self.backups.stop()
         except Exception:
@@ -331,6 +482,9 @@ class DatabaseServer:
             str(self.backup_interval),
             "--backup-keep",
             str(self.backup_keep),
+            *self._retention_argv(),
+            *self._erasure_argv(),
+            *self._autopilot_argv(),
         )
         log_path = self.run_dir / f"server-{self.server_id}.log"
         pid = spawn_detached(argv, cwd=self.root, log_path=log_path)
@@ -338,6 +492,65 @@ class DatabaseServer:
         info = self._await_endpoint(pid, timeout=20.0)
         info["log"] = str(log_path)
         return info
+
+    def _retention_argv(self) -> List[str]:
+        """The retention policy as ``run`` flags (0 = disabled), for the child."""
+        pol = self.retention.policy
+        return [
+            "--retention-interval",
+            str(self.retention_interval),
+            "--retention-days",
+            str((pol.max_age or 0) / 86400.0),
+            "--backup-retention-days",
+            str((pol.backup_max_age or 0) / 86400.0),
+            "--max-total-size",
+            str(pol.max_total_bytes or 0),
+        ]
+
+    def _autopilot_argv(self) -> List[str]:
+        """The autopilot configuration as ``run`` flags, for the child."""
+        pol = self.autopilot.policy
+        argv = [
+            "--autopilot-interval",
+            str(self.autopilot_interval),
+            "--check-interval",
+            str(pol.check_interval),
+            "--deep-check-interval",
+            str(pol.deep_check_interval),
+            "--autopilot-startup-delay",
+            str(pol.startup_delay),
+            "--drift-action",
+            pol.drift_action,
+        ]
+        if not pol.heal:
+            argv.append("--no-auto-heal")
+        if not pol.allow_rollback:
+            argv.append("--no-rollback")
+        if not pol.ensure_backups:
+            argv.append("--no-auto-backup")
+        if pol.workers:
+            argv += ["--autopilot-workers", str(pol.workers)]
+        if not pol.use_go:
+            argv.append("--no-go-workers")
+        return argv
+
+    def _erasure_argv(self) -> List[str]:
+        """The Reed-Solomon backup config as ``run`` flags, for the child."""
+        if self.erasure is None:
+            return []
+        argv = [
+            "--rs-data-shards",
+            str(self.erasure.data_shards),
+            "--rs-parity-shards",
+            str(self.erasure.parity_shards),
+            "--rs-block-size",
+            str(self.erasure.block_bytes),
+            "--scrub-interval",
+            str(self.scrub_interval),
+        ]
+        for d in self.erasure.shard_dirs:
+            argv += ["--shard-dir", d]
+        return argv
 
     def _await_endpoint(self, pid: int, timeout: float) -> Dict[str, Any]:
         deadline = time.monotonic() + timeout
@@ -392,7 +605,109 @@ class DatabaseServer:
             "databases": self.databases(),
             "data_dir": str(self.data_dir),
             "backup_dir": str(self.backup_dir),
+            "retention": self.retention_status(),
+            "backups": self.backup_status(),
+            "autopilot": self.autopilot_status(),
         }
+
+    # -- autopilot (self-healing maintenance) --------------------------
+    def autopilot_status(self) -> Dict[str, Any]:
+        """Schedule, per-database health, suspect keys and recent events."""
+        st = self.autopilot.status()
+        st["enabled"] = self.autopilot_interval > 0
+        return st
+
+    def run_maintenance(
+        self,
+        *,
+        dry_run: bool = False,
+        tasks: Optional[List[str]] = None,
+        force: bool = True,
+        wait: bool = True,
+    ) -> Dict[str, Any]:
+        """Run one autopilot tick now (all tasks unless ``tasks`` names some).
+
+        ``force`` ignores the task schedules; ``dry_run`` only reports what
+        would be checked/healed/removed; ``wait`` waits for a tick already in
+        progress (in any process) instead of skipping.
+        """
+        if tasks:
+            bad = [t for t in tasks if t not in AUTOPILOT_TASKS]
+            if bad:
+                raise ValueError(
+                    f"unknown maintenance task(s) {bad}; valid: {list(AUTOPILOT_TASKS)}"
+                )
+        return self.autopilot.run_once(
+            dry_run=dry_run, tasks=tasks, force=force, wait=wait
+        )
+
+    def check_health(self) -> Dict[str, Any]:
+        """Check the catalog and every hosted database now; repairs nothing."""
+        return self.run_maintenance(tasks=["catalog", "check"])
+
+    # -- backups --------------------------------------------------------
+    def backup_status(self) -> Dict[str, Any]:
+        """Backup format, erasure-coding config and the last integrity scrub."""
+        return {
+            "format": "reed-solomon" if self.erasure else "chunked",
+            "interval": self.backup_interval,
+            "keep": self.backup_keep,
+            "erasure": self.erasure.summary() if self.erasure else None,
+            "shard_roots": (
+                [str(r) for r in self.backups.shard_roots()] if self.erasure else []
+            ),
+            "scrub_interval": self.scrub_interval if self.erasure else None,
+            "last_scrub": self.backups.last_scrub,
+        }
+
+    def verify_backups(
+        self, storage_key: Optional[str] = None, timestamp: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Check every (or one) backup set block by block; modifies nothing."""
+        pol = self.autopilot.policy
+        return self.backups.verify_backups(
+            storage_key, timestamp, workers=pol.workers, use_go=pol.use_go
+        )
+
+    def repair_backups(
+        self, storage_key: Optional[str] = None, timestamp: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Rebuild lost/corrupt shards of erasure-coded backup sets."""
+        pol = self.autopilot.policy
+        return self.backups.repair_backups(
+            storage_key, timestamp, workers=pol.workers, use_go=pol.use_go
+        )
+
+    def restore_backup(
+        self, storage_key: str, dest: PathLike, timestamp: Optional[str] = None
+    ) -> Path:
+        """Restore a backup set (newest if ``timestamp`` is None) into ``dest``."""
+        return self.backups.restore(storage_key, timestamp, dest)
+
+    # -- retention ------------------------------------------------------
+    def retention_status(self) -> Dict[str, Any]:
+        """Policy, janitor interval, current usage and the last pass's summary."""
+        last = self.retention.last_report
+        return {
+            "policy": self.retention.policy.to_dict(),
+            "interval": self.retention_interval,
+            "usage": self.retention.usage(),
+            "last_run": (
+                None
+                if last is None
+                else {
+                    "dry_run": last["dry_run"],
+                    "freed_bytes": last["freed_bytes"],
+                    "evicted": len(last["evicted"]),
+                    "pruned_backups": len(last["pruned_backups"]),
+                    "over_budget": last["over_budget"],
+                }
+            ),
+        }
+
+    def enforce_retention(self, *, dry_run: bool = False) -> Dict[str, Any]:
+        """Run one retention pass now (or report what it would do)."""
+        return self.retention.enforce(dry_run=dry_run)
 
     # -- postgres logs --------------------------------------------------
     def postgres_logs(self, lines: int = 100) -> Dict[str, Any]:
@@ -477,6 +792,12 @@ class _Handler(BaseHTTPRequestHandler):
                 return self._send_json(
                     200, {"backups": self.app.backups.list_backups(key)}
                 )
+            if path == "/retention":
+                return self._send_json(200, self.app.retention_status())
+            if path == "/backups/status":
+                return self._send_json(200, self.app.backup_status())
+            if path == "/autopilot":
+                return self._send_json(200, self.app.autopilot_status())
             if path == "/pglogs":
                 lines = int(qs.get("lines", ["100"])[0])
                 return self._send_json(200, self.app.postgres_logs(lines))
@@ -504,6 +825,37 @@ class _Handler(BaseHTTPRequestHandler):
                 return self._query()
             if path == "/backup":
                 return self._backup()
+            if path in ("/backups/verify", "/backups/repair"):
+                body = self._body_json()
+                action = (
+                    self.app.verify_backups
+                    if path.endswith("verify")
+                    else self.app.repair_backups
+                )
+                return self._send_json(
+                    200, action(body.get("storage_key"), body.get("timestamp"))
+                )
+            if path == "/retention":
+                body = self._body_json()
+                return self._send_json(
+                    200,
+                    self.app.enforce_retention(dry_run=bool(body.get("dry_run"))),
+                )
+            if path == "/autopilot/run":
+                body = self._body_json()
+                tasks = body.get("tasks")
+                if tasks is not None and not (
+                    isinstance(tasks, list) and all(isinstance(t, str) for t in tasks)
+                ):
+                    raise ValueError("tasks must be a list of task names")
+                return self._send_json(
+                    200,
+                    self.app.run_maintenance(
+                        dry_run=bool(body.get("dry_run")),
+                        tasks=tasks or None,
+                        force=bool(body.get("force", True)),
+                    ),
+                )
             return self._send_json(404, {"error": f"no such route: {path}"})
         except FileNotFoundError as exc:
             return self._send_json(404, {"error": str(exc)})
@@ -516,6 +868,13 @@ class _Handler(BaseHTTPRequestHandler):
 
     # -- endpoint implementations --------------------------------------
     def _health(self) -> Dict[str, Any]:
+        # Liveness must not depend on the catalog: a damaged catalog is the
+        # autopilot's job to repair, not a reason for a supervisor to restart.
+        try:
+            n_databases: Optional[int] = len(self.app.databases())
+        except Exception:
+            n_databases = None
+        last = self.app.autopilot.last_report
         return {
             "status": "ok",
             "service": "file-analyzer-database-server",
@@ -523,7 +882,12 @@ class _Handler(BaseHTTPRequestHandler):
             "backend": self.app.backend,
             "server_id": self.app.server_id,
             "project_root": self.app.root,
-            "databases": len(self.app.databases()),
+            "databases": n_databases,
+            "autopilot": {
+                "running": self.app.autopilot.running,
+                "healthy": None if last is None else last.get("healthy"),
+                "problems": None if last is None else len(last.get("problems", [])),
+            },
         }
 
     def _session(self) -> Dict[str, Any]:

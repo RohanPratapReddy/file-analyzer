@@ -28,7 +28,7 @@ requires-python = ">=3.9"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "Rohan Pratap Reddy Ravula" }]
-keywords = ["static-analysis", "code-intelligence", "repository", "sqlite", "mcp", "ai-agent", "repository-monitor", "incremental-analysis", "document-intelligence"]
+keywords = ["static-analysis", "code-intelligence", "repository", "sqlite", "mcp", "ai-agent", "repository-monitor", "incremental-analysis", "document-intelligence", "database-server", "reed-solomon", "self-healing"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
@@ -49,8 +49,14 @@ ocr = ["file-analyzer-engine[ocr]"]
 pii = ["file-analyzer-engine[pii]"]
 eval = ["file-analyzer-engine[eval]"]
 document = ["file-analyzer-engine[document]"]
-# Opt-in: also install the database-hosting server alongside the analysis profile.
+# Opt-in: also install the database-hosting server alongside the analysis profile
+# (session catalog + HTTP control plane, chunked or Reed-Solomon sharded backups
+# with scrub/repair, time/space retention, the self-healing autopilot + process
+# supervisor, and its Go worker pool). Pure stdlib for SQLite hosting; the
+# remote-backend drivers come with the next two extras.
 server = ["file-analyzer-server"]
+server-postgres = ["file-analyzer-server[postgres]"]
+server-mysql = ["file-analyzer-server[mysql]"]
 
 [project.urls]
 Homepage = "https://github.com/RohanPratapReddy/file-analyzer"

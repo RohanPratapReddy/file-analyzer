@@ -10,14 +10,29 @@ requires-python = ">=3.9"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "Rohan Pratap Reddy Ravula" }]
+keywords = ["file-analyzer", "sqlite", "client", "database-server", "read-only", "backup", "self-healing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Database :: Front-Ends",
+    "Topic :: Software Development :: Libraries",
+]
 dynamic = ["version"]
 
 # The client is intentionally pure standard library -- zero runtime dependencies.
+# That includes ServerClient, the HTTP client for a hosted file-analyzer-server:
+# databases/query/download/upload, backups (status / verify / repair), retention
+# (status / enforce) and the self-healing autopilot (check / run / status).
 dependencies = []
 
 [project.optional-dependencies]
 # Opt in to local analysis by pulling the analyzer fleet alongside the client.
 engine = ["file-analyzer-engine"]
+
+[project.urls]
+Homepage = "https://github.com/RohanPratapReddy/file-analyzer"
+Repository = "https://github.com/RohanPratapReddy/file-analyzer"
 
 [tool.setuptools.dynamic]
 version = { attr = "file_analyzer._version.__version__" }

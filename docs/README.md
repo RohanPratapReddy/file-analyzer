@@ -10,8 +10,9 @@ to run it, use it as a library, or understand a single module on its own is here
 > importable `file_analyzer` namespace: **`file-analyzer`** (meta = the analysis
 > profile, client + engine — most users want this), **`file-analyzer-client`** (tiny,
 > pure-stdlib; query a hosted server or a local `.db`), **`file-analyzer-engine`**
-> (the analyzer fleet), and **`file-analyzer-server`** (the DB-hosting server, a
-> deliberate separate install). Fleet/SDK imports go through the `file_analyzer.engine`
+> (the analyzer fleet), and **`file-analyzer-server`** (the DB-hosting server:
+> token-auth HTTP control plane, Reed-Solomon sharded backups, retention and a
+> self-healing autopilot; a deliberate separate install, see [server.md](server.md)). Fleet/SDK imports go through the `file_analyzer.engine`
 > facade. Source for each lives under [`../packages/`](../packages/). Full matrix:
 > [Installation & packaging](../README.md#installation--packaging).
 
@@ -50,6 +51,13 @@ layers:
 - **[runtime-containment.md](runtime-containment.md)** — the CLI entrypoints refuse
   to run on bare-metal host hardware; they start only inside a container or VM
   (fail-closed, exit code 3, `FILE_ANALYZER_ALLOW_BARE_METAL` override).
+- **[server.md](server.md)** — the **database-hosting server**
+  (`file-analyzer-server`): session tokens and `PROJECT_ROOT-{token}-{db}` naming,
+  detached lifecycle, the HTTP control plane + `ServerClient`, rotating backups
+  (plain or **Reed-Solomon erasure-coded shards** over several disks, with scrub
+  and repair), time/space **retention**, the self-healing **autopilot**
+  (check / heal / scrub / backup / retention / sweep) on a **Go worker pool**, the
+  process **supervisor**, and the Docker `server` compose profile.
 
 ## Per-module reference
 

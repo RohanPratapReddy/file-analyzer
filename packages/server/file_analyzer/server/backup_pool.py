@@ -38,6 +38,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
@@ -92,31 +93,59 @@ def _readers_roots() -> List[str]:
 # ---------------------------------------------------------------------------
 # Toolchain build (on demand)
 # ---------------------------------------------------------------------------
+_BUILD_LOCK = threading.Lock()
+_BINARY_NAME = "backup-pool.exe" if os.name == "nt" else "backup-pool"
+
+
+def _binary_fresh(exe: Path) -> bool:
+    """True when ``exe`` exists and is newer than every Go source + go.mod."""
+    try:
+        built = exe.stat().st_mtime
+        sources = [*_GO_DIR.glob("*.go"), _GO_DIR / "go.mod"]
+        return all(src.stat().st_mtime <= built for src in sources if src.exists())
+    except OSError:
+        return False
+
+
 def _go_binary(log: List[str]) -> Optional[Path]:
+    """The server pool binary, built on demand (``None`` without a Go toolchain).
+
+    One driver binary serves every server pool (backups and the autopilot's
+    inspect/verify/stage jobs). It is rebuilt only when a Go source is newer
+    than the binary, and builds are serialized in-process so concurrent pools
+    (the periodic backup and an autopilot tick, say) never race on the output
+    file.
+    """
     if shutil.which("go") is None:
         return None
-    exe = _GO_DIR / ("backup-pool.exe" if os.name == "nt" else "backup-pool")
-    try:
-        proc = subprocess.run(
-            ["go", "build", "-o", exe.name, "."],
-            cwd=_GO_DIR,
-            capture_output=True,
-            text=True,
-        )
+    exe = _GO_DIR / _BINARY_NAME
+    with _BUILD_LOCK:
+        if _binary_fresh(exe):
+            return exe
+        try:
+            proc = subprocess.run(
+                ["go", "build", "-o", exe.name, "."],
+                cwd=_GO_DIR,
+                capture_output=True,
+                text=True,
+            )
+        except OSError as err:
+            log.append(f"[server-pool] go build error: {err}")
+            return None
         if proc.returncode != 0:
-            log.append(f"[backup-pool] go build failed:\n{proc.stderr}")
+            log.append(f"[server-pool] go build failed:\n{proc.stderr}")
             return None
         return exe
-    except OSError as err:
-        log.append(f"[backup-pool] go build error: {err}")
-        return None
 
 
 def _stage(
-    spec: Dict[str, Any], batches: List[List[str]]
+    spec: Dict[str, Any],
+    batches: List[List[str]],
+    *,
+    prefix: str = "fa-backup-pool-",
 ) -> "tuple[Path, Path, List[int]]":
     # Scratch lives outside backup_dir so it never shows up as a bogus backup key.
-    run_dir = Path(tempfile.mkdtemp(prefix="fa-backup-pool-"))
+    run_dir = Path(tempfile.mkdtemp(prefix=prefix))
     (run_dir / "batches").mkdir(parents=True, exist_ok=True)
     spec_path = run_dir / "spec.json"
     spec_path.write_text(json.dumps(spec), encoding="utf-8")
@@ -136,7 +165,17 @@ def _run_go(
     ids: List[int],
     roots: List[str],
     log: List[str],
+    *,
+    module: Optional[str] = None,
+    kind: Optional[str] = None,
+    min_workers: int = DEFAULT_MIN_WORKERS,
+    max_workers: int = DEFAULT_MAX_WORKERS,
 ) -> int:
+    """Run the Go pool over the staged batches ``ids``; return its exit code.
+
+    ``module``/``kind`` select the Python worker each goroutine runs (default:
+    the backup worker); the pool's output is appended to ``log``.
+    """
     cmd = [
         str(exe),
         "-python",
@@ -150,10 +189,14 @@ def _run_go(
         "-readers-roots",
         os.pathsep.join(roots),
         "-min-workers",
-        str(DEFAULT_MIN_WORKERS),
+        str(min_workers),
         "-max-workers",
-        str(DEFAULT_MAX_WORKERS),
+        str(max_workers),
     ]
+    if module:
+        cmd += ["-module", module]
+    if kind:
+        cmd += ["-kind", kind]
     try:
         proc = subprocess.Popen(
             cmd,
@@ -164,7 +207,7 @@ def _run_go(
             bufsize=1,
         )
     except OSError as err:
-        log.append(f"[backup-pool] failed to launch pool: {err}")
+        log.append(f"[server-pool] failed to launch pool: {err}")
         return 1
     assert proc.stdout is not None
     for line in proc.stdout:

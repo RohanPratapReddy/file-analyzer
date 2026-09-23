@@ -80,7 +80,7 @@ python -m file_analyzer.views install   repository.db
 python -m file_analyzer.views dump      repository_schema.sql
 python -m file_analyzer.views list      repository.db
 python -m file_analyzer.views read      repository.db --view v_extension_distribution
-python -m file_analyzer.views artifacts file_analyzer/views/sql       # (re)generate sql/ artifacts
+python -m file_analyzer.views artifacts packages/engine/file_analyzer/views/sql   # (re)generate sql/ artifacts
 ```
 
 ## The view catalog — 33 views (`v_` prefix)
@@ -117,7 +117,7 @@ Each is created as a DB object named `v_<name>` (e.g. the view
   `modernc.org/sqlite` (no cgo / no gcc).
 - **Docker/Postgres backend** — `.sql` dumps already carry the appended
   `CREATE OR REPLACE VIEW` statements; for `.db` artifacts loaded via `pgloader`
-  (tables only), the loader then applies `file_analyzer/views/sql/views.pgsql.sql`.
+  (tables only), the loader then applies `packages/engine/file_analyzer/views/sql/views.pgsql.sql`.
 
 The Go reader **discovers** the installed views from the catalog (`SELECT name
 FROM sqlite_master WHERE type='view'`) rather than embedding query SQL, and reads
@@ -136,7 +136,7 @@ ARTIFACTS_DIR=./artifacts docker compose up --build
 ```
 
 - For `.db` artifacts, `pgloader` copies **tables only**, so the loader's
-  `apply_views` step then applies `file_analyzer/views/sql/views.pgsql.sql` (bind-mounted
+  `apply_views` step then applies `packages/engine/file_analyzer/views/sql/views.pgsql.sql` (bind-mounted
   in as `/loader/views.pgsql.sql`) after each load, running **without**
   `ON_ERROR_STOP` so views over base tables a given database lacks are skipped,
   not fatal — the same present-tables-only contract as the SQLite side.
@@ -146,11 +146,13 @@ ARTIFACTS_DIR=./artifacts docker compose up --build
   too, which is idempotent.
 
 Regenerate the bind-mounted `views.pgsql.sql` after editing `catalog.py` with
-`python -m file_analyzer.views artifacts file_analyzer/views/sql`.
+`python -m file_analyzer.views artifacts packages/engine/file_analyzer/views/sql`.
 
 **2. Running the `python -m file_analyzer.views` CLI inside the engine image.** The engine
-image's stage `COPY`s the whole `file_analyzer/` package (`COPY file_analyzer/ ./file_analyzer/`), so it
-already contains `file_analyzer.views`. Its `ENTRYPOINT` is `python -m file_analyzer.main`; override
+image installs the client + engine wheels built from `packages/` (the Dockerfile's
+`wheels` stage) and pre-builds the Go reader (`views/go` -> `repo-reader`) next to
+them, so it already contains `file_analyzer.views` with the concurrent Go read path
+live. Its `ENTRYPOINT` is `python -m file_analyzer.main`; override
 it with `--entrypoint python` to invoke the views CLI against a mounted artifact:
 
 ```bash
@@ -164,6 +166,14 @@ docker compose --profile engine run --build --entrypoint python engine \
 
 (`docker compose run --entrypoint` replaces the entrypoint for that one run; the
 arguments after the service name become the new entrypoint's argv.)
+
+**3. The static Go reader image (`reader` profile).** The Dockerfile's `reader`
+target compiles `packages/engine/file_analyzer/views/go` with `CGO_ENABLED=0` into a
+distroless image whose entrypoint is the reader itself:
+
+```bash
+ARTIFACTS_DIR=./artifacts docker compose --profile reader run --build reader   -source /artifacts/repository.db -workers 8 -verbose
+```
 
 ## Notes & gotchas
 
@@ -189,7 +199,7 @@ arguments after the service name become the new entrypoint's argv.)
   no DDL/DML; reserved-word columns (`"count"`, `"value"`) are double-quoted so
   both engines accept them.
 - **Regenerating artifacts.** After editing `catalog.py`, run
-  `python -m file_analyzer.views artifacts file_analyzer/views/sql` to refresh
+  `python -m file_analyzer.views artifacts packages/engine/file_analyzer/views/sql` to refresh
   `views.sqlite.sql`, `views.pgsql.sql`, and `catalog.json` (the Docker loader
   bind-mounts `views.pgsql.sql`).
 

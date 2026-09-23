@@ -123,6 +123,13 @@ MONITOR_ARGS="/workspace --out /artifacts --interval 1 --max-workers 200 --min-w
 The service runs `init: true` (tini as PID 1, reaps orphans) with a
 `stop_grace_period` that lets the SIGTERM handler drain workers before SIGKILL.
 
+The image installs the client + engine wheels built from `packages/` and copies in
+the Go toolchain (`GO_VERSION` build arg, default `1.26`) with the `monitor-pool`
+driver (and every other engine Go pool) **pre-built**. So the Go worker-pool
+engine is live from the first change, with no compile step at runtime; the
+pure-Python pool is still the fallback. The image's own `tini` runs as a
+subreaper (`TINI_SUBREAPER=1`), so it cooperates with compose's `init: true`.
+
 ## Over MCP
 
 The MCP server exposes the monitor as tools — `start_monitor`, `stop_monitor`,

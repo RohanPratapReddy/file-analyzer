@@ -94,6 +94,13 @@ class SessionCatalog:
             "backend TEXT, data_dir TEXT, fingerprint TEXT, project_root TEXT, "
             "token TEXT, url TEXT, started_at REAL, heartbeat_at REAL",
         )
+        # Last read access per hosted database (query / download). Kept in its
+        # own table so older catalogs gain it without a column migration; the
+        # retention janitor measures idleness from max(updated_at, accessed_at).
+        store.ensure_table(
+            "database_access",
+            "storage_key TEXT PRIMARY KEY, accessed_at REAL",
+        )
         store.ensure_index("ix_databases_token", "databases", "token")
         store.ensure_index("ix_servers_fingerprint", "servers", "fingerprint")
         self._initialized = True
@@ -235,8 +242,40 @@ class SessionCatalog:
                 store.execute(
                     "DELETE FROM databases WHERE storage_key = ?", (storage_key,)
                 )
+                store.execute(
+                    "DELETE FROM database_access WHERE storage_key = ?",
+                    (storage_key,),
+                )
             finally:
                 store.close()
+
+    def touch_database(self, storage_key: str, when: Optional[float] = None) -> None:
+        """Record a read access to a hosted database (delete-then-insert)."""
+        when = time.time() if when is None else float(when)
+        with FileLock(self.lock_path, timeout=self.lock_timeout):
+            store = self._store()
+            try:
+                self._ensure_schema(store)
+                store.execute(
+                    "DELETE FROM database_access WHERE storage_key = ?",
+                    (storage_key,),
+                )
+                store.insert(
+                    "database_access",
+                    {"storage_key": storage_key, "accessed_at": when},
+                )
+            finally:
+                store.close()
+
+    def access_times(self) -> Dict[str, float]:
+        """``{storage_key: accessed_at}`` for every database read at least once."""
+        store = self._store()
+        try:
+            self._ensure_schema(store)
+            rows = store.query("SELECT storage_key, accessed_at FROM database_access")
+        finally:
+            store.close()
+        return {r["storage_key"]: float(r["accessed_at"] or 0.0) for r in rows}
 
     # -- servers --------------------------------------------------------
     def register_server(self, record: Dict[str, Any]) -> None:

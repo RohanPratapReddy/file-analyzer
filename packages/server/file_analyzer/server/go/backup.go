@@ -1,34 +1,45 @@
-// server backup pool (Go): a concurrent goroutine pool that drives per-database
-// backups by fanning out to the Python batch worker
-// (file_analyzer/server/backup_worker.py, i.e. `python -m file_analyzer.server.backup_worker`).
+// server worker pool (Go): a concurrent goroutine pool that drives the hosting
+// server's fanned-out jobs by running one Python batch worker per batch. It
+// serves two kinds of work, selected with -module:
+//
+//   - backups   -- file_analyzer.server.backup_worker (the default): back up a
+//     batch of hosted databases (file_analyzer/server/backup_pool.py);
+//   - autopilot -- file_analyzer.server.autopilot_worker with -kind inspect |
+//     verify | stage: health-check hosted databases, verify/repair
+//     backup sets, or stage verified restores for the self-healing
+//     autopilot (file_analyzer/server/autopilot_pool.py).
 //
 // ROLE
-//   The server backs up every database it hosts on a schedule. The Python side
-//   (file_analyzer/server/backup_pool.py) partitions the storage keys into
-//   batches, stages one job spec.json plus one <out>/batches/batch_<id>.json per
-//   batch, and hands this pool the batch ids. A fixed pool of goroutines drains
-//   a batch channel and runs each batch concurrently, one child process per batch:
 //
-//       python -m file_analyzer.server.backup_worker \
-//           --spec <spec> --out <out> --batch <batch_<id>.json> \
-//           [--readers-root <r> ...]
+//	The Python side partitions the work into batches, stages one job spec.json
+//	plus one <out>/batches/batch_<id>.json per batch, and hands this pool the
+//	batch ids. A fixed pool of goroutines drains a batch channel and runs each
+//	batch concurrently, one child process per batch:
 //
-//   Distinct storage keys own disjoint on-disk backup subtrees and per-key locks,
-//   so batches back up in parallel with no contention. The pool never touches a
-//   database or a backup file and never reimplements the snapshot/chunk/rotation
-//   logic -- it is a concurrency driver only; the Python worker does the work and
-//   its manifests are what the caller collects, so every backup restores
-//   identically regardless of which process produced it.
+//	    python -m <module> [--kind <kind>] \
+//	        --spec <spec> --out <out> --batch <batch_<id>.json> \
+//	        [--readers-root <r> ...]
+//
+//	Batches are partitioned by storage key, and distinct keys own disjoint
+//	on-disk subtrees and per-key locks, so batches run in parallel without
+//	contention. The pool never touches a database or a backup file and never
+//	reimplements any snapshot/verify/restore logic -- it is a concurrency driver
+//	only; the Python worker does the work and writes the results the caller
+//	collects, so the outcome is identical regardless of which process ran it.
 //
 // Zombie-safety: each child is fully waited on (cmd.Wait) after its stdout/stderr
 // pipes drain, so no defunct child processes are left behind.
 //
 // Build:
-//   go build -o backup-pool .
+//
+//	go build -o backup-pool .
+//
 // Run:
-//   ./backup-pool -python python -spec <spec> -out <out> \
-//                 -batch-ids 0,1,2 -readers-roots <r1><sep><r2> \
-//                 -min-workers 4 -max-workers 32
+//
+//	./backup-pool -python python -spec <spec> -out <out> \
+//	              -batch-ids 0,1,2 -readers-roots <r1><sep><r2> \
+//	              [-module file_analyzer.server.autopilot_worker -kind verify] \
+//	              -min-workers 4 -max-workers 32
 package main
 
 import (
@@ -50,7 +61,9 @@ type batchResult struct {
 }
 
 func main() {
-	python := flag.String("python", "python", "python interpreter used to run the backup worker")
+	python := flag.String("python", "python", "python interpreter used to run the batch worker")
+	module := flag.String("module", "file_analyzer.server.backup_worker", "python module run (with -m) for every batch")
+	kind := flag.String("kind", "", "job kind forwarded to the worker as --kind (empty: none)")
 	spec := flag.String("spec", "", "path to the job-spec JSON file")
 	out := flag.String("out", "", "pool output directory (holds batches/ and results/)")
 	batchIDsCSV := flag.String("batch-ids", "", "comma-separated batch ids to run")
@@ -65,14 +78,14 @@ func main() {
 	}
 	ids := splitNonEmpty(*batchIDsCSV, ",")
 	if len(ids) == 0 {
-		fmt.Println("== backup-pool (Go) == no batches assigned; nothing to do")
+		fmt.Printf("== server-pool (Go) [%s] == no batches assigned; nothing to do\n", label(*module, *kind))
 		return
 	}
 	roots := splitNonEmpty(*readersRootsCSV, string(os.PathListSeparator))
 
 	workers := effectiveWorkers(len(ids), *minWorkers, *maxWorkers)
 
-	fmt.Printf("== backup-pool (Go) ==\n")
+	fmt.Printf("== server-pool (Go) [%s] ==\n", label(*module, *kind))
 	fmt.Printf("batches  : %d\n", len(ids))
 	fmt.Printf("workers  : %d (concurrent processes; floor %d / ceiling %d)\n\n",
 		workers, *minWorkers, *maxWorkers)
@@ -87,7 +100,7 @@ func main() {
 			defer wg.Done()
 			for id := range batchCh {
 				start := time.Now()
-				err := runWorker(*python, *spec, *out, id, roots)
+				err := runWorker(*python, *module, *kind, *spec, *out, id, roots)
 				resCh <- batchResult{id: id, err: err, elapsed: time.Since(start)}
 			}
 		}()
@@ -149,18 +162,21 @@ func effectiveWorkers(nBatches, minW, maxW int) int {
 // runWorker executes one batch worker as a child process. When readers roots are
 // supplied (an un-installed/editable checkout where the file_analyzer namespace is
 // split across packages/*), they are put on the child's PYTHONPATH so that
-// `python -m file_analyzer.server.backup_worker` resolves the module at launch --
+// `python -m <module>` resolves the module at launch --
 // the `--readers-root` args alone cannot, because -m resolution happens before the
 // worker runs. Both are passed (env for -m; args as a belt-and-suspenders sys.path
 // insert). When the package is installed, roots is empty and neither is needed.
-func runWorker(python, spec, out, id string, roots []string) error {
+func runWorker(python, module, kind, spec, out, id string, roots []string) error {
 	batchFile := filepath.Join(out, "batches", "batch_"+id+".json")
-	args := []string{
-		"-m", "file_analyzer.server.backup_worker",
+	args := []string{"-m", module}
+	if kind != "" {
+		args = append(args, "--kind", kind)
+	}
+	args = append(args,
 		"--spec", spec,
 		"--out", out,
 		"--batch", batchFile,
-	}
+	)
 	for _, r := range roots {
 		args = append(args, "--readers-root", r)
 	}
@@ -222,6 +238,19 @@ func streamPrefixed(wg *sync.WaitGroup, r interface{ Read([]byte) (int, error) }
 	for sc.Scan() {
 		fmt.Printf("%s%s\n", prefix, sc.Text())
 	}
+}
+
+// label names the job for the log header: the worker module's last component,
+// plus the kind when one is given (e.g. "autopilot_worker/verify").
+func label(module, kind string) string {
+	name := module
+	if i := strings.LastIndex(module, "."); i >= 0 {
+		name = module[i+1:]
+	}
+	if kind != "" {
+		return name + "/" + kind
+	}
+	return name
 }
 
 func splitNonEmpty(s, sep string) []string {

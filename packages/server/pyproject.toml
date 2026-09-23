@@ -4,18 +4,20 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "file-analyzer-server"
-description = "The database-hosting server for the file-analyzer platform: session-token catalog, PROJECT_ROOT-{token}-{db} storage in SQLite/Postgres/MySQL, detached PID lifecycle, chunked rotating backups, and a token-authenticated HTTP control plane."
+description = "The database-hosting server for the file-analyzer platform: session-token catalog, PROJECT_ROOT-{token}-{db} storage in SQLite/Postgres/MySQL, detached PID lifecycle, rotating backups (chunked or Reed-Solomon erasure-coded shards across disks, with scrub + repair), time/space retention, a self-healing autopilot with a process supervisor, Go worker pools, and a token-authenticated HTTP control plane."
 readme = "README.md"
 requires-python = ">=3.9"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "Rohan Pratap Reddy Ravula" }]
-keywords = ["database-server", "sqlite", "postgresql", "mysql", "file-analyzer"]
+keywords = ["database-server", "sqlite", "postgresql", "mysql", "file-analyzer", "backup", "reed-solomon", "erasure-coding", "sharding", "retention", "self-healing", "supervisor"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Topic :: Database :: Database Engines/Servers",
+    "Topic :: System :: Archiving :: Backup",
+    "Topic :: System :: Monitoring",
 ]
 # Version is single-sourced from file_analyzer/_version.py (client wheel) and read
 # at build time by setup.py; see that file. It is declared dynamic here.
@@ -23,7 +25,10 @@ dynamic = ["version"]
 
 # The server builds on the small client wheel (foundation: tokens, naming, store,
 # runtime_guard, and the ServerClient). The client is pure stdlib, so this adds no
-# heavyweight transitive dependency.
+# heavyweight transitive dependency. Everything the server itself adds is pure
+# stdlib too: the Reed-Solomon codec (erasure.py, GF(2^8) Cauchy MDS), shard
+# placement (sharding.py), retention, the autopilot + its worker pool, and the
+# process supervisor -- so there is nothing else to install for SQLite hosting.
 dependencies = ["file-analyzer-client>=1.0.0,<2"]
 
 [project.optional-dependencies]
@@ -35,6 +40,8 @@ mysql = ["PyMySQL>=1.1"]
 
 [project.scripts]
 #     file-analyzer-server run /path/to/repo --backend sqlite
+#     file-analyzer-server start /repo --detach --rs-data-shards 4 #         --shard-dir /mnt/d1 --shard-dir /mnt/d2 --shard-dir /mnt/d3
+#     file-analyzer-server check|maintain|autopilot|backup-verify|backup-repair /repo
 file-analyzer-server = "file_analyzer.server.__main__:main"
 
 [project.urls]
@@ -54,8 +61,12 @@ where = ["."]
 include = ["file_analyzer*"]
 namespaces = true
 
-# The server ships its own concurrent Go backup pool (built on demand at runtime
-# via `go build`), so the Go source tree must travel inside the wheel.
+# The server ships its own concurrent Go worker pool (built on demand at runtime
+# via `go build`): one driver binary, go/backup.go, runs both the backup workers
+# (file_analyzer.server.backup_worker) and the autopilot's inspect / verify /
+# stage workers (file_analyzer.server.autopilot_worker). It has no third-party Go
+# modules (hence no go.sum), so the Go source tree is all that must travel inside
+# the wheel. Without a Go toolchain the pools fall back to Python thread pools.
 [tool.setuptools.package-data]
 "file_analyzer.server" = [
     "go/*.go",

@@ -32,6 +32,7 @@ on top of that.
 | Full pipeline | `python -m file_analyzer.main …`, `file-analyzer …` | ✅ |
 | Background monitor | `python -m file_analyzer …`, `file-analyzer-monitor …` | ✅ |
 | MCP server | `python -m mcp_server`, `file-analyzer-mcp` | ✅ |
+| Database-hosting server | `file-analyzer-server run/start …`, `python -m file_analyzer.server …`, `FileAnalyzerServer.serve()` / `start()` | ✅ (serving only; `--no-contain` / `contained=False` when the caller owns isolation) |
 | SDK (library import) | `import file_analyzer.engine`, `AnalysisEngine(...)`, `scrub(...)` | ❌ (by design — caller owns isolation) |
 
 `--help` and `--version` are **always exempt**: they print and exit before the
@@ -134,6 +135,13 @@ docker run --rm -v "$PWD:/work" -w /work file-analyzer \
   python -m file_analyzer.main /work --out /work/artifacts --quiet
 ```
 
+The database-hosting server has its own image (Dockerfile `server` target, compose
+profile `server`). It serves as the unprivileged `fa` user (uid 10001) under
+`tini`, so the guard passes and the process holds no root inside the container
+either; see [server.md](server.md#running-it-in-docker). Its admin subcommands
+(`status`, `check`, `backup-verify`, `maintain`, …) serve nothing and are not
+gated.
+
 Any VM (VMware, VirtualBox, KVM/QEMU, Hyper-V guest, a cloud instance such as EC2 /
 GCE, WSL2, …) also satisfies the guard with no extra flags.
 
@@ -165,3 +173,4 @@ run under Docker (where `virtualized` is `true`, so the commands proceed).
   the containment refusal).
 - [`../README.md`](../README.md) — project overview and the Docker workflow that
   satisfies the guard.
+- [`server.md`](server.md) — the database-hosting server and its Docker profile.

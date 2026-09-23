@@ -349,8 +349,36 @@ ARTIFACTS_DIR=./artifacts docker compose up --build
 ```
 
 See [`../README.md`](../README.md) for the full stack details (the `loader`
-applies `file_analyzer/views/sql/views.pgsql.sql` after each `.db` load, since `pgloader`
-copies tables only) and [`views/README.md`](views/README.md) for the view layer.
+applies `packages/engine/file_analyzer/views/sql/views.pgsql.sql` after each `.db`
+load, since `pgloader` copies tables only) and [`views/README.md`](views/README.md)
+for the view layer.
+
+### The other images / compose profiles
+
+The root [`Dockerfile`](../Dockerfile) builds every image from the wheels in
+[`../packages/`](../packages/) (a `wheels` stage runs `python -m build` for
+client/server/engine) and copies in the Go toolchain (`ARG GO_VERSION`, default
+`1.26`), **pre-building every Go worker pool** so the concurrent engines are live
+from the first run. Each opt-in service sits behind its own profile, so a plain
+`docker compose up` never builds it:
+
+| profile / target | what it runs | typical invocation |
+|---|---|---|
+| `engine` | `python -m file_analyzer.main` (this document) | `docker compose --profile engine run --build engine …` |
+| `reader` | the Go view reader over an artifact | `docker compose --profile reader run --build reader …` |
+| `monitor` | `python -m file_analyzer monitor` under `tini` — see [monitor.md](monitor.md) | `docker compose --profile monitor up -d --build monitor` |
+| `mcp` | `python -m mcp_server` over stdio (attached, one per agent session) | `claude mcp add file-analyzer -- docker compose -f /abs/docker-compose.yml --profile mcp run --rm -T mcp` |
+| `server` | `file-analyzer-server run /workspace` — the database-hosting server, as uid 10001, with Reed-Solomon shards over three volumes — see [server.md](server.md#running-it-in-docker) | `SOURCE_DIR=/repo docker compose --profile server up -d --build server` |
+
+```bash
+# host the engine's artifact on the server, then query it over HTTP
+docker compose exec server file-analyzer-server host /workspace     --db-name repository --source /artifacts/repository.db
+docker compose exec server file-analyzer-server status /workspace   # token + databases
+docker compose exec server file-analyzer-server backup-verify /workspace     --rs-data-shards 4 --rs-parity-shards 2     --shard-dir /shards/disk1 --shard-dir /shards/disk2 --shard-dir /shards/disk3
+```
+
+Build args: `PYTHON_VERSION` (default `3.12`), `GO_VERSION` (default `1.26`),
+and for the server `SERVER_EXTRAS=postgres|mysql` (a remote-backend driver).
 
 ---
 
@@ -427,3 +455,7 @@ JSON-RPC stream.
 - [`monitor.md`](monitor.md) — the always-on background monitor
   (`python -m file_analyzer monitor`): incremental re-analysis, durable change log, worker
   pool, and the soft MCP agent tier.
+- [`server.md`](server.md) — the database-hosting server (`file-analyzer-server`):
+  hosting, the HTTP control plane + `ServerClient`, Reed-Solomon sharded backups,
+  retention, the self-healing autopilot on the Go worker pool, the supervisor, and
+  the Docker `server` profile.

@@ -7,8 +7,13 @@ stands up a real, detachable, multi-instance server that hosts a repo-session's
 databases under the ``PROJECT_ROOT-{session-token}-{db_name}`` convention in
 SQLite or Postgres/MySQL, coordinates parallel instances through a shared
 session catalog (with token reuse), runs periodic chunked rotating backups, can
-surface the backend Postgres logs, and serves a token-authenticated HTTP control
-plane that a :class:`ServerClient` connects to.
+surface the backend Postgres logs, enforces time- and space-based retention,
+maintains and repairs itself, and serves a token-authenticated HTTP control
+plane that a :class:`ServerClient` connects to. Self-repair has two parts:
+
+* the :class:`Autopilot` handles scheduled health checks, healing from
+  verified backups, backup scrub/repair, and sweeps;
+* the :class:`ServerSupervisor` restarts the server process.
 
 Everything here is import-safe on a bare interpreter: only the standard library
 is imported at module load; the optional Postgres/MySQL drivers are imported
@@ -34,13 +39,18 @@ from __future__ import annotations
 from ..client import ServerClient, ServerError
 from ..naming import sqlite_db_path, storage_key
 from ..tokens import new_session_token, project_fingerprint, project_slug
-from .backup import BackupManager
+from .autopilot import Autopilot, AutopilotPolicy
+from .backup import BackupManager, SnapshotIntegrityError
 from .catalog import SessionCatalog, default_catalog_dir
 from .daemon import pid_alive, spawn_detached, stop_pid
 from .dbhost import DatabaseHost, HostedDatabase
+from .erasure import ReedSolomon, TooManyErasures
 from .pglog import PostgresLogTailer
+from .retention import RetentionManager, RetentionPolicy, parse_size
 from .sdk import FileAnalyzerServer
 from .server import DatabaseServer
+from .sharding import ErasureConfig, IntegrityError, UnrecoverableSet
+from .supervisor import ServerSupervisor
 
 __all__ = [
     "DatabaseServer",
@@ -51,7 +61,19 @@ __all__ = [
     "DatabaseHost",
     "HostedDatabase",
     "BackupManager",
+    "SnapshotIntegrityError",
+    "Autopilot",
+    "AutopilotPolicy",
+    "ServerSupervisor",
     "PostgresLogTailer",
+    "RetentionManager",
+    "RetentionPolicy",
+    "parse_size",
+    "ReedSolomon",
+    "TooManyErasures",
+    "ErasureConfig",
+    "UnrecoverableSet",
+    "IntegrityError",
     "default_catalog_dir",
     "storage_key",
     "sqlite_db_path",

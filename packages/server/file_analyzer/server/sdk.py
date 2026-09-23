@@ -35,6 +35,14 @@ class FileAnalyzerServer:
     backups. Parallel instances on the same repository share one token (no
     duplicate database copies).
 
+    It also maintains and repairs itself. The server's **autopilot** checks the
+    catalog and every hosted database on a schedule. It restores damaged,
+    missing or drifted databases from verified backups (quarantining the
+    damaged copy), scrubs and repairs backup shards, keeps backups fresh,
+    enforces retention, and sweeps debris and orphans (:meth:`check`,
+    :meth:`heal`, :meth:`maintain`, :meth:`autopilot_status`). :meth:`supervise`
+    restarts the detached process itself when it crashes or hangs.
+
     All of this is delegated to :class:`file_analyzer.server.DatabaseServer` and
     :class:`file_analyzer.client.ServerClient`; the modules are imported lazily so
     ``import file_analyzer.server`` stays cheap and bare-metal-safe.
@@ -47,6 +55,8 @@ class FileAnalyzerServer:
         client = srv.connect()             # a ServerClient bound to url + token
         client.query(srv.storage_key_for("repository"),
                      "SELECT * FROM v_file_inventory")
+        srv.check()["healthy"]             # health-check every database now
+        srv.heal()                         # ...and repair whatever is damaged
         srv.stop()
     """
 
@@ -54,6 +64,7 @@ class FileAnalyzerServer:
         self._path = path
         self._kwargs = kwargs
         self._server: Any = None  # lazily built DatabaseServer
+        self._supervisor: Any = None  # ServerSupervisor once supervise() runs
 
     def __repr__(self) -> str:  # pragma: no cover - trivial
         return f"FileAnalyzerServer(root={str(self._path)!r})"
@@ -85,7 +96,14 @@ class FileAnalyzerServer:
         return self._srv().storage_key_for(db_name)
 
     # -- lifecycle ---------------------------------------------------
-    def start(self, *, detach: bool = True, contained: bool = True) -> Any:
+    def start(
+        self,
+        *,
+        detach: bool = True,
+        contained: bool = True,
+        supervise: bool = False,
+        **supervisor_options: Any,
+    ) -> Any:
         """Start the server.
 
         With ``detach=True`` (default) it is launched as a background process that
@@ -93,9 +111,18 @@ class FileAnalyzerServer:
         (``{server_id, pid, url, token, ...}``). With ``detach=False`` it serves in
         the foreground and blocks until stopped (honoring the containment guard
         unless ``contained=False``).
+
+        ``supervise=True`` (detached mode only) also starts a :meth:`supervise`
+        watchdog in this process, which restarts the server if it dies or hangs.
+        ``supervisor_options`` are passed to :class:`ServerSupervisor`.
         """
         if detach:
-            return self._srv().start_detached()
+            info = self._srv().start_detached()
+            if supervise:
+                self.supervise(info=info, **supervisor_options)
+            return info
+        if supervise:
+            raise ValueError("supervise=True requires detach=True")
         return self._srv().serve(contained=contained)
 
     def serve(self, *, contained: bool = True) -> int:
@@ -103,7 +130,12 @@ class FileAnalyzerServer:
         return self._srv().serve(contained=contained)
 
     def stop(self, *, all_for_repo: bool = False, timeout: float = 10.0) -> Any:
-        """Stop this server by PID (or every server hosting this repo)."""
+        """Stop this server by PID (or every server hosting this repo).
+
+        Any :meth:`supervise` watchdog is stopped first. Otherwise it would
+        treat the intentional shutdown as a crash and restart the server.
+        """
+        self.unsupervise()
         return self._srv().stop(all_for_repo=all_for_repo, timeout=timeout)
 
     def status(self) -> Dict[str, Any]:
@@ -125,6 +157,125 @@ class FileAnalyzerServer:
         if storage_key:
             return srv.backups.backup_database(storage_key)
         return srv.backups.backup_all()
+
+    def retention(self) -> Dict[str, Any]:
+        """Retention policy, current usage and the last janitor pass."""
+        return self._srv().retention_status()
+
+    def enforce_retention(self, *, dry_run: bool = False) -> Dict[str, Any]:
+        """Run a retention pass now (``dry_run`` reports without removing)."""
+        return self._srv().enforce_retention(dry_run=dry_run)
+
+    def backup_status(self) -> Dict[str, Any]:
+        """Backup format, erasure-coding config and the last integrity scrub."""
+        return self._srv().backup_status()
+
+    def verify_backups(
+        self, storage_key: Optional[str] = None, timestamp: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Verify every (or one) backup set block by block; modifies nothing."""
+        return self._srv().verify_backups(storage_key, timestamp)
+
+    def repair_backups(
+        self, storage_key: Optional[str] = None, timestamp: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Rebuild lost/corrupt shards of erasure-coded (Reed-Solomon) backups."""
+        return self._srv().repair_backups(storage_key, timestamp)
+
+    def restore(
+        self, storage_key: str, dest: PathLike, timestamp: Optional[str] = None
+    ) -> Path:
+        """Restore a backup set (newest by default) into ``dest``."""
+        return self._srv().restore_backup(storage_key, dest, timestamp)
+
+    # -- self-healing (autopilot + supervisor) -----------------------
+    def check(self) -> Dict[str, Any]:
+        """Health-check the catalog and every hosted database now.
+
+        For each database this checks its structure, compares its checksum with
+        the hosted content and runs ``quick_check``. It repairs nothing.
+        ``report["healthy"]`` is the verdict and ``report["problems"]`` lists
+        every damaged, missing or drifted database.
+        """
+        return self._srv().check_health()
+
+    def heal(self, *, dry_run: bool = False) -> Dict[str, Any]:
+        """Check everything now and repair whatever is damaged.
+
+        Runs the ``catalog``, ``scrub``, ``check``, ``heal`` and ``backup``
+        tasks:
+
+        * rebuilds a damaged catalog;
+        * repairs backup shards;
+        * restores damaged, missing or drifted databases from verified backups,
+          keeping the damaged copy in quarantine;
+        * backs up any database that lacks a fresh backup.
+
+        With ``dry_run`` it reports the plan and changes nothing.
+        """
+        return self._srv().run_maintenance(
+            dry_run=dry_run, tasks=["catalog", "scrub", "check", "heal", "backup"]
+        )
+
+    def maintain(
+        self,
+        *,
+        dry_run: bool = False,
+        tasks: Optional[List[str]] = None,
+        force: bool = True,
+    ) -> Dict[str, Any]:
+        """Run a full autopilot tick now: check, heal, scrub, backup, retention
+        and sweep (or only the tasks named in ``tasks``)."""
+        return self._srv().run_maintenance(dry_run=dry_run, tasks=tasks, force=force)
+
+    def autopilot_status(self) -> Dict[str, Any]:
+        """Autopilot policy, schedule, per-database health and recent events."""
+        return self._srv().autopilot_status()
+
+    def health_report(self) -> Dict[str, Any]:
+        """One view of all self-healing state: the autopilot's per-database
+        health, the backup scrub, retention usage and the supervisor."""
+        srv = self._srv()
+        return {
+            "autopilot": srv.autopilot_status(),
+            "backups": srv.backup_status(),
+            "retention": srv.retention_status(),
+            "supervisor": self.supervisor_status(),
+        }
+
+    def start_autopilot(self) -> Dict[str, Any]:
+        """Run the autopilot loop in *this* process (for example when the host
+        is embedded rather than served). The shared autopilot lock keeps its
+        ticks from overlapping with a running server on the same repository."""
+        self._srv().autopilot.start()
+        return self.autopilot_status()
+
+    def stop_autopilot(self) -> None:
+        """Stop an autopilot loop started with :meth:`start_autopilot`."""
+        self._srv().autopilot.stop()
+
+    def supervise(
+        self, *, info: Optional[Dict[str, Any]] = None, **options: Any
+    ) -> Dict[str, Any]:
+        """Watch the detached server from this process and restart it when it
+        exits or stops answering ``/health`` (see :class:`ServerSupervisor`)."""
+        from .supervisor import ServerSupervisor
+
+        if self._supervisor is None:
+            self._supervisor = ServerSupervisor(self._srv(), **options)
+        self._supervisor.start(info)
+        return self._supervisor.status()
+
+    def unsupervise(self) -> None:
+        """Stop the :meth:`supervise` watchdog; the server keeps running."""
+        if self._supervisor is not None:
+            self._supervisor.stop()
+            self._supervisor = None
+
+    def supervisor_status(self) -> Optional[Dict[str, Any]]:
+        """The watchdog's state and restart history, or None if no watchdog
+        is running."""
+        return None if self._supervisor is None else self._supervisor.status()
 
     def postgres_logs(self, lines: int = 100) -> Dict[str, Any]:
         """Tail the backend Postgres server logs (empty on a SQLite backend)."""

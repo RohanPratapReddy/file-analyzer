@@ -137,5 +137,64 @@ class ServerClient:
         params = {"storage_key": storage_key} if storage_key else None
         return self._request("GET", "/backups", params=params).get("backups", [])
 
+    def retention(self) -> Dict[str, Any]:
+        """Retention policy, current usage and the last janitor pass."""
+        return self._request("GET", "/retention")
+
+    def enforce_retention(self, dry_run: bool = False) -> Dict[str, Any]:
+        """Run a retention pass now (``dry_run`` reports without removing)."""
+        return self._request("POST", "/retention", json_body={"dry_run": dry_run})
+
+    def backup_status(self) -> Dict[str, Any]:
+        """Backup format, erasure-coding (Reed-Solomon) config and last scrub."""
+        return self._request("GET", "/backups/status")
+
+    def verify_backups(
+        self, storage_key: Optional[str] = None, timestamp: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Verify every (or one) backup set block by block on the server."""
+        return self._request(
+            "POST",
+            "/backups/verify",
+            json_body={"storage_key": storage_key, "timestamp": timestamp},
+        )
+
+    def repair_backups(
+        self, storage_key: Optional[str] = None, timestamp: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Rebuild lost/corrupt shards of erasure-coded backups on the server."""
+        return self._request(
+            "POST",
+            "/backups/repair",
+            json_body={"storage_key": storage_key, "timestamp": timestamp},
+        )
+
+    def autopilot_status(self) -> Dict[str, Any]:
+        """Self-healing maintenance: schedule, per-database health, events."""
+        return self._request("GET", "/autopilot")
+
+    def run_autopilot(
+        self,
+        *,
+        dry_run: bool = False,
+        tasks: Optional[List[str]] = None,
+        force: bool = True,
+    ) -> Dict[str, Any]:
+        """Run a maintenance tick on the server now (check/heal/backup/...).
+
+        ``tasks`` limits it to named tasks (``catalog``, ``scrub``, ``check``,
+        ``heal``, ``backup``, ``retention``, ``sweep``); ``dry_run`` only
+        reports what would be done.
+        """
+        return self._request(
+            "POST",
+            "/autopilot/run",
+            json_body={"dry_run": dry_run, "tasks": tasks, "force": force},
+        )
+
+    def check(self) -> Dict[str, Any]:
+        """Health-check every hosted database now (fixes nothing)."""
+        return self.run_autopilot(tasks=["catalog", "check"])
+
     def postgres_logs(self, lines: int = 100) -> Dict[str, Any]:
         return self._request("GET", "/pglogs", params={"lines": lines})

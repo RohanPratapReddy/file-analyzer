@@ -3,25 +3,41 @@
 # =============================================================================
 # The `loader` stage is fully self-contained: it apt-installs pgloader + the psql
 # client and inlines its load script via a Dockerfile heredoc. It COPYs NOTHING
-# from the tree. The other stages need source:
-#   * `go-build`/`reader` -> the Go VIEW-reader under file_analyzer/views/go (+ file_analyzer/views/sql).
-#   * `engine`            -> the whole file_analyzer/ Python package (runs `python -m file_analyzer.main`).
+# from the tree. Every other stage needs source from packages/ -- the three wheels
+# that merge into the one PEP 420 `file_analyzer` namespace:
+#   * `wheels`                  -> builds file-analyzer-{client,server,engine}
+#                                  wheels from packages/{client,server,engine}
+#                                  (the server/engine setup.py shims read the
+#                                  version from packages/client, so all three
+#                                  trees travel together).
+#   * `go-build`/`reader`       -> the Go VIEW-reader under
+#                                  packages/engine/file_analyzer/views/go.
+#   * `engine`/`monitor`/`mcp`  -> install the client + engine wheels.
+#   * `server`                  -> installs the client + server wheels.
 #
-# So: exclude everything, then re-include the file_analyzer/ package. This keeps the
-# context to just what the source-using stages compile/run.
+# So: exclude everything, then re-include packages/ alone. This keeps the context
+# to just what the source-using stages build.
 *
 
-!file_analyzer/**
+!packages/**
 
-# Never bring caches or build outputs into the context.
+# Never bring caches, local build outputs or prebuilt Go binaries into the
+# context -- the images build their own (a stale host binary built for another
+# OS/arch would otherwise shadow the in-image `go build`).
 **/__pycache__/
-*.pyc
-file_analyzer/views/go/repo-reader
-file_analyzer/views/go/repo-reader.exe
-file_analyzer/views/go/*.exe
-file_analyzer/router/go/analysis-plane
-file_analyzer/router/go/*.exe
+**/*.pyc
+packages/*/build/
+packages/*/dist/
+packages/*/*.egg-info/
+packages/**/go/*.exe
+packages/client/file_analyzer/client/go/client-reader
+packages/engine/file_analyzer/views/go/repo-reader
+packages/engine/file_analyzer/core/go/repo-injector
+packages/engine/file_analyzer/router/go/analysis-plane
+packages/engine/file_analyzer/monitor/go/monitor-pool
+packages/server/file_analyzer/server/go/backup-pool
 
-# (The AnalysisEngine artifacts are NOT baked into any image -- they are
-#  bind-mounted at runtime: /artifacts (loader/reader/engine) and /workspace
-#  (engine source repo) by db.docker-compose.yml.)
+# (The AnalysisEngine artifacts and every server database/backup/shard are NOT
+#  baked into any image -- they are mounted at runtime by docker-compose.yml:
+#  /artifacts (loader/reader/engine/monitor), /workspace (the source repo), and
+#  the server's /data + /shards/* named volumes.)
